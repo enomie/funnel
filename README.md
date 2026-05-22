@@ -11,4 +11,4 @@ npm run lint
 npm run build
 ```
 
-License: AGPL-3.0-or-later (see `package.json`).
+License: see `LICENSE` and `package.json`.
