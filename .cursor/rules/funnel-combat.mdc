@@ -1,0 +1,37 @@
+---
+description: UT99-style weapons, fire modes, and impact modeling
+globs: src/combat/**/*
+alwaysApply: false
+---
+
+# FUNNEL — Combat
+
+## Input model (target)
+
+- **LMB:** primary fire
+- **RMB:** secondary / alt-fire (UT99), not global ADS — ADS only where weapon-specific (e.g. Sniper zoom)
+- Extend `InputState` with `primaryHeld/Pressed/Released` and `secondaryHeld/Pressed/Released` before adding complex weapons.
+
+## Data model (target)
+
+Split weapon config into:
+
+- `WeaponDefinition` — slot, visuals, fire profiles
+- `FireProfile` per mode — hitscan vs projectile, spread, charge, ricochet rules
+- `ImpactProfile` per mode — `directDamage`, `splashRadius`, `splashDamage`, `impulse`, `ricochet`, `stickiness`, `childProjectiles`, `damageOverTime`, `effectKind`
+
+Keep tuning in `weapon-definitions.ts` (or sibling files), behavior in `weapon-arsenal.ts`, meshes in `projectile-visuals.ts`.
+
+## Collision
+
+- Projectiles: Rapier ray-step per frame (no tunneling); Ripper LMB = up to 3 wall ricochets with surface nudge.
+- Hitscan: dedicated module pattern (`hitscan-weapon.ts`), not mixed into projectile advance loop.
+
+## Visuals / perf
+
+- Cache materials/geometries by color; cap dynamic lights (`PROJECTILE_LIGHT_POOL_SIZE` pattern).
+- Throttle trails; pool/remove temporaries without array shifting in hot paths.
+
+## Arsenal slots
+
+`1` Pistol · `2` Shock · `3` Rocket · `4` Ripper · `5` Flak · `6` Sniper · `7` Gatling · `8` Pulse · `9` Bio · `0` Redeemer — see `docs/introduction.md` §7 for LMB/RMB/impact specs.

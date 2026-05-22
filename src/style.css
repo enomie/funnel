@@ -1,0 +1,178 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #050607;
+  color: #eef4ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
+.funnel-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #050607;
+}
+
+.funnel-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.funnel-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.funnel-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+}
+
+.funnel-crosshair::before,
+.funnel-crosshair::after {
+  position: absolute;
+  content: "";
+  background: rgba(238, 244, 255, 0.9);
+  box-shadow: 0 0 10px rgba(90, 194, 255, 0.65);
+}
+
+.funnel-crosshair::before {
+  left: 10px;
+  top: 0;
+  width: 2px;
+  height: 22px;
+}
+
+.funnel-crosshair::after {
+  left: 0;
+  top: 10px;
+  width: 22px;
+  height: 2px;
+}
+
+.funnel-panel {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: min(330px, calc(100vw - 32px));
+  padding: 13px 14px 14px;
+  border: 1px solid rgba(158, 190, 214, 0.24);
+  border-radius: 8px;
+  background: rgba(7, 10, 12, 0.76);
+  box-shadow: 0 14px 45px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.funnel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.funnel-badge {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #12465a;
+  color: #9ee6ff;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.funnel-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  margin: 0;
+  color: #d3deea;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.funnel-grid dt {
+  margin: 0;
+  color: #88a5b9;
+}
+
+.funnel-grid dd {
+  margin: 0;
+}
+
+.funnel-weapon-readout {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.funnel-status {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 197, 105, 0.38);
+  border-radius: 8px;
+  background: rgba(22, 17, 8, 0.82);
+  color: #ffdda4;
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.funnel-status[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 720px) {
+  .funnel-panel {
+    left: 10px;
+    top: 10px;
+    width: min(300px, calc(100vw - 20px));
+    padding: 11px 12px 12px;
+  }
+
+  .funnel-grid {
+    font-size: 11px;
+  }
+
+  .funnel-status {
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: 12px;
+  }
+}

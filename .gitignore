@@ -1,0 +1,15 @@
+# Local / generated (per project policy)
+node_modules/
+.backups/
+dist/
+
+# Environment & OS
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+
+# Editor / tooling caches
+*.log
+.vite/

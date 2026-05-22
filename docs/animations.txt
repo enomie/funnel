@@ -1,0 +1,24 @@
+# Shooter-Pack — Collada animation clips
+# Inspected via _Scripts/inspect-shooter-pack.mjs (2026-05-22T17:51:37.634Z)
+
+Base model: public/Shooter-Pack/animation-model-y-bot.dae
+Skeleton bones: 65
+Animation files: 15
+
+## Clips
+
+- firing-rifle (collada="default"): 1.167s, tracks=156, compatible=true
+- jump-backward (collada="default"): 0.9s, tracks=156, compatible=true
+- jump-forward (collada="default"): 0.9s, tracks=156, compatible=true
+- rifle-aiming-idle (collada="default"): 3.1s, tracks=156, compatible=true
+- rifle-run (collada="default"): 0.733s, tracks=156, compatible=true
+- run-backwards (collada="default"): 0.533s, tracks=156, compatible=true
+- start-walking-backwards (collada="default"): 2.033s, tracks=156, compatible=true
+- start-walking (collada="default"): 1.467s, tracks=156, compatible=true
+- stop-walking (collada="default"): 2.667s, tracks=156, compatible=true
+- strafe-2 (collada="default"): 0.533s, tracks=156, compatible=true
+- strafe (collada="default"): 0.667s, tracks=156, compatible=true
+- walk-backwards-stop (collada="default"): 1.367s, tracks=156, compatible=true
+- walking-backwards (collada="default"): 1.4s, tracks=156, compatible=true
+- walking-to-dying (collada="default"): 3.067s, tracks=156, compatible=true
+- walking (collada="default"): 1.367s, tracks=156, compatible=true
