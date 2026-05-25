@@ -1,6 +1,6 @@
 # FUNNEL
 
-UT99-inspired, high-speed WebGPU arena shooter in a 50×300×50 m industrial funnel.
+UT99 Funnel Mod inspired, high-speed WebGPU arena FPS shooter in a 50×300×50 m industrial funnel.
 
 - **Spec:** [docs/introduction.md](docs/introduction.md)
 - **Stack:** Three.js WebGPU + Rapier SIMD, Vite + TypeScript
