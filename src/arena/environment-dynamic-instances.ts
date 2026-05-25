@@ -17,6 +17,10 @@ import {
 } from './environment-dynamic-shapes';
 import { RAIN_WAVE_CATALOG } from './environment-rain-catalog';
 import { dynamicGridMaterial } from '../render/materials/environment-dynamic-style';
+import {
+  fillInterpolatedBodyTranslation,
+  PhysicsTranslationInterpolator
+} from '../physics/physics-interpolation';
 
 function configuredRainCapacity(shape: DynamicPropSpec, docDefault: number): number {
   const key = dynamicPropKey(shape);
@@ -145,6 +149,9 @@ export class DynamicEnvironmentInstances {
   readonly #composeQuaternion = new Quaternion();
   readonly #composeScale = new Vector3(1, 1, 1);
   readonly #composeMatrix = new Matrix4();
+  readonly #interpByBodyHandle = new Map<number, PhysicsTranslationInterpolator>();
+  readonly #renderTranslationScratch = { x: 0, y: 0, z: 0 };
+  #renderInterpolationBlend = 1;
 
   constructor(scene: Scene) {
     this.#scene = scene;
@@ -191,9 +198,20 @@ export class DynamicEnvironmentInstances {
       slotIndex
     };
     this.#entries.push(entry);
-    this.#writeBodyMatrix(pool, slotIndex, body);
+    this.#interpForBody(body).seedFromBody(body);
+    this.#writeBodyMatrix(pool, slotIndex, body, 1);
     pool.mesh.instanceMatrix.needsUpdate = true;
     return entry;
+  }
+
+  capturePhysicsInterpolation(): void {
+    for (const entry of this.#entries) {
+      this.#interpForBody(entry.body).captureAfterPhysicsStep(entry.body);
+    }
+  }
+
+  setRenderInterpolationBlend(blend: number): void {
+    this.#renderInterpolationBlend = blend;
   }
 
   sync(): void {
@@ -215,7 +233,7 @@ export class DynamicEnvironmentInstances {
         if (body.isSleeping()) {
           continue;
         }
-        this.#writeBodyMatrix(pool, slotIndex, body);
+        this.#writeBodyMatrix(pool, slotIndex, body, this.#renderInterpolationBlend);
         poolDirty = true;
       }
 
@@ -225,8 +243,23 @@ export class DynamicEnvironmentInstances {
     }
   }
 
-  #writeBodyMatrix(pool: ShapePool, slotIndex: number, body: RigidBody): void {
-    const translation = body.translation();
+  #interpForBody(body: RigidBody): PhysicsTranslationInterpolator {
+    const handle = body.handle;
+    let interpolator = this.#interpByBodyHandle.get(handle);
+    if (interpolator === undefined) {
+      interpolator = new PhysicsTranslationInterpolator();
+      this.#interpByBodyHandle.set(handle, interpolator);
+    }
+
+    return interpolator;
+  }
+
+  #writeBodyMatrix(pool: ShapePool, slotIndex: number, body: RigidBody, blend: number): void {
+    const translation = fillInterpolatedBodyTranslation(
+      this.#interpForBody(body),
+      blend,
+      this.#renderTranslationScratch
+    );
     const rotation = body.rotation();
     this.#composePosition.set(translation.x, translation.y, translation.z);
     this.#composeQuaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);

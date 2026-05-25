@@ -6,15 +6,25 @@ export const FOOTSTEP_VOICE_CAP = 6;
 export const WEAPON_AUDIO_FLY_VOICE_CAP = 24;
 
 
-export type SpatialOneShotKind = 'fire' | 'impact' | 'foot' | 'grunt' | 'mechanics' | 'generic';
+export type SpatialOneShotKind =
+  | 'fire'
+  | 'impact'
+  | 'foot'
+  | 'grunt'
+  | 'mechanics'
+  | 'mechanics-hold'
+  | 'generic'
+  | 'redeemer-blast';
 
 export const SPATIAL_ONE_SHOT_TTL_S: Record<SpatialOneShotKind, number> = {
   foot: 0.2,
   mechanics: 0.08,
+  'mechanics-hold': 45,
   fire: 0.55,
   generic: 0.2,
   impact: 2,
-  grunt: 4
+  grunt: 4,
+  'redeemer-blast': 3.2
 };
 
 
@@ -24,7 +34,9 @@ export const SPATIAL_ONE_SHOT_EVICT_RANK: Record<SpatialOneShotKind, number> = {
   mechanics: 2,
   generic: 3,
   fire: 4,
-  impact: 5
+  impact: 5,
+  'redeemer-blast': 6,
+  'mechanics-hold': 7
 };
 
 

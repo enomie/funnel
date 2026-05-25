@@ -16,18 +16,6 @@ import pickups from '../texts/pickups.json';
 import keys from '../texts/keys.json';
 import information from '../texts/Information.json';
 
-const startButtons = document.querySelectorAll<HTMLButtonElement>('.home-start');
-if (startButtons.length === 0) {
-  throw new Error('FUNNEL home start button was not found.');
-}
-
-for (const startButton of startButtons) {
-  startButton.addEventListener('click', () => {
-    markFunnelBootIntent();
-    window.location.assign('./game.html');
-  });
-}
-
 const sliderRoot = document.getElementById('home-sliders');
 const keysRoot = document.getElementById('home-keys-root');
 const footerRoot = document.getElementById('home-footer-root');
@@ -40,6 +28,18 @@ if (heroBlurb) {
 }
 if (heroCtaRoot) {
   renderHeroCta(heroCtaRoot, info);
+}
+
+const startButtons = document.querySelectorAll<HTMLButtonElement>('.home-start');
+if (startButtons.length === 0) {
+  throw new Error('FUNNEL home start button was not found.');
+}
+
+for (const startButton of startButtons) {
+  startButton.addEventListener('click', () => {
+    markFunnelBootIntent();
+    window.location.assign('./game.html');
+  });
 }
 
 if (sliderRoot) {

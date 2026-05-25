@@ -57,6 +57,8 @@ type MutableBotBrainFrame = {
   stepped: boolean;
 };
 
+const BOT_BRAIN_ACCUMULATOR_CAP_S = BOT_BRAIN_STEP_S * 2;
+
 export class BotBrain {
   #accumulator = 0;
   readonly #intent: MutableBotBrainIntent = {
@@ -89,6 +91,9 @@ export class BotBrain {
   update(deltaSeconds: number, sampleInput: () => BotBrainInput): BotBrainFrame {
     let stepped = false;
     this.#accumulator += deltaSeconds;
+    if (this.#accumulator > BOT_BRAIN_ACCUMULATOR_CAP_S) {
+      this.#accumulator = BOT_BRAIN_ACCUMULATOR_CAP_S;
+    }
     while (this.#accumulator >= BOT_BRAIN_STEP_S) {
       this.#accumulator -= BOT_BRAIN_STEP_S;
       this.#think(sampleInput());

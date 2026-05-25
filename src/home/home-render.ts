@@ -39,8 +39,9 @@ export interface HomeInformation {
   technology: string;
   publisher: { name: string; url: string; label: string };
   publishedAt: { name: string; url: string; label: string };
+  github: { name: string; url: string };
   tagline: string;
-  warning: string;
+  warning: string[];
   platforms: PlatformChip[];
   matchGoal: string;
 }
@@ -188,7 +189,12 @@ function platformChip(chip: PlatformChip): HTMLElement {
 
 export function renderHeroCta(root: HTMLElement, info: HomeInformation): void {
   const warning = el('p', 'home-hero-cta__warning');
-  warning.append(el('strong', undefined, 'Warning:'), document.createTextNode(` ${info.warning}`));
+  warning.append(el('strong', undefined, 'Warning:'));
+  warning.append(document.createTextNode(` ${info.warning[0] ?? ''}`));
+  if (info.warning.length > 1) {
+    warning.append(document.createElement('br'));
+    warning.append(document.createTextNode(info.warning[1] ?? ''));
+  }
 
   const start = el('button', 'home-start home-hero-cta__start', 'Start Match');
   start.type = 'button';
@@ -207,11 +213,14 @@ export function renderKeys(root: HTMLElement, keys: KeyBinding[]): void {
   const section = el('section', 'home-keys');
   section.append(el('h2', 'home-keys__heading', 'Controls'));
 
-  const grid = el('dl', 'home-keys__grid');
+  const list = el('div', 'home-keys__list');
   for (const row of keys) {
-    grid.append(el('dt', undefined, row.action), el('dd', undefined, row.keys));
+    const card = el('article', 'home-card home-card--control');
+    card.append(el('h3', 'home-card__title', row.action));
+    card.append(el('p', 'home-card__lead', row.keys));
+    list.append(card);
   }
-  section.append(grid);
+  section.append(list);
   root.append(section);
 }
 
@@ -229,6 +238,8 @@ export function renderFooter(root: HTMLElement, info: HomeInformation): void {
   credits.append(externalLink(info.publisher.url, info.publisher.name));
   credits.append(document.createTextNode(` — ${info.publishedAt.label} `));
   credits.append(externalLink(info.publishedAt.url, info.publishedAt.name));
+  credits.append(document.createTextNode(' — '));
+  credits.append(externalLink(info.github.url, info.github.name));
   footer.append(credits);
 
   const visitor = el('p', 'home-footer__visitor');

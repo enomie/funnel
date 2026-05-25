@@ -17,12 +17,21 @@ export function syncRigidBodyObjects(items: readonly SyncedBody[]): void {
 }
 
 
+export function syncHumanoidVisualRootAt(
+  root: Object3D,
+  translation: { readonly x: number; readonly y: number; readonly z: number },
+  deathSnapshot: ActorDeathSnapshot,
+  liveYaw: number
+): void {
+  root.position.set(translation.x, translation.y, translation.z);
+  root.rotation.y = actorVisualYaw(deathSnapshot, liveYaw);
+}
+
 export function syncHumanoidVisualRoot(
   body: RigidBody,
   root: Object3D,
   deathSnapshot: ActorDeathSnapshot,
   liveYaw: number
 ): void {
-  root.position.copy(body.translation());
-  root.rotation.y = actorVisualYaw(deathSnapshot, liveYaw);
+  syncHumanoidVisualRootAt(root, body.translation(), deathSnapshot, liveYaw);
 }

@@ -2,6 +2,8 @@
 
 import {
   shockOrbComboKillRadiusM,
+  SHOCK_ORB_COMBO_EXPAND_MS,
+  SHOCK_ORB_SOLO_EXPAND_MS,
   shockOrbSoloKillRadiusM
 } from './shock-combo';
 
@@ -213,6 +215,14 @@ function impactFromFire(
   };
 }
 
+const WEAPON_BY_VISUAL_KIND = new Map<ProjectileVisualKind, WeaponDefinition>();
+
+export function weaponDefinitionForVisualKind(
+  visualKind: ProjectileVisualKind
+): WeaponDefinition | undefined {
+  return WEAPON_BY_VISUAL_KIND.get(visualKind);
+}
+
 export const WEAPON_DEFINITIONS: readonly WeaponDefinition[] = [
   {
     slotLabel: '1',
@@ -290,18 +300,20 @@ export const WEAPON_DEFINITIONS: readonly WeaponDefinition[] = [
     secondaryImpact: {
       directDamage: 52,
       impactRadius: SHOCK_ORB_SOLO_KILL_M,
-      impactExpandMs: 400,
+      impactExpandMs: SHOCK_ORB_SOLO_EXPAND_MS,
       ricochetMax: 0,
       explodeOnContact: true,
-      lethalSplash: true
+      lethalSplash: true,
+      expandingLethal: true
     },
     comboImpact: {
       directDamage: 96,
       impactRadius: SHOCK_ORB_COMBO_KILL_M,
-      impactExpandMs: 420,
+      impactExpandMs: SHOCK_ORB_COMBO_EXPAND_MS,
       ricochetMax: 0,
       explodeOnContact: true,
-      lethalSplash: true
+      lethalSplash: true,
+      expandingLethal: true
     },
     ammo: {
       ammoMax: 15,
@@ -695,3 +707,7 @@ export const WEAPON_DEFINITIONS: readonly WeaponDefinition[] = [
     }
   }
 ] as const;
+
+for (const weapon of WEAPON_DEFINITIONS) {
+  WEAPON_BY_VISUAL_KIND.set(weapon.visualKind, weapon);
+}

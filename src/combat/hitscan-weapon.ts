@@ -98,16 +98,15 @@ export class HitscanWeapon {
         ricochetMax: 0,
         explodeOnContact: false
       },
-      point: this.#hitPoint
+      point: this.#hitPoint,
+      nowMs: 0
     };
   }
 
-  update(_nowMs: number): void {
+  update(nowMs: number): void {
     if (this.#sphereInstancing === null) {
       return;
     }
-
-    const nowMs = performance.now();
     for (let index = this.#impactBursts.length - 1; index >= 0; index -= 1) {
       const burst = this.#impactBursts[index];
       if (!updateImpactBurst(this.#sphereInstancing, burst, nowMs)) {
@@ -150,21 +149,21 @@ export class HitscanWeapon {
     fire: FireProfile,
     impact: ImpactProfile,
     muzzlePosition: Vector3,
-    direction: Vector3
+    direction: Vector3,
+    nowMs: number
   ): void {
     const range = resolveHitscanRange(fire);
     this.#prepareHitscanRay(muzzlePosition, direction);
     const hit = this.#raycastWorld(range);
-    const nowMs = performance.now();
     if (hit !== null && nowMs >= this.#lastBeamImpactAt + BEAM_IMPACT_INTERVAL_MS) {
         this.#audio.playImpact(weapon, this.#hitPoint, BEAM_IMPACT_GAIN, impact);
         this.#spawnImpact(weapon, this.#hitPoint, 'hit', impact, nowMs);
       if (this.#impactSink !== null) {
-        this.#commitImpact(impact, hit.collider);
+        this.#commitImpact(weapon.visualKind, impact, hit.collider, nowMs);
       }
       this.#lastBeamImpactAt = nowMs;
     }
-    this.#updateBeamStream(weapon.color, muzzlePosition, this.#hitPoint);
+    this.#updateBeamStream(weapon.color, muzzlePosition, this.#hitPoint, nowMs);
   }
 
   fireVolley(
@@ -173,6 +172,7 @@ export class HitscanWeapon {
     impact: ImpactProfile,
     direction: Vector3,
     muzzlePosition: Vector3,
+    nowMs: number,
     shockCombo?: ShockComboFireContext
   ): void {
     this.#audio.playFire(weapon, muzzlePosition, fire, impact);
@@ -184,7 +184,7 @@ export class HitscanWeapon {
       fire.projectileCount,
       fire.spreadRadians,
       (shotDirection) => {
-        this.#fireRay(weapon, impact, muzzlePosition, shotDirection, range, fire, shockCombo);
+        this.#fireRay(weapon, impact, muzzlePosition, shotDirection, range, fire, nowMs, shockCombo);
       }
     );
   }
@@ -196,6 +196,7 @@ export class HitscanWeapon {
     direction: Vector3,
     range: number,
     fire: FireProfile,
+    nowMs: number,
     shockCombo?: ShockComboFireContext
   ): void {
     this.#prepareHitscanRay(muzzlePosition, direction);
@@ -210,7 +211,7 @@ export class HitscanWeapon {
       if (orbHit !== null) {
         shockCombo.onComboHit(orbHit);
         this.#hitPoint.copy(orbHit.point);
-        this.#spawnTracer(muzzlePosition, this.#hitPoint, weapon.color, WEAPON_CONFIG.tracerDurationMs);
+        this.#spawnTracer(muzzlePosition, this.#hitPoint, weapon.color, WEAPON_CONFIG.tracerDurationMs, nowMs);
         return;
       }
     }
@@ -218,7 +219,6 @@ export class HitscanWeapon {
     const hit = this.#raycastWorld(range);
 
     if (hit !== null) {
-      const nowMs = performance.now();
       const impactGain = fire.delivery === 'beamTick' ? BEAM_IMPACT_GAIN : IMPACT_GAIN_NORMAL;
       if (
         fire.delivery !== 'beamTick' ||
@@ -226,17 +226,17 @@ export class HitscanWeapon {
       ) {
         this.#audio.playImpact(weapon, this.#hitPoint, impactGain, impact);
         this.#spawnImpact(weapon, this.#hitPoint, 'hit', impact, nowMs);
-        this.#commitImpact(impact, hit.collider);
+        this.#commitImpact(weapon.visualKind, impact, hit.collider, nowMs);
         this.#lastBeamImpactAt = nowMs;
       }
     }
 
     if (fire.delivery === 'beamTick') {
-      this.#updateBeamStream(weapon.color, muzzlePosition, this.#hitPoint);
+      this.#updateBeamStream(weapon.color, muzzlePosition, this.#hitPoint, nowMs);
       return;
     }
 
-    this.#spawnTracer(muzzlePosition, this.#hitPoint, weapon.color, WEAPON_CONFIG.tracerDurationMs);
+    this.#spawnTracer(muzzlePosition, this.#hitPoint, weapon.color, WEAPON_CONFIG.tracerDurationMs, nowMs);
   }
 
   #prepareHitscanRay(muzzlePosition: Vector3, direction: Vector3): void {
@@ -246,7 +246,12 @@ export class HitscanWeapon {
       .addScaledVector(this.#rayDirection, MUZZLE_RAY_ORIGIN_NUDGE);
   }
 
-  #commitImpact(impact: ImpactProfile, hitCollider: Collider | undefined): void {
+  #commitImpact(
+    sourceWeaponVisualKind: WeaponDefinition['visualKind'],
+    impact: ImpactProfile,
+    hitCollider: Collider | undefined,
+    nowMs: number
+  ): void {
     if (this.#impactSink === null) {
       return;
     }
@@ -254,6 +259,8 @@ export class HitscanWeapon {
     const scratch = this.#impactScratch;
     scratch.impact = impact;
     scratch.hitCollider = hitCollider;
+    scratch.sourceWeaponVisualKind = sourceWeaponVisualKind;
+    scratch.nowMs = nowMs;
     this.#impactSink.apply(scratch);
   }
 
@@ -280,22 +287,22 @@ export class HitscanWeapon {
     return hit;
   }
 
-  #updateBeamStream(color: number, start: Vector3, end: Vector3): void {
+  #updateBeamStream(color: number, start: Vector3, end: Vector3, nowMs: number): void {
     if (this.#beamStream === null || this.#beamStreamColor !== color) {
       this.releaseBeamStream();
       this.#beamStream = createBeamStreamVisual(this.#scene, color);
       this.#beamStreamColor = color;
     }
 
-    updateBeamStreamVisual(this.#beamStream, start, end);
+    updateBeamStreamVisual(this.#beamStream, start, end, nowMs);
   }
 
-  #spawnTracer(start: Vector3, end: Vector3, color: number, durationMs: number): void {
+  #spawnTracer(start: Vector3, end: Vector3, color: number, durationMs: number, nowMs: number): void {
     if (this.#segmentLines === null) {
       return;
     }
 
-    this.#segmentLines.spawnSegment(start, end, color, durationMs);
+    this.#segmentLines.spawnSegment(start, end, color, durationMs, nowMs);
   }
 
   #spawnImpact(
@@ -303,7 +310,7 @@ export class HitscanWeapon {
     position: Vector3,
     kind: 'hit' | 'ricochet',
     impact: ImpactProfile,
-    nowMs = performance.now()
+    nowMs: number
   ): void {
     if (this.#sphereInstancing === null) {
       return;
@@ -323,7 +330,6 @@ export class HitscanWeapon {
       impact,
       position,
       kind,
-      undefined,
       nowMs
     );
     if (burst !== null) {

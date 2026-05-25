@@ -3,7 +3,7 @@
   "versionDate": "2026-05-25",
   "license": "MIT License",
   "licenseUrl": "https://opensource.org/licenses/MIT",
-  "technology": "TypeScript · Three.js WebGPU · Rapier SIMD",
+  "technology": "TypeScript · Three.js WebGPU TSL · Rapier SIMD",
   "publisher": {
     "name": "anomie.at",
     "url": "https://anomie.at",
@@ -14,8 +14,15 @@
     "url": "https://unzine.net/unseen/code/funnel/v001/",
     "label": "Published at"
   },
-  "tagline": "Tactical FPS arena shooter inspired by UT99 Funnel mod maps (2001) and classic Star Wars battles.",
-  "warning": "Contains flashing lights and rapid visual effects. Stop playing if you feel unwell or uncomfortable.",
+  "github": {
+    "name": "GitHub",
+    "url": "https://github.com/enomie/funnel/"
+  },
+  "tagline": "Tactical FPS arena shooter inspired by UT99 Funnel mod maps (2001), Tron & classic Star Wars battles.",
+  "warning": [
+    "Contains flashing lights and rapid visual effects.",
+    "Stop playing if you feel unwell or uncomfortable."
+  ],
   "platforms": [
     { "icon": "./icons/platform-apple.svg", "label": "macOS M1+" },
     { "icon": "./icons/platform-chrome.svg", "label": "Google Chrome" }

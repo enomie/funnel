@@ -73,7 +73,7 @@ export class SegmentLineInstancingService {
     this.#scene = scene;
   }
 
-  spawnSegment(start: Vector3, end: Vector3, color: number, durationMs: number): void {
+  spawnSegment(start: Vector3, end: Vector3, color: number, durationMs: number, nowMs: number): void {
     const layerKey = `line:${String(color)}`;
     const slot = this.#acquireSlot(layerKey, color);
     if (slot < 0) {
@@ -84,7 +84,7 @@ export class SegmentLineInstancingService {
     this.#active.push({
       layerKey,
       slot,
-      removeAtMs: performance.now() + durationMs
+      removeAtMs: nowMs + durationMs
     });
   }
 

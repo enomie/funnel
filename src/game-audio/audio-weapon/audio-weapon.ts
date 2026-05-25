@@ -2,6 +2,10 @@
 
 import type { Vector3 } from 'three/webgpu';
 import type { FireProfile, ImpactProfile, WeaponDefinition } from '../../combat/weapon-definitions';
+import {
+  isLethalExplosionWeapon,
+  scaleExplosionGainNearListener
+} from '../combat-world-audio';
 import { IMPACT_GAIN_RICOCHET } from '../audio-config';
 import { playBakedPhrase, scheduleVoiceTail } from '../audio-baked-phrase';
 import { AudioContextEngine } from '../audio-mixer';
@@ -11,7 +15,7 @@ import {
 import {
   scheduleRocketImpactPhrase
 } from '../audio-one-shots/audio-impact-rocket';
-import { getAudioRedeemerImpact } from '../audio-one-shots/audio-impact-redeemer';
+import { attachRedeemerBlastSpread, detachRedeemerBlastSpread } from '../audio-one-shots/audio-impact-redeemer';
 import { tryBeginSpatialOneShot } from '../audio-spatial-voice';
 import { getAudioFlybyVoice } from '../audio-flyby/audio-flyby-voice';
 import { playNoAmmoKlick } from './audio-no-ammo-klick';
@@ -20,18 +24,22 @@ import {
   WeaponChargeHoldAudio,
   type ChargeHoldMechanicsState
 } from './audio-weapon-charge-hold';
+import {
+  WeaponBeamHoldAudio,
+  type BeamHoldMechanicsState
+} from './audio-weapon-beam-hold';
 import { deriveFireAudioPreset } from './audio-fire-preset';
 import { getBakedFire, getBakedImpact } from './audio-weapon-bake';
 import { scheduleFirePhrase } from '../audio-one-shots/audio-fire-phrase';
 
-export type { ReloadMechanicsState, ChargeHoldMechanicsState };
+export type { ReloadMechanicsState, ChargeHoldMechanicsState, BeamHoldMechanicsState };
 
 
 export class WeaponAudio {
   readonly #flyby = getAudioFlybyVoice();
-  readonly #redeemerImpact = getAudioRedeemerImpact();
   readonly #reload = new WeaponReloadAudio();
   readonly #chargeHold = new WeaponChargeHoldAudio();
+  readonly #beamHold = new WeaponBeamHoldAudio();
 
   attachProjectileFly(
     weapon: WeaponDefinition,
@@ -54,6 +62,10 @@ export class WeaponAudio {
 
   detachProjectileFly(slotIndex: number): void {
     this.#flyby.detach(slotIndex);
+  }
+
+  hasFreeProjectileFlySlot(): boolean {
+    return this.#flyby.hasFreeSlot();
   }
 
   playFire(
@@ -99,12 +111,15 @@ export class WeaponAudio {
     }
 
     const scale = options.ricochet === true ? gainScale * IMPACT_GAIN_RICOCHET : gainScale;
+    const stagedGain = isLethalExplosionWeapon(weapon, impact)
+      ? scaleExplosionGainNearListener(position, scale)
+      : scale;
     AudioContextEngine.get().resume();
     const context = AudioContextEngine.get().context;
     const baked = getBakedImpact(weapon, impact);
 
     if (baked !== undefined) {
-      const played = playBakedPhrase(context, baked, voice.input, scale);
+      const played = playBakedPhrase(context, baked, voice.input, stagedGain);
       voice.track(played.source, played.gainNode);
       voice.endAfter(played.source);
       return;
@@ -113,9 +128,9 @@ export class WeaponAudio {
     const time = context.currentTime;
     let durationS: number;
     if (weapon.visualKind === 'rocket') {
-      durationS = scheduleRocketImpactPhrase(impact.impactRadius, scale, time, context, voice.input);
+      durationS = scheduleRocketImpactPhrase(impact.impactRadius, stagedGain, time, context, voice.input);
     } else {
-      durationS = scheduleDefaultImpactPhrase(weapon, impact, scale, time, context, voice.input);
+      durationS = scheduleDefaultImpactPhrase(weapon, impact, stagedGain, time, context, voice.input);
     }
     const tail = scheduleVoiceTail(context, voice.input, durationS);
     voice.track(tail);
@@ -123,11 +138,11 @@ export class WeaponAudio {
   }
 
   playRedeemerBlastSpread(position: Vector3, gainScale: number): number | null {
-    return this.#redeemerImpact.attach(position, gainScale);
+    return attachRedeemerBlastSpread(position, scaleExplosionGainNearListener(position, gainScale));
   }
 
   stopRedeemerBlastSpread(slotIndex: number): void {
-    this.#redeemerImpact.detach(slotIndex);
+    detachRedeemerBlastSpread(slotIndex);
   }
 
   playEmptyClick(_weapon: WeaponDefinition, position: Vector3, nowMs: number): void {
@@ -147,12 +162,17 @@ export class WeaponAudio {
     this.#chargeHold.sync(position, state);
   }
 
+  syncBeamHoldMechanics(position: Vector3, state: BeamHoldMechanicsState): void {
+    this.#beamHold.sync(position, state);
+  }
+
   stopReloadMechanics(): void {
     this.#reload.stop();
     this.#chargeHold.stop();
+    this.#beamHold.stop();
   }
 
   hasActiveMechanicsVoice(): boolean {
-    return this.#reload.isActive() || this.#chargeHold.isActive();
+    return this.#reload.isActive() || this.#chargeHold.isActive() || this.#beamHold.isActive();
   }
 }

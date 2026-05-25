@@ -1,11 +1,13 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/combat/projectile-visuals.ts
 
 import { Euler, Group, Material, Mesh, Object3D, TorusGeometry } from 'three/webgpu';
-import type { BufferGeometry } from 'three/webgpu';
+import type { BufferGeometry, Scene } from 'three/webgpu';
+import { detachSceneObject } from '../render/dispose-three';
 import { getUnitLowPolySphereGeometry } from '../render/low-poly-sphere-geometry';
 import {
   PROJECTILE_GLOW_LAYERS,
   PROJECTILE_OUTER_GLOW_SCALE,
+  isPooledProjectileMaterial,
   projectileCoreMaterial,
   projectileGlowLayerMaterial
 } from './projectile-materials';
@@ -112,6 +114,15 @@ export function resetProjectileTransform(object: Object3D): void {
   object.rotation.set(0, 0, 0);
   object.quaternion.set(0, 0, 0, 1);
   object.scale.set(1, 1, 1);
+}
+
+export function disposeSceneProjectileVisual(object: Object3D, scene: Scene): void {
+  detachSceneObject(object, {
+    scene,
+    disposeSubtree: true,
+    geometry: false,
+    shouldDisposeMaterial: (material) => !isPooledProjectileMaterial(material)
+  });
 }
 
 

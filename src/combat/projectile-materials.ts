@@ -1,6 +1,6 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/combat/projectile-materials.ts
 
-import { AdditiveBlending, MeshBasicMaterial } from 'three/webgpu';
+import { AdditiveBlending, Material, MeshBasicMaterial } from 'three/webgpu';
 
 
 export const PROJECTILE_GLOW_LAYERS = [
@@ -66,6 +66,22 @@ export function projectileGlowLayerOpacity(layerIndex: number, powerFraction: nu
   const layer = PROJECTILE_GLOW_LAYERS[layerIndex];
   const power = Math.max(0, Math.min(1, powerFraction));
   return layer.opacity * power;
+}
+
+export function isPooledProjectileMaterial(material: Material): boolean {
+  for (const cached of CORE_CACHE.values()) {
+    if (cached === material) {
+      return true;
+    }
+  }
+
+  for (const cached of GLOW_LAYER_CACHE.values()) {
+    if (cached === material) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function isProjectileGlowMeshName(name: string): boolean {

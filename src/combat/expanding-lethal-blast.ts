@@ -9,6 +9,7 @@ import {
   type ExpandingLethalBlastTick
 } from './apply-impact';
 import type { FactionTeam } from './teams';
+import type { ProjectileVisualKind } from './weapon-definitions';
 
 
 export interface ExpandingLethalBlast {
@@ -19,6 +20,7 @@ export interface ExpandingLethalBlast {
   readonly killedActorIds: Set<string>;
   readonly sourceFaction: FactionTeam;
   readonly sourceActorId?: string;
+  readonly sourceWeaponVisualKind?: ProjectileVisualKind;
   readonly friendlyFire: boolean;
   lastSweepMs: number;
   audioSlot: number | null;
@@ -30,7 +32,9 @@ export function spawnExpandingLethalBlast(
   expandMs: number,
   sourceFaction: FactionTeam,
   sourceActorId: string | undefined,
+  sourceWeaponVisualKind: ProjectileVisualKind | undefined,
   friendlyFire: boolean,
+  nowMs: number,
   hitCollider?: Collider,
   impactDeps?: ApplyImpactDeps
 ): ExpandingLethalBlast {
@@ -38,10 +42,11 @@ export function spawnExpandingLethalBlast(
     center: center.clone(),
     maxRadius,
     expandMs,
-    spawnedAtMs: performance.now(),
+    spawnedAtMs: nowMs,
     killedActorIds: new Set<string>(),
     sourceFaction,
     sourceActorId,
+    sourceWeaponVisualKind,
     friendlyFire,
     lastSweepMs: 0,
     audioSlot: null
@@ -52,9 +57,11 @@ export function spawnExpandingLethalBlast(
       impactDeps,
       sourceFaction,
       sourceActorId,
+      sourceWeaponVisualKind,
       hitCollider,
       blast.killedActorIds,
-      friendlyFire
+      friendlyFire,
+      nowMs
     );
   }
 
@@ -75,6 +82,7 @@ export function tickExpandingLethalBlastEffect(
   const tick: ExpandingLethalBlastTick = {
     sourceFaction: blast.sourceFaction,
     sourceActorId: blast.sourceActorId,
+    sourceWeaponVisualKind: blast.sourceWeaponVisualKind,
     center: blast.center,
     currentRadius,
     killedActorIds: blast.killedActorIds,

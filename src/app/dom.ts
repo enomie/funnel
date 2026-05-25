@@ -25,7 +25,6 @@ export interface AppDom {
   teamEnemyPoints: HTMLSpanElement;
   ammoHud: HTMLDivElement;
   ammoTitle: HTMLSpanElement;
-  ammoCount: HTMLSpanElement;
   ammoMagazine: HTMLDivElement;
   ammoReloadFill: HTMLDivElement;
   weaponBar: HTMLDivElement;
@@ -114,7 +113,7 @@ export function createAppDom(root: HTMLDivElement): AppDom {
       <div class="funnel-hud-panel__head funnel-health__head">
         <span class="funnel-hud-panel__title">Vitals</span>
       </div>
-      <div class="funnel-hud-panel__body funnel-health__body">
+      <div class="funnel-hud-panel__body">
         <div class="funnel-stat-row">
           <span class="funnel-stat-row__label funnel-stat-row__label--health">HP</span>
           <div class="funnel-stat-row__track">
@@ -136,15 +135,15 @@ export function createAppDom(root: HTMLDivElement): AppDom {
       <div class="funnel-hud-panel__head funnel-ammo__head">
         <span class="funnel-hud-panel__title funnel-ammo__title"></span>
       </div>
-      <div class="funnel-hud-panel__body funnel-ammo__body">
+      <div class="funnel-hud-panel__body">
         <div class="funnel-stat-row">
-          <span class="funnel-stat-row__label funnel-stat-row__label--numeric funnel-ammo__count">0</span>
+          <span class="funnel-stat-row__label funnel-stat-row__label--mag">MG</span>
           <div class="funnel-stat-row__track">
             <div class="funnel-ammo__mag"></div>
           </div>
         </div>
         <div class="funnel-stat-row">
-          <span class="funnel-stat-row__label">Reload</span>
+          <span class="funnel-stat-row__label funnel-stat-row__label--reload">RL</span>
           <div class="funnel-stat-row__track">
             <div class="funnel-ammo__reload-fill funnel-stat-row__fill"></div>
           </div>
@@ -242,13 +241,11 @@ export function createAppDom(root: HTMLDivElement): AppDom {
 
   const ammoHud = hud.querySelector<HTMLDivElement>('.funnel-ammo');
   const ammoTitle = hud.querySelector<HTMLSpanElement>('.funnel-ammo__title');
-  const ammoCount = hud.querySelector<HTMLSpanElement>('.funnel-ammo__count');
   const ammoMagazine = hud.querySelector<HTMLDivElement>('.funnel-ammo__mag');
   const ammoReloadFill = hud.querySelector<HTMLDivElement>('.funnel-ammo__reload-fill');
   if (
     ammoHud === null ||
     ammoTitle === null ||
-    ammoCount === null ||
     ammoMagazine === null ||
     ammoReloadFill === null
   ) {
@@ -305,7 +302,6 @@ export function createAppDom(root: HTMLDivElement): AppDom {
     weaponBar,
     ammoHud,
     ammoTitle,
-    ammoCount,
     ammoMagazine,
     ammoReloadFill,
     healthHud,

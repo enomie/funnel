@@ -1,6 +1,7 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/core/game-frame-clock.ts
 
 import { PHYSICS_CONFIG } from '../config/game-config';
+import { computeRenderInterpolationBlend } from '../physics/physics-interpolation';
 import { shouldAdvanceGameFrame } from '../platform/chrome-macos-arm-profile';
 
 
@@ -18,6 +19,10 @@ export interface GameFrameTick {
 export interface PhysicsStepBatch {
   readonly subSteps: number;
   readonly fixedStep: number;
+  /** True when fixed-step work remains after this frame's capped sub-step budget. */
+  readonly physicsBacklogged: boolean;
+  /** True when physics was throttled this frame — defer expensive non-critical systems. */
+  readonly loadShedNonCritical: boolean;
 }
 
 type MutableGameFrameTick = {
@@ -29,6 +34,8 @@ type MutableGameFrameTick = {
 type MutablePhysicsStepBatch = {
   subSteps: number;
   fixedStep: number;
+  physicsBacklogged: boolean;
+  loadShedNonCritical: boolean;
 };
 
 
@@ -41,7 +48,9 @@ export class GameFrameClock {
   #frameId = 0;
   readonly #physicsMaxSubSteps: number;
   #activeMaxSubSteps: number;
+  #accumulatorShedThisFrame = false;
   readonly #maxPhysicsRemainderS: number;
+  #onVisibilityReset: (() => void) | null = null;
   readonly #renderTick: MutableGameFrameTick = {
     deltaSeconds: 0,
     nowMs: 0,
@@ -49,7 +58,9 @@ export class GameFrameClock {
   };
   readonly #physicsStepBatch: MutablePhysicsStepBatch = {
     subSteps: 0,
-    fixedStep: PHYSICS_CONFIG.fixedStep
+    fixedStep: PHYSICS_CONFIG.fixedStep,
+    physicsBacklogged: false,
+    loadShedNonCritical: false
   };
 
   constructor(physicsMaxSubSteps: number) {
@@ -94,14 +105,19 @@ export class GameFrameClock {
 
   
   accumulatePhysics(deltaSeconds: number): void {
+    this.#accumulatorShedThisFrame = false;
     if (deltaSeconds <= 0) {
       return;
     }
 
-    this.#physicsAccumulator = Math.min(
-      this.#physicsAccumulator + deltaSeconds,
-      PHYSICS_CONFIG.fixedStep * this.#activeMaxSubSteps
-    );
+    const maxAccumulatorS =
+      PHYSICS_CONFIG.fixedStep * this.#activeMaxSubSteps;
+    const nextAccumulatorS = this.#physicsAccumulator + deltaSeconds;
+    if (nextAccumulatorS > maxAccumulatorS) {
+      this.#accumulatorShedThisFrame = true;
+    }
+
+    this.#physicsAccumulator = Math.min(nextAccumulatorS, maxAccumulatorS);
   }
 
   
@@ -125,14 +141,30 @@ export class GameFrameClock {
       this.#physicsAccumulator = this.#maxPhysicsRemainderS;
     }
 
+    const physicsBacklogged = this.#physicsAccumulator >= fixedStep;
+    const budgetReduced = this.#activeMaxSubSteps < this.#physicsMaxSubSteps;
     const batch = this.#physicsStepBatch;
     batch.subSteps = subSteps;
     batch.fixedStep = fixedStep;
+    batch.physicsBacklogged = physicsBacklogged;
+    batch.loadShedNonCritical =
+      physicsBacklogged ||
+      this.#accumulatorShedThisFrame ||
+      (budgetReduced && subSteps === this.#activeMaxSubSteps && subSteps > 0);
     return batch as PhysicsStepBatch;
+  }
+
+  renderInterpolationBlend(subSteps: number): number {
+    return computeRenderInterpolationBlend(this.#physicsAccumulator, subSteps);
+  }
+
+  setVisibilityResetHandler(handler: () => void): void {
+    this.#onVisibilityReset = handler;
   }
 
   #onVisibilityChange = (): void => {
     this.#lastTickMs = performance.now();
     this.#physicsAccumulator = 0;
+    this.#onVisibilityReset?.();
   };
 }

@@ -2,7 +2,7 @@
   { "action": "Move", "keys": "WASD · Shift sprint · Space jump" },
   { "action": "Stance", "keys": "Hold C to crouch" },
   { "action": "Weapons", "keys": "1–0 select · LMB primary · RMB alt-fire" },
-  { "action": "Aim", "keys": "V or MMB (FPS)" },
+  { "action": "Third person", "keys": "V toggle (dev test)" },
   { "action": "Pointer lock", "keys": "Click arena or P" },
   { "action": "Revive / Hire", "keys": "Hold R near downed ally (1 s) or enemy (2 s)" },
   { "action": "Team (dev)", "keys": "T flip team" },

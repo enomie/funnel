@@ -11,6 +11,12 @@ export const SHOCK_ORB_SOLO_KILL_RADIUS_FACTOR = 6;
 
 export const SHOCK_COMBO_KILL_RADIUS_FACTOR = 5;
 
+/** Solo orb kill sphere — gameplay + VFX expansion. */
+export const SHOCK_ORB_SOLO_EXPAND_MS = 720;
+
+/** Combo detonation — slower shockwave than solo orb. */
+export const SHOCK_ORB_COMBO_EXPAND_MS = 960;
+
 const SHOCK_ORB_HIT_RADIUS_FACTOR = 1.1;
 
 const _offset = new Vector3();

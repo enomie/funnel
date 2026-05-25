@@ -51,16 +51,16 @@ export class PlayerHealth {
     return this.#dead;
   }
 
-  get isRegenerating(): boolean {
+  isRegeneratingAt(nowMs: number): boolean {
     if (this.#dead || this.#health >= this.#maxHealth) {
       return false;
     }
 
-    return performance.now() - this.#lastDamageAtMs >= this.#regenDelayMs;
+    return nowMs - this.#lastDamageAtMs >= this.#regenDelayMs;
   }
 
   
-  damage(amount: number): DamageResult {
+  damage(amount: number, nowMs: number): DamageResult {
     if (this.#dead || amount <= 0) {
       return {
         healthDamage: 0,
@@ -70,7 +70,7 @@ export class PlayerHealth {
       };
     }
 
-    this.#lastDamageAtMs = performance.now();
+    this.#lastDamageAtMs = nowMs;
 
     const shieldDamage = Math.min(this.#shield, amount);
     this.#shield -= shieldDamage;

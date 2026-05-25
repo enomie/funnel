@@ -20,20 +20,27 @@ export function resetPresenceTickAccumulator(accumulator: PresenceTickAccumulato
 }
 
 
+export interface PresenceTickResult {
+  winner: FactionTeam | null;
+  scored: boolean;
+}
+
 export function tickTeamPresenceScoring(
   deltaSeconds: number,
   accumulator: PresenceTickAccumulator,
   registry: ActorRegistry,
   points: TeamMatchPoints
-): FactionTeam | null {
+): PresenceTickResult {
   if (points.isMatchOver) {
-    return points.winner;
+    return { winner: points.winner, scored: false };
   }
 
   accumulator.seconds += deltaSeconds;
+  let scored = false;
 
   while (accumulator.seconds >= PRESENCE_TICK_SECONDS) {
     accumulator.seconds -= PRESENCE_TICK_SECONDS;
+    scored = true;
 
     registry.forEachActor((actor) => {
       if (actor.health.isDead) {
@@ -48,9 +55,9 @@ export function tickTeamPresenceScoring(
 
     const winner = points.winner;
     if (winner !== null) {
-      return winner;
+      return { winner, scored: true };
     }
   }
 
-  return null;
+  return { winner: null, scored };
 }

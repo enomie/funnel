@@ -97,7 +97,8 @@ export function syncActorDeathState(
   collider: Collider,
   snapshot: ActorDeathSnapshot,
   isDead: boolean,
-  yaw: number
+  yaw: number,
+  nowMs: number
 ): void {
   if (!isDead) {
     if (snapshot.applied) {
@@ -109,7 +110,7 @@ export function syncActorDeathState(
 
   if (!snapshot.applied) {
     snapshot.applied = true;
-    snapshot.diedAtMs = performance.now();
+    snapshot.diedAtMs = nowMs;
     snapshot.frozenYaw = yaw;
     snapshot.groundY = inferGroundYFromBody(body, inferCapsuleModeFromCollider(collider));
     applyCapsuleMode(collider, 'crouch');

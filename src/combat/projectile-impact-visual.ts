@@ -96,6 +96,17 @@ function resolveImpactBurstProfile(
   hotBurst?: boolean;
 } {
   if (weapon.visualKind === 'redeemer' || impact.expandingLethal === true) {
+    if (weapon.visualKind === 'shock') {
+      return {
+        expandPeakFraction: LETHAL_KILL_EXPAND_PEAK_FRACTION,
+        expandEase: 'cubic',
+        contractEndScaleFraction: LETHAL_KILL_CONTRACT_END_FRACTION,
+        opacityFade: LETHAL_KILL_OPACITY_FADE,
+        opacityFadePower: LETHAL_KILL_OPACITY_FADE_POWER,
+        hotBurst: true
+      };
+    }
+
     return {
       expandPeakFraction: REDEEMER_IMPACT_EXPAND_PEAK_FRACTION,
       expandEase: 'cubic',
@@ -161,8 +172,8 @@ export function spawnProjectileImpactBurst(
   impact: ImpactProfile,
   position: { x: number; y: number; z: number },
   kind: ImpactBurstKind,
-  radiusOverride?: number,
-  nowMs = performance.now()
+  nowMs: number,
+  radiusOverride?: number
 ): ImpactBurst | null {
   const endScale = resolveImpactVfxRadius(weapon, impact, kind, radiusOverride);
   if (endScale <= 0) {

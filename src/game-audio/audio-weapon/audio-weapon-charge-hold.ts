@@ -3,9 +3,18 @@
 import type { Vector3 } from 'three/webgpu';
 import { getNoiseBuffer } from '../audio-noise-buffer';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
+import {
+  isAudioAlive,
+  registerAudioSilenceHook,
+  safeConnect,
+  safeCreateNode,
+  safeStart,
+  safeStop
+} from '../audio-guard';
 import { AudioContextEngine } from '../audio-mixer';
-import { isWithinHearingRange, setupSpatialPanner } from '../audio-system';
-import { tryBeginSpatialOneShot } from '../audio-spatial-voice';
+import { isWithinHearingRange } from '../audio-system';
+import { setAudioParamImmediate } from '../audio-spatial-sync';
+import { tryBeginSpatialOneShot, tryBeginSustainedSpatialVoice, type SustainedSpatialVoice } from '../audio-spatial-voice';
 import { playNoiseBurst, playOscBurst } from '../audio-one-shots/audio-one-shot-synth';
 
 export interface ChargeHoldMechanicsState {
@@ -25,23 +34,32 @@ const BIO_RUMBLE_IDLE_GAIN = AUDIO_VOICE_PEAK * 0.14;
 const BIO_RUMBLE_PEAK_GAIN = AUDIO_VOICE_PEAK * 0.82;
 const BIO_RUMBLE_NOISE_FILTER_HZ = 158;
 const BIO_RUMBLE_NOISE_GAIN = 0.46;
-const BIO_RUMBLE_ATTACK_S = 0.05;
 
-interface BioRumbleNodes {
-  panner: PannerNode;
+interface BioHoldVoice {
+  release: () => void;
+  syncPosition: (position: Vector3) => void;
   rumbleOsc: OscillatorNode;
   rumbleGain: GainNode;
-  noiseSource: AudioBufferSourceNode;
   noiseFilter: BiquadFilterNode;
-  noiseGain: GainNode;
 }
 
 
 export class WeaponChargeHoldAudio {
   #lastRocketMarkedCount = 0;
-  #bioRumble: BioRumbleNodes | null = null;
+  #bioHold: BioHoldVoice | null = null;
+
+  constructor() {
+    registerAudioSilenceHook(() => {
+      this.stop();
+    });
+  }
 
   sync(position: Vector3, state: ChargeHoldMechanicsState): void {
+    if (!isAudioAlive()) {
+      this.stop();
+      return;
+    }
+
     this.#syncRocketMarks(position, state);
     this.#syncBioRumble(position, state);
   }
@@ -52,7 +70,7 @@ export class WeaponChargeHoldAudio {
   }
 
   isActive(): boolean {
-    return this.#bioRumble !== null;
+    return this.#bioHold !== null;
   }
 
   #syncRocketMarks(position: Vector3, state: ChargeHoldMechanicsState): void {
@@ -118,7 +136,7 @@ export class WeaponChargeHoldAudio {
       return;
     }
 
-    if (this.#bioRumble === null) {
+    if (this.#bioHold === null) {
       this.#startBioRumble(position, state.bioChargeFraction);
       return;
     }
@@ -132,110 +150,132 @@ export class WeaponChargeHoldAudio {
     }
 
     AudioContextEngine.get().resume();
-    const context = AudioContextEngine.get().context;
-    const time = context.currentTime;
-    const gain = bioRumbleGainForFraction(fraction);
+    const sustained = tryBeginSustainedSpatialVoice(position, 'mechanics-hold', 'near');
+    if (sustained === null) {
+      return;
+    }
 
-    const panner = context.createPanner();
-    setupSpatialPanner(panner, 'near');
-    panner.positionX.setValueAtTime(position.x, time);
-    panner.positionY.setValueAtTime(position.y, time);
-    panner.positionZ.setValueAtTime(position.z, time);
-    panner.connect(AudioContextEngine.get().sfxInput);
+    const hold = wireBioHoldGraph(sustained, fraction);
+    if (hold === null) {
+      sustained.release();
+      return;
+    }
 
-    const rumbleGain = context.createGain();
-    rumbleGain.gain.setValueAtTime(0.001, time);
-    rumbleGain.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), time + BIO_RUMBLE_ATTACK_S);
-    rumbleGain.connect(panner);
+    sustained.onAutoRelease(() => {
+      this.#bioHold = null;
+    });
 
-    const rumbleOsc = context.createOscillator();
-    rumbleOsc.type = 'sine';
-    rumbleOsc.frequency.setValueAtTime(
-      BIO_RUMBLE_BASE_HZ + fraction * (BIO_RUMBLE_PEAK_HZ - BIO_RUMBLE_BASE_HZ),
-      time
-    );
-    rumbleOsc.connect(rumbleGain);
-
-    const noiseSource = context.createBufferSource();
-    noiseSource.buffer = getNoiseBuffer(context, 'bio-rumble');
-    noiseSource.loop = true;
-
-    const noiseFilter = context.createBiquadFilter();
-    noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = BIO_RUMBLE_NOISE_FILTER_HZ;
-    noiseFilter.Q.value = 0.72;
-
-    const noiseGain = context.createGain();
-    noiseGain.gain.value = BIO_RUMBLE_NOISE_GAIN;
-    noiseSource.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(rumbleGain);
-
-    rumbleOsc.start(time);
-    noiseSource.start(time);
-
-    this.#bioRumble = {
-      panner,
-      rumbleOsc,
-      rumbleGain,
-      noiseSource,
-      noiseFilter,
-      noiseGain
-    };
+    this.#bioHold = hold;
   }
 
   #updateBioRumble(position: Vector3, fraction: number): void {
-    const nodes = this.#bioRumble;
-    if (nodes === null) {
+    const hold = this.#bioHold;
+    if (hold === null) {
       return;
     }
 
-    const time = AudioContextEngine.get().context.currentTime;
     const gain = bioRumbleGainForFraction(fraction);
 
-    nodes.panner.positionX.value = position.x;
-    nodes.panner.positionY.value = position.y;
-    nodes.panner.positionZ.value = position.z;
-
-    nodes.rumbleGain.gain.setTargetAtTime(gain, time, 0.045);
-    nodes.rumbleOsc.frequency.setTargetAtTime(
-      BIO_RUMBLE_BASE_HZ + fraction * (BIO_RUMBLE_PEAK_HZ - BIO_RUMBLE_BASE_HZ),
-      time,
-      0.06
+    hold.syncPosition(position);
+    setAudioParamImmediate(hold.rumbleGain.gain, gain);
+    setAudioParamImmediate(
+      hold.rumbleOsc.frequency,
+      BIO_RUMBLE_BASE_HZ + fraction * (BIO_RUMBLE_PEAK_HZ - BIO_RUMBLE_BASE_HZ)
     );
-    nodes.noiseFilter.frequency.setTargetAtTime(
-      BIO_RUMBLE_NOISE_FILTER_HZ + fraction * 48,
-      time,
-      0.06
-    );
+    setAudioParamImmediate(hold.noiseFilter.frequency, BIO_RUMBLE_NOISE_FILTER_HZ + fraction * 48);
   }
 
   #stopBioRumble(): void {
-    const nodes = this.#bioRumble;
-    if (nodes === null) {
+    const hold = this.#bioHold;
+    if (hold === null) {
       return;
     }
 
-    const stopTime = AudioContextEngine.get().context.currentTime + 0.02;
-    this.#stopSource(nodes.rumbleOsc, stopTime);
-    this.#stopSource(nodes.noiseSource, stopTime);
+    hold.release();
+    this.#bioHold = null;
+  }
+}
 
-    nodes.rumbleOsc.disconnect();
-    nodes.noiseSource.disconnect();
-    nodes.noiseFilter.disconnect();
-    nodes.noiseGain.disconnect();
-    nodes.rumbleGain.disconnect();
-    nodes.panner.disconnect();
-    this.#bioRumble = null;
+function wireBioHoldGraph(sustained: SustainedSpatialVoice, fraction: number): BioHoldVoice | null {
+  const context = AudioContextEngine.get().context;
+  const time = context.currentTime;
+  const gain = bioRumbleGainForFraction(fraction);
+  const hz = BIO_RUMBLE_BASE_HZ + fraction * (BIO_RUMBLE_PEAK_HZ - BIO_RUMBLE_BASE_HZ);
+
+  const rumbleGain = safeCreateNode('bio-rumble-gain', () => context.createGain());
+  if (rumbleGain === null) {
+    return null;
   }
 
-  #stopSource(source: OscillatorNode | AudioBufferSourceNode, stopTime: number): void {
-    try {
-      source.stop(stopTime);
-    } catch {
-      // Source may already be stopped.
-    }
+  setAudioParamImmediate(rumbleGain.gain, gain);
+  if (!safeConnect(rumbleGain, sustained.input, 'bio-rumble-gain-input')) {
+    return null;
   }
+
+  const rumbleOsc = safeCreateNode('bio-rumble-osc', () => context.createOscillator());
+  if (rumbleOsc === null) {
+    return null;
+  }
+
+  rumbleOsc.type = 'sine';
+  setAudioParamImmediate(rumbleOsc.frequency, hz);
+  if (!safeConnect(rumbleOsc, rumbleGain, 'bio-rumble-osc-gain')) {
+    return null;
+  }
+
+  const noiseSource = safeCreateNode('bio-rumble-noise', () => context.createBufferSource());
+  if (noiseSource === null) {
+    return null;
+  }
+
+  noiseSource.buffer = getNoiseBuffer(context, 'bio-rumble');
+  noiseSource.loop = true;
+
+  const noiseFilter = safeCreateNode('bio-rumble-filter', () => context.createBiquadFilter());
+  if (noiseFilter === null) {
+    return null;
+  }
+
+  noiseFilter.type = 'lowpass';
+  setAudioParamImmediate(noiseFilter.frequency, BIO_RUMBLE_NOISE_FILTER_HZ + fraction * 48);
+  noiseFilter.Q.value = 0.72;
+
+  const noiseGain = safeCreateNode('bio-rumble-noise-gain', () => context.createGain());
+  if (noiseGain === null) {
+    return null;
+  }
+
+  noiseGain.gain.value = BIO_RUMBLE_NOISE_GAIN;
+  if (
+    !safeConnect(noiseSource, noiseFilter, 'bio-rumble-noise-filter') ||
+    !safeConnect(noiseFilter, noiseGain, 'bio-rumble-filter-gain') ||
+    !safeConnect(noiseGain, rumbleGain, 'bio-rumble-noise-gain')
+  ) {
+    return null;
+  }
+
+  if (!safeStart(rumbleOsc, time, 'bio-rumble-osc-start')) {
+    return null;
+  }
+
+  if (!safeStart(noiseSource, time, 'bio-rumble-noise-start')) {
+    safeStop(rumbleOsc, time + 0.01, 'bio-rumble-osc-rollback');
+    return null;
+  }
+
+  sustained.track(rumbleGain, rumbleOsc, noiseSource, noiseFilter, noiseGain);
+
+  return {
+    release: () => {
+      sustained.release();
+    },
+    syncPosition: (position) => {
+      sustained.syncPosition(position);
+    },
+    rumbleOsc,
+    rumbleGain,
+    noiseFilter
+  };
 }
 
 function bioRumbleGainForFraction(fraction: number): number {

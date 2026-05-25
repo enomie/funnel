@@ -14,7 +14,7 @@ export interface HumanoidRenderTickContext {
   readonly deltaSeconds: number;
   readonly syncDeathState: () => void;
   readonly syncVisualFromBody: () => void;
-  readonly updateLocomotion: (deltaSeconds: number, input: LocomotionAnimInput) => void;
+  readonly updateLocomotion: (deltaSeconds: number, input: LocomotionAnimInput, nowMs: number) => void;
   readonly weapon: WeaponArsenal;
   readonly weaponAim: { readonly yaw: number; readonly pitch: number };
   readonly weaponBodyPosition: Vector3;
@@ -33,7 +33,6 @@ export function tickHumanoidRenderFrame(
 
   if (isDead) {
     if (!wasSuspended) {
-      weapon.suspendCombat();
       suspendState.active = true;
     }
   } else {
@@ -49,5 +48,5 @@ export function tickHumanoidRenderFrame(
   context.syncVisualFromBody();
 
   locomotionInput.fireStarted = weapon.consumeFireStarted();
-  context.updateLocomotion(deltaSeconds, locomotionInput);
+  context.updateLocomotion(deltaSeconds, locomotionInput, nowMs);
 }

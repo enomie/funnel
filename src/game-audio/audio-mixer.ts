@@ -1,6 +1,8 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-mixer.ts
 
 import { AUDIO_MASTER_GAIN } from './audio-config';
+import { attachAudioContextStateLogger } from './audio-debug';
+import { markAudioPermanentlyDead, tryResumeGameAudio } from './audio-guard';
 
 const SFX_LIMITER_THRESHOLD = -10;
 const SFX_LIMITER_RATIO = 12;
@@ -31,6 +33,12 @@ export class AudioContextEngine {
     this.#sfxInput.connect(limiter);
     limiter.connect(this.#masterGain);
     this.#masterGain.connect(this.#context.destination);
+
+    attachAudioContextStateLogger(this.#context, (reason) => {
+      if (reason === 'closed' || reason === 'closed-at-init') {
+        markAudioPermanentlyDead(`AudioContext statechange: ${reason}`);
+      }
+    });
   }
 
   static get(): AudioContextEngine {
@@ -47,8 +55,6 @@ export class AudioContextEngine {
   }
 
   resume(): void {
-    if (this.#context.state === 'suspended') {
-      void this.#context.resume();
-    }
+    tryResumeGameAudio();
   }
 }

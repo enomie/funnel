@@ -134,7 +134,7 @@ export class BotRoster {
     }
   }
 
-  flashDamage(actorId: string, nowMs = performance.now()): void {
+  flashDamage(actorId: string, nowMs: number): void {
     for (const bot of this.#bots) {
       if (bot.combatActor.id === actorId) {
         bot.visual.flashDamage(nowMs);
@@ -165,15 +165,15 @@ export class BotRoster {
     return false;
   }
 
-  suspendAllCombat(): void {
+  suspendAllCombat(nowMs: number): void {
     for (const bot of this.#bots) {
-      bot.weapon.suspendCombat();
+      bot.weapon.suspendCombat(nowMs);
     }
   }
 
-  prepareMatchRestart(): void {
+  prepareMatchRestart(nowMs: number): void {
     for (const bot of this.#bots) {
-      bot.prepareMatchRestart();
+      bot.prepareMatchRestart(nowMs);
     }
   }
 
@@ -189,11 +189,24 @@ export class BotRoster {
     }
   }
 
+  capturePhysicsInterpolation(): void {
+    for (const bot of this.#bots) {
+      bot.controller.capturePhysicsInterpolation();
+    }
+  }
+
+  setRenderInterpolationBlend(blend: number): void {
+    for (const bot of this.#bots) {
+      bot.controller.setRenderInterpolationBlend(blend);
+    }
+  }
+
   
   preparePhysicsFrame(
     deltaSeconds: number,
     nowMs: number,
-    context: Omit<BotCombatContext, 'targets'>
+    context: Omit<BotCombatContext, 'targets'>,
+    shedNonCritical = false
   ): void {
     if (!context.matchLive) {
       return;
@@ -203,7 +216,7 @@ export class BotRoster {
     const combatContext = this.#bindCombatContext(context);
 
     for (const bot of this.#bots) {
-      bot.preparePhysicsFrame(deltaSeconds, nowMs, combatContext);
+      bot.preparePhysicsFrame(deltaSeconds, nowMs, combatContext, shedNonCritical);
     }
   }
 
@@ -217,11 +230,12 @@ export class BotRoster {
   }
 
   tickJumpPads(jumpPadField: JumpPadField, nowMs: number): void {
+    const bots = this.#bots;
     const scratch = this.#jumpPadBotScratch;
-    scratch.length = 0;
-    for (const bot of this.#bots) {
-      scratch.push(bot.controller);
+    for (let index = 0; index < bots.length; index += 1) {
+      scratch[index] = bots[index].controller;
     }
+    scratch.length = bots.length;
     jumpPadField.tickBots(scratch, nowMs);
   }
 
@@ -287,6 +301,12 @@ export class BotRoster {
     }
 
     this.#bots = [];
+  }
+
+  resetVisibilityClock(): void {
+    for (const bot of this.#bots) {
+      bot.resetVisibilityClock();
+    }
   }
 
   #syncTargets(player: BotCombatContext['player']): void {

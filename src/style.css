@@ -637,7 +637,12 @@ body {
 }
 
 .funnel-hud-panel {
-  --funnel-hud-panel-block-height: 66px;
+  --funnel-hud-panel-body-height: calc(
+    6px + var(--funnel-stat-row-height) + var(--funnel-stat-row-gap) + var(--funnel-stat-row-height) + 7px
+  );
+  --funnel-hud-panel-block-height: calc(
+    var(--funnel-hud-panel-head-min-height) + var(--funnel-hud-panel-body-height)
+  );
   --funnel-hud-panel-stat-width: 220px;
   --funnel-stat-label-width: 40px;
   --funnel-stat-row-gap: 6px;
@@ -653,7 +658,7 @@ body {
   display: flex;
   flex-direction: column;
   width: var(--funnel-hud-panel-stat-width);
-  min-height: var(--funnel-hud-panel-block-height);
+  height: var(--funnel-hud-panel-block-height);
   overflow: hidden;
   border: 1px solid var(--funnel-hud-panel-border);
   border-radius: var(--funnel-hud-panel-radius);
@@ -664,8 +669,10 @@ body {
 
 .funnel-hud-panel__head {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
+  height: var(--funnel-hud-panel-head-min-height);
   min-height: var(--funnel-hud-panel-head-min-height);
   padding: var(--funnel-hud-panel-head-padding);
 }
@@ -685,10 +692,21 @@ body {
 }
 
 .funnel-hud-panel__body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--funnel-stat-row-gap);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: var(--funnel-stat-row-height) var(--funnel-stat-row-height);
+  row-gap: var(--funnel-stat-row-gap);
+  height: var(--funnel-hud-panel-body-height);
   padding: 6px 8px 7px;
+}
+
+.funnel-stat-row {
+  display: grid;
+  grid-template-columns: var(--funnel-stat-label-width) 1fr;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .funnel-health {
@@ -718,23 +736,16 @@ body {
   text-shadow: 0 0 8px rgba(var(--funnel-ammo-accent-rgb), 0.35);
 }
 
-.funnel-stat-row {
-  display: grid;
-  grid-template-columns: var(--funnel-stat-label-width) 1fr;
-  align-items: center;
-  column-gap: 8px;
-  height: var(--funnel-stat-row-height);
-}
-
 .funnel-stat-row__label {
   font-size: var(--funnel-hud-label-size);
   font-weight: var(--funnel-hud-label-weight);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--funnel-text-dim);
   text-align: left;
   line-height: 1;
+  height: 1em;
   white-space: nowrap;
+  overflow: hidden;
 }
 
 .funnel-stat-row__label--health {
@@ -745,19 +756,18 @@ body {
   color: var(--funnel-shield-color);
 }
 
-.funnel-stat-row__label--numeric {
-  text-transform: uppercase;
-  font-family: var(--funnel-hud-mono-font);
-  font-variant-numeric: tabular-nums;
-  color: #ffffff;
+.funnel-ammo .funnel-stat-row__label--mag {
+  color: rgb(var(--funnel-ammo-accent-rgb));
 }
 
-.funnel-ammo__count {
-  text-align: left;
+.funnel-ammo .funnel-stat-row__label--reload {
+  color: var(--funnel-team-ally-soft);
 }
 
 .funnel-stat-row__track {
   height: var(--funnel-stat-track-height);
+  min-height: 0;
+  max-height: var(--funnel-stat-track-height);
   min-width: 0;
   border-radius: var(--funnel-stat-track-radius);
   overflow: hidden;
@@ -799,11 +809,13 @@ body {
   gap: var(--funnel-ammo-cell-gap);
   width: 100%;
   height: 100%;
+  min-height: 0;
 }
 
 .funnel-ammo__cell {
   flex: 1 1 0;
   min-width: 0;
+  min-height: 0;
   height: 100%;
   border-radius: var(--funnel-ammo-cell-radius);
   box-shadow: none;
@@ -1475,6 +1487,20 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
   line-height: 1;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 48px var(--funnel-team-ally-glow);
+}
+
+.funnel-death-overlay__killer {
+  margin: 6px 0 0;
+  color: var(--funnel-text-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.funnel-death-overlay__weapon {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: none;
 }
 
 .funnel-revive-hire-panel {

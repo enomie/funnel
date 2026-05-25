@@ -128,6 +128,10 @@ export class BotNavigationCache {
     this.#peelSign = null;
   }
 
+  flushAccumulator(): void {
+    this.#accumulator = 0;
+  }
+
   update(fixedStep: number, input: BotNavigationInput): BotNavigationSnapshot {
     return this.#update(fixedStep, input);
   }

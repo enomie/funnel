@@ -20,6 +20,7 @@ import {
   AUDIO_PANNER_ROLLOFF_FACTOR
 } from './audio-config';
 import { AudioContextEngine } from './audio-mixer';
+import { isAudioAlive } from './audio-guard';
 
 const WORLD_UP_Y = 1;
 const LISTENER_EPSILON_SQ = 0.000001;
@@ -74,6 +75,10 @@ export function readAudioListenerPosition(out: Vector3): Vector3 {
 }
 
 export function syncAudioListenerFromCamera(vectors: CameraVectors): void {
+  if (!isAudioAlive()) {
+    return;
+  }
+
   const origin = vectors.origin;
   const forward = vectors.direction;
 

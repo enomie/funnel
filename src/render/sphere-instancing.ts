@@ -175,7 +175,7 @@ export class SphereInstancingService {
     endScale: number,
     durationMs = IMPACT_BURST_DURATION_MS,
     startScale = IMPACT_BURST_START_SCALE,
-    spawnedAtMs = performance.now(),
+    spawnedAtMs: number,
     profile: {
       expandPeakFraction?: number;
       expandEase?: 'quad' | 'cubic';

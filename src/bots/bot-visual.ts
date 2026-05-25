@@ -15,11 +15,13 @@ import { HumanoidVisual } from '../player/humanoid-visual';
 import { PlayerAimSpine } from '../player/player-aim-spine';
 import type { ShooterPackCharacter } from '../player/shooter-pack-loader';
 import type { PlayerTeam } from '../player/player-team';
+import { factionHumanoidRig, type HumanoidRigId } from '../player/humanoid-rig';
 import { applyRelativeTeamColors } from '../player/team-visual-colors';
 
 export class BotVisual {
   readonly #humanoid: HumanoidVisual;
   readonly #aimSpine = new PlayerAimSpine();
+  readonly #rigId: HumanoidRigId;
   #faction: FactionTeam;
   #weaponSocket: Group;
   #muzzleSocket: Group;
@@ -32,6 +34,7 @@ export class BotVisual {
     weapon: WeaponDefinition
   ) {
     this.#faction = slot.faction;
+    this.#rigId = template?.rigId ?? factionHumanoidRig(slot.faction);
     this.#humanoid = new HumanoidVisual(
       template === undefined ? `bot-fallback-${slot.faction}` : `bot-${slot.faction}`,
       scene
@@ -68,6 +71,10 @@ export class BotVisual {
     return this.#humanoid.locomotionClipId;
   }
 
+  get rigId(): HumanoidRigId {
+    return this.#rigId;
+  }
+
   get faction(): FactionTeam {
     return this.#faction;
   }
@@ -87,7 +94,7 @@ export class BotVisual {
     applyRelativeTeamColors(this.root, role);
   }
 
-  flashDamage(nowMs?: number): void {
+  flashDamage(nowMs: number): void {
     this.#humanoid.flashDamage(nowMs);
   }
 
@@ -99,8 +106,8 @@ export class BotVisual {
     deltaSeconds: number,
     input: LocomotionAnimInput,
     aimPitch: number,
-    visualReduced = false,
-    nowMs?: number
+    visualReduced: boolean,
+    nowMs: number
   ): void {
     this.#humanoid.updateLocomotion(deltaSeconds, input, nowMs, visualReduced);
     if (input.isDead || visualReduced) {

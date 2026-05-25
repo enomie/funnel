@@ -74,10 +74,10 @@ export class HumanoidVisual {
   updateLocomotion(
     deltaSeconds: number,
     input: LocomotionAnimInput,
-    nowMs?: number,
+    nowMs: number,
     visualReduced = false
   ): void {
-    const flashNowMs = nowMs ?? performance.now();
+    const flashNowMs = nowMs;
 
     this.#locomotion?.update(deltaSeconds, input);
 
@@ -109,7 +109,7 @@ export class HumanoidVisual {
     this.#teamRole = role;
   }
 
-  flashDamage(nowMs = performance.now()): void {
+  flashDamage(nowMs: number): void {
     this.#flashUntilMs = nowMs + DAMAGE_HIT_FLASH_MS;
     if (this.#character !== null) {
       setJointHitFlash(this.#character, this.#teamRole, true);

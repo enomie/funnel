@@ -1,6 +1,7 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/core/game-events.ts
 
 import type { FactionTeam } from '../combat/teams';
+import type { ProjectileVisualKind } from '../combat/weapon-definitions';
 
 export interface ActorDamagedEvent {
   readonly actorId: string;
@@ -9,14 +10,17 @@ export interface ActorDamagedEvent {
   readonly remainingShield: number;
   readonly sourceFaction: FactionTeam;
   readonly sourceActorId?: string;
+  readonly sourceWeaponVisualKind?: ProjectileVisualKind;
+  readonly nowMs: number;
 }
 
 export interface ActorDiedEvent {
   readonly actorId: string;
   readonly faction: FactionTeam;
-  
   readonly sourceFaction: FactionTeam;
   readonly sourceActorId?: string;
+  readonly sourceWeaponVisualKind?: ProjectileVisualKind;
+  readonly nowMs: number;
 }
 
 export interface ActorRespawnedEvent {

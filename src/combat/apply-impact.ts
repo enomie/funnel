@@ -6,10 +6,13 @@ import { Vector3 } from 'three/webgpu';
 import { COMBAT_DAMAGE_CONFIG } from '../config/game-config';
 import { ACTOR_RAY_QUERY_GROUPS } from '../physics/collision-groups';
 import type { GameEventBus } from '../core/event-bus';
+import { commitActorDeath } from './actor-death-lifecycle';
+import type { ActorDeathLifecycleDeps } from './actor-death-lifecycle';
 import type { ActorRegistry } from './actor-registry';
 import type { CombatActor } from './combat-actor';
 import { areSameFaction, type FactionTeam } from './teams';
 import type { ImpactProfile } from './weapon-definitions';
+import type { ProjectileVisualKind } from './weapon-definitions';
 
 const SPLASH_CENTER_FRACTION = 1;
 const SPLASH_EDGE_FRACTION = 0.35;
@@ -28,15 +31,18 @@ let _splashLosRay: RAPIER.Ray | null = null;
 export interface ApplyImpactRequest {
   sourceFaction: FactionTeam;
   sourceActorId?: string;
+  sourceWeaponVisualKind?: ProjectileVisualKind;
   impact: ImpactProfile;
   point: Vector3;
   hitCollider?: Collider;
+  nowMs: number;
 }
 
 export interface ApplyImpactDeps {
   registry: ActorRegistry;
   bus: GameEventBus;
   world: World;
+  deathLifecycle: ActorDeathLifecycleDeps;
 }
 
 
@@ -57,8 +63,10 @@ export function applyImpact(deps: ApplyImpactDeps, request: ApplyImpactRequest):
       deps,
       request.sourceFaction,
       request.sourceActorId,
+      request.sourceWeaponVisualKind,
       directTarget,
-      request.impact
+      request.impact,
+      request.nowMs
     );
   }
 
@@ -70,9 +78,11 @@ export function applyImpact(deps: ApplyImpactDeps, request: ApplyImpactRequest):
     deps,
     request.sourceFaction,
     request.sourceActorId,
+    request.sourceWeaponVisualKind,
     request.point,
     request.impact,
-    directTarget
+    directTarget,
+    request.nowMs
   );
 }
 
@@ -80,8 +90,10 @@ function applyDirectDamage(
   deps: ApplyImpactDeps,
   sourceFaction: FactionTeam,
   sourceActorId: string | undefined,
+  sourceWeaponVisualKind: ProjectileVisualKind | undefined,
   target: CombatActor,
-  impact: ImpactProfile
+  impact: ImpactProfile,
+  nowMs: number
 ): void {
   if (!canDamageTarget(sourceFaction, target, impact.splashFriendlyFire === true)) {
     return;
@@ -92,16 +104,26 @@ function applyDirectDamage(
     return;
   }
 
-  damageActor(deps, sourceFaction, sourceActorId, target, amount);
+  damageActor(
+    deps,
+    sourceFaction,
+    sourceActorId,
+    sourceWeaponVisualKind,
+    target,
+    amount,
+    nowMs
+  );
 }
 
 function applySplashDamage(
   deps: ApplyImpactDeps,
   sourceFaction: FactionTeam,
   sourceActorId: string | undefined,
+  sourceWeaponVisualKind: ProjectileVisualKind | undefined,
   center: Vector3,
   impact: ImpactProfile,
-  directTarget: CombatActor | null
+  directTarget: CombatActor | null,
+  nowMs: number
 ): void {
   const { impactRadius, directDamage } = impact;
   if (impactRadius <= 0) {
@@ -139,7 +161,7 @@ function applySplashDamage(
 
       const falloff = 1 - dist / impactRadius;
       const amount = resolveDamageAmount(impact, directDamage, falloff);
-      damageActor(deps, sourceFaction, sourceActorId, actor, amount);
+      damageActor(deps, sourceFaction, sourceActorId, sourceWeaponVisualKind, actor, amount, nowMs);
     }
   );
 }
@@ -188,15 +210,17 @@ function damageActor(
   deps: ApplyImpactDeps,
   sourceFaction: FactionTeam,
   sourceActorId: string | undefined,
+  sourceWeaponVisualKind: ProjectileVisualKind | undefined,
   target: CombatActor,
-  amount: number
+  amount: number,
+  nowMs: number
 ): void {
   if (amount <= 0 || target.health.isDead) {
     return;
   }
 
   const resolvedAmount = resolveWeaponDamageAmount(target, amount);
-  const result = target.health.damage(resolvedAmount);
+  const result = target.health.damage(resolvedAmount, nowMs);
 
   deps.bus.emit('actor-damaged', {
     actorId: target.id,
@@ -204,15 +228,19 @@ function damageActor(
     remaining: result.remainingHealth,
     remainingShield: result.remainingShield,
     sourceFaction,
-    sourceActorId
+    sourceActorId,
+    sourceWeaponVisualKind,
+    nowMs
   });
 
   if (result.remainingHealth <= 0) {
-    deps.bus.emit('actor-died', {
+    commitActorDeath(deps.deathLifecycle, {
       actorId: target.id,
       faction: target.getFaction(),
+      nowMs,
       sourceFaction,
-      sourceActorId
+      sourceActorId,
+      sourceWeaponVisualKind
     });
   }
 }
@@ -220,6 +248,7 @@ function damageActor(
 export interface ExpandingLethalBlastTick {
   sourceFaction: FactionTeam;
   sourceActorId?: string;
+  sourceWeaponVisualKind?: ProjectileVisualKind;
   center: Vector3;
   currentRadius: number;
   killedActorIds: Set<string>;
@@ -275,7 +304,15 @@ export function tickExpandingLethalBlast(
       }
 
       tick.killedActorIds.add(actor.id);
-      damageActor(deps, tick.sourceFaction, tick.sourceActorId, actor, LETHAL_DAMAGE);
+      damageActor(
+        deps,
+        tick.sourceFaction,
+        tick.sourceActorId,
+        tick.sourceWeaponVisualKind,
+        actor,
+        LETHAL_DAMAGE,
+        nowMs
+      );
     }
   );
 }
@@ -284,9 +321,11 @@ export function killActorFromBlastDirectHit(
   deps: ApplyImpactDeps,
   sourceFaction: FactionTeam,
   sourceActorId: string | undefined,
+  sourceWeaponVisualKind: ProjectileVisualKind | undefined,
   hitCollider: Collider,
   killedActorIds: Set<string>,
-  friendlyFire: boolean
+  friendlyFire: boolean,
+  nowMs: number
 ): void {
   const target = deps.registry.resolveCollider(hitCollider);
   if (target === null || target.health.isDead || killedActorIds.has(target.id)) {
@@ -298,7 +337,7 @@ export function killActorFromBlastDirectHit(
   }
 
   killedActorIds.add(target.id);
-  damageActor(deps, sourceFaction, sourceActorId, target, LETHAL_DAMAGE);
+  damageActor(deps, sourceFaction, sourceActorId, sourceWeaponVisualKind, target, LETHAL_DAMAGE, nowMs);
 }
 
 function resolveSourceBody(deps: ApplyImpactDeps, sourceActorId: string | undefined): RigidBody | null {

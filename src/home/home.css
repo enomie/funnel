@@ -17,6 +17,7 @@
   --home-line: rgba(16, 58, 173, 0.55);
   --home-card-border: rgba(255, 255, 255, 0.12);
   --home-card-width: 300px;
+  --home-control-card-width: 240px;
   --home-hero-width: min(1120px, calc(100% - 40px));
 }
 
@@ -129,7 +130,7 @@ body.home > * {
   width: 100%;
   max-width: var(--home-hero-width);
   margin-inline: auto;
-  padding: clamp(48px, 12vh, 96px) 20px clamp(24px, 4vh, 40px);
+  padding: clamp(48px, 12vh, 96px) 20px 0;
   text-align: center;
 }
 
@@ -185,7 +186,7 @@ body.home > * {
   width: 100%;
   max-width: var(--home-hero-width);
   margin-inline: auto;
-  padding: 0 20px clamp(36px, 6vh, 56px);
+  padding: 90px 20px 90px;
   text-align: center;
 }
 
@@ -243,7 +244,7 @@ body.home > * {
   display: flex;
   flex-direction: column;
   gap: 28px;
-  padding: 32px 0 24px;
+  padding: 8px 0 24px;
 }
 
 .home-slider {
@@ -257,6 +258,7 @@ body.home > * {
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+  text-align: center;
   color: var(--home-text-dim);
 }
 
@@ -348,7 +350,7 @@ body.home > * {
 }
 
 .home-card__slot {
-  font-size: 11px;
+ 
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--card-accent, var(--home-text-dim));
@@ -362,6 +364,17 @@ body.home > * {
 }
 
 .home-card--tip .home-card__title {
+  color: var(--home-team);
+  margin-bottom: 8px;
+}
+
+.home-card--control {
+  flex: 0 1 var(--home-control-card-width);
+  width: var(--home-control-card-width);
+  border-color: var(--home-team);
+}
+
+.home-card--control .home-card__title {
   color: var(--home-team);
   margin-bottom: 8px;
 }
@@ -395,36 +408,27 @@ body.home > * {
 
 .home-keys {
   padding: 8px 20px 32px;
+  max-width: var(--home-hero-width);
+  margin-inline: auto;
+  width: 100%;
 }
 
 .home-keys__heading {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
+  padding: 0;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+  text-align: center;
   color: var(--home-text-dim);
 }
 
-.home-keys__grid {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 16px;
-  max-width: 640px;
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.home-keys__grid dt {
-  margin: 0;
-  font-weight: 700;
-  color: var(--home-text-dim);
-}
-
-.home-keys__grid dd {
-  margin: 0;
-  color: #c0cedc;
+.home-keys__list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
 }
 
 /* —— Footer —— */
@@ -514,5 +518,6 @@ body.home > * {
 
   :root {
     --home-card-width: 260px;
+    --home-control-card-width: min(240px, 100%);
   }
 }

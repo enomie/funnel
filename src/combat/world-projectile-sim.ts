@@ -18,6 +18,7 @@ import {
 import {
   createProjectileVisual,
   createRipperCoreVisual,
+  disposeSceneProjectileVisual,
   isBoltProjectileKind,
   resetProjectileTransform
 } from './projectile-visuals';
@@ -28,7 +29,6 @@ import {
   tickExpandingLethalBlastEffect,
   type ExpandingLethalBlast
 } from './expanding-lethal-blast';
-import { getAudioRedeemerImpact } from '../game-audio/audio-one-shots/audio-impact-redeemer';
 import { CombatPointLightPool } from '../render/combat-point-light-pool';
 import {
   beginRedeemerImpactFlash,
@@ -61,7 +61,6 @@ import type {
   RocketSmokeTrailInstancingService
 } from '../render/rocket-smoke-trail-instancing';
 import { ROCKET_SMOKE_SPAWN_INTERVAL_MS } from '../render/rocket-smoke-trail-instancing';
-import { detachSceneObject } from '../render/dispose-three';
 import {
   findFirstShockOrbAlongRay,
   projectileIsShockOrb,
@@ -246,15 +245,6 @@ export interface ProjectileSimBridge {
   readonly maxActive: number;
   readonly sourceFaction: () => FactionTeam;
   readonly impactSink: CombatImpactSink;
-  playImpact(
-    weapon: WeaponDefinition,
-    point: Vector3,
-    gain: number,
-    impact: ImpactProfile,
-    options?: { ricochet?: boolean }
-  ): void;
-  playRedeemerBlastSpread(position: Vector3, gain: number): number | null;
-  stopRedeemerBlastSpread(slot: number): void;
   resolveShockCombo?(hit: ShockOrbRayHit): void;
 }
 
@@ -281,6 +271,8 @@ export class WorldProjectileSim implements WorldEffectsSource {
   readonly #ownerAim = new Map<string, { yaw: number; pitch: number }>();
   #nextProjectileId = 1;
   #projectileTickNowMs = 0;
+  #shedNonCriticalThisFrame = false;
+  #flybySyncPhase = 0;
 
   constructor(
     scene: Scene,
@@ -400,9 +392,31 @@ export class WorldProjectileSim implements WorldEffectsSource {
     weapon: WeaponDefinition,
     impact: ImpactProfile,
     position: Vector3,
-    kind: ImpactBurstKind
+    kind: ImpactBurstKind,
+    impactRadiusOverride?: number,
+    nowMs?: number
   ): void {
-    this.#spawnImpact(weapon, impact, position, kind);
+    this.#spawnImpact(weapon, impact, position, kind, impactRadiusOverride, nowMs);
+  }
+
+  spawnOwnerLethalDetonation(
+    ownerId: string,
+    weapon: WeaponDefinition,
+    impact: ImpactProfile,
+    position: Vector3,
+    nowMs: number,
+    impactGain: number,
+    hitCollider?: Collider
+  ): void {
+    this.#spawnLethalDetonationAt(
+      ownerId,
+      weapon,
+      impact,
+      position,
+      nowMs,
+      impactGain,
+      hitCollider
+    );
   }
 
   detonateById(id: number, impactGain = REDEEMER_GUIDED_IMPACT_GAIN): boolean {
@@ -425,6 +439,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
     impact: ImpactProfile,
     direction: Vector3,
     muzzlePosition: Vector3,
+    nowMs: number,
     limits?: ProjectileSpawnLimits
   ): number {
     const bridge = this.#bridges.get(ownerId);
@@ -537,7 +552,6 @@ export class WorldProjectileSim implements WorldEffectsSource {
       fire.speed,
       impact.impactRadius
     );
-    const nowMs = performance.now();
     const id = this.#nextProjectileId;
     this.#nextProjectileId += 1;
 
@@ -594,8 +608,8 @@ export class WorldProjectileSim implements WorldEffectsSource {
     );
   }
 
-  tickWorld(nowMs: number, deltaSeconds: number): void {
-    this.#updateProjectiles(deltaSeconds, nowMs);
+  tickWorld(nowMs: number, deltaSeconds: number, shedNonCritical = false): void {
+    this.#updateProjectiles(deltaSeconds, nowMs, shedNonCritical);
     this.#updateImpactEffects(nowMs);
     tickExplosiveImpactFlashes(this.#pointLightPool, this.#redeemerFlashes, nowMs);
     if (this.#rocketSmoke !== null && this.#rocketSmoke.hasActive()) {
@@ -607,128 +621,155 @@ export class WorldProjectileSim implements WorldEffectsSource {
     return this.#bridges.get(projectile.ownerId) ?? null;
   }
 
-  #updateProjectiles(deltaSeconds: number, nowMs: number): void {
+  #updateProjectiles(deltaSeconds: number, nowMs: number, shedNonCritical: boolean): void {
     this.#projectileTickNowMs = nowMs;
-    for (let index = this.#projectiles.length - 1; index >= 0; index -= 1) {
+    this.#shedNonCriticalThisFrame = shedNonCritical;
+    const flybySyncStride =
+      shedNonCritical ? 0 : this.#projectiles.length > 14 ? 2 : 1;
+    let index = this.#projectiles.length - 1;
+    while (index >= 0) {
+      if (index >= this.#projectiles.length) {
+        index = this.#projectiles.length - 1;
+        if (index < 0) {
+          break;
+        }
+      }
+
       const projectile = this.#projectiles[index];
+      let removedCurrent = false;
 
       if (projectile.stuckDetonateAtMs > 0) {
         this.#syncProjectileVisual(projectile);
         this.#syncRedeemerFlightLightFor(projectile);
-        if (nowMs < projectile.stuckDetonateAtMs) {
-          continue;
+        if (nowMs >= projectile.stuckDetonateAtMs) {
+          this.#detonateProjectile(projectile, projectile.position);
+          this.#removeProjectile(projectile);
+          removedCurrent = true;
+        }
+      } else {
+        this.#steerGuidedProjectile(projectile, deltaSeconds);
+
+        if (projectile.weapon.visualKind === 'rocket') {
+          projectile.rollAngle += ROCKET_SPIN_RAD_S * deltaSeconds;
         }
 
-        this.#detonateProjectile(projectile, projectile.position);
-        this.#removeProjectileAt(index);
-        continue;
-      }
+        const previousPosition = _previousPosition.copy(projectile.position);
+        this.#integrateProjectileMotion(projectile, deltaSeconds);
+        let remainingDistance = projectile.velocity.length() * deltaSeconds;
+        let shouldRemove = false;
+        let collisionSteps = 0;
 
-      this.#steerGuidedProjectile(projectile, deltaSeconds);
+        while (remainingDistance > MIN_STEP_DISTANCE) {
+          if (collisionSteps >= MAX_COLLISION_STEPS_PER_FRAME) {
+            projectile.position.addScaledVector(projectile.direction, remainingDistance);
+            this.#spawnTrail(projectile, previousPosition, projectile.position);
+            break;
+          }
 
-      if (projectile.weapon.visualKind === 'rocket') {
-        projectile.rollAngle += ROCKET_SPIN_RAD_S * deltaSeconds;
-      }
+          const comboHit = this.#findShockComboHit(projectile, remainingDistance);
+          const hit = this.#castProjectileStep(projectile, remainingDistance);
 
-      const previousPosition = _previousPosition.copy(projectile.position);
-      this.#integrateProjectileMotion(projectile, deltaSeconds);
-      let remainingDistance = projectile.velocity.length() * deltaSeconds;
-      let shouldRemove = false;
-      let collisionSteps = 0;
+          if (
+            comboHit !== null &&
+            (hit === null || comboHit.distance <= hit.distance)
+          ) {
+            this.#spawnTrail(projectile, previousPosition, comboHit.point, true);
+            this.#bridgeFor(projectile)?.resolveShockCombo?.(comboHit);
+            shouldRemove = true;
+            break;
+          }
 
-      while (remainingDistance > MIN_STEP_DISTANCE) {
-        if (collisionSteps >= MAX_COLLISION_STEPS_PER_FRAME) {
-          projectile.position.addScaledVector(projectile.direction, remainingDistance);
-          this.#spawnTrail(projectile, previousPosition, projectile.position);
-          break;
-        }
+          if (hit === null) {
+            projectile.position.addScaledVector(projectile.direction, remainingDistance);
+            this.#spawnTrail(projectile, previousPosition, projectile.position);
+            break;
+          }
 
-        const comboHit = this.#findShockComboHit(projectile, remainingDistance);
-        const hit = this.#castProjectileStep(projectile, remainingDistance);
+          this.#spawnTrail(projectile, previousPosition, hit.point, true);
+          const stepDistance = Math.max(hit.distance, MIN_STEP_DISTANCE);
+          remainingDistance -= stepDistance;
 
-        if (
-          comboHit !== null &&
-          (hit === null || comboHit.distance <= hit.distance)
-        ) {
-          this.#spawnTrail(projectile, previousPosition, comboHit.point, true);
-          this.#bridgeFor(projectile)?.resolveShockCombo?.(comboHit);
+          if (this.#tryRipperActorHit(projectile, hit)) {
+            shouldRemove = true;
+            break;
+          }
+
+          if (this.#tryRicochet(projectile, hit)) {
+            previousPosition.copy(projectile.position);
+            collisionSteps += 1;
+            continue;
+          }
+
+          if (this.#tryBioDirectActorHit(projectile, hit)) {
+            shouldRemove = true;
+            break;
+          }
+
+          if (this.#tryStickProjectile(projectile, hit)) {
+            shouldRemove = false;
+            break;
+          }
+
+          this.#handleProjectileHit(projectile, hit);
           shouldRemove = true;
           break;
         }
 
-        if (hit === null) {
-          projectile.position.addScaledVector(projectile.direction, remainingDistance);
-          this.#spawnTrail(projectile, previousPosition, projectile.position);
-          break;
+        if (shouldRemove) {
+          this.#removeProjectile(projectile);
+          removedCurrent = true;
+        } else if (this.#shouldExpireProjectile(projectile, nowMs)) {
+          this.#detonateProjectile(projectile, projectile.position);
+          this.#removeProjectile(projectile);
+          removedCurrent = true;
+        } else {
+          if (projectile.flySlot !== null) {
+            const shouldSyncFlyby =
+              flybySyncStride > 0 &&
+              (flybySyncStride === 1 ||
+                ((projectile.id + this.#flybySyncPhase) & 1) === 0);
+            if (
+              shouldSyncFlyby &&
+              !this.#audio.syncProjectileFly(
+                projectile.flySlot,
+                projectile.position,
+                projectile.direction,
+                projectile.velocity.length()
+              )
+            ) {
+              projectile.flySlot = null;
+            }
+          }
+
+          if (
+            !shedNonCritical &&
+            projectile.flySlot === null &&
+            this.#audio.hasFreeProjectileFlySlot()
+          ) {
+            projectile.flySlot = this.#audio.attachProjectileFly(
+              projectile.weapon,
+              projectile.position,
+              projectile.direction,
+              projectile.velocity.length(),
+              projectile.impact.impactRadius
+            );
+          }
+
+          this.#syncProjectileVisual(projectile);
+          this.#syncRedeemerFlightLightFor(projectile);
         }
-
-        this.#spawnTrail(projectile, previousPosition, hit.point, true);
-        const stepDistance = Math.max(hit.distance, MIN_STEP_DISTANCE);
-        remainingDistance -= stepDistance;
-
-        if (this.#tryRipperActorHit(projectile, hit)) {
-          shouldRemove = true;
-          break;
-        }
-
-        if (this.#tryRicochet(projectile, hit)) {
-          previousPosition.copy(projectile.position);
-          collisionSteps += 1;
-          continue;
-        }
-
-        if (this.#tryBioDirectActorHit(projectile, hit)) {
-          shouldRemove = true;
-          break;
-        }
-
-        if (this.#tryStickProjectile(projectile, hit)) {
-          shouldRemove = false;
-          break;
-        }
-
-        this.#handleProjectileHit(projectile, hit);
-        shouldRemove = true;
-        break;
       }
 
-      if (shouldRemove) {
-        this.#removeProjectileAt(index);
+      if (removedCurrent) {
+        if (index >= this.#projectiles.length) {
+          index = this.#projectiles.length - 1;
+        }
         continue;
       }
 
-      if (this.#shouldExpireProjectile(projectile, nowMs)) {
-        this.#detonateProjectile(projectile, projectile.position);
-        this.#removeProjectileAt(index);
-        continue;
-      }
-
-      if (projectile.flySlot !== null) {
-        if (
-          !this.#audio.syncProjectileFly(
-            projectile.flySlot,
-            projectile.position,
-            projectile.direction,
-            projectile.velocity.length()
-          )
-        ) {
-          projectile.flySlot = null;
-        }
-      }
-
-      if (projectile.flySlot === null) {
-        projectile.flySlot = this.#audio.attachProjectileFly(
-          projectile.weapon,
-          projectile.position,
-          projectile.direction,
-          projectile.velocity.length(),
-          projectile.impact.impactRadius
-        );
-      }
-
-      this.#syncProjectileVisual(projectile);
-      this.#syncRedeemerFlightLightFor(projectile);
+      index -= 1;
     }
+    this.#flybySyncPhase = (this.#flybySyncPhase + 1) & 1;
   }
 
   #syncRedeemerFlightLightFor(projectile: WorldProjectile): void {
@@ -935,12 +976,14 @@ export class WorldProjectileSim implements WorldEffectsSource {
       projectile.impact,
       projectile.ricochetsRemaining
     );
-    bridge.playImpact(projectile.weapon, hit.point, IMPACT_GAIN_NORMAL, gameplayImpact);
+    this.#audio.playImpact(projectile.weapon, hit.point, IMPACT_GAIN_NORMAL, gameplayImpact);
     this.#spawnRipperImpactBurst(projectile, hit.point);
     bridge.impactSink.apply({
       impact: gameplayImpact,
       point: hit.point,
-      hitCollider: hit.collider
+      hitCollider: hit.collider,
+      sourceWeaponVisualKind: projectile.weapon.visualKind,
+      nowMs: this.#projectileTickNowMs
     });
     return true;
   }
@@ -959,7 +1002,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       ...projectile.impact,
       impactRadius: 0
     };
-    bridge.playImpact(projectile.weapon, point, IMPACT_GAIN_NORMAL, directImpact);
+    this.#audio.playImpact(projectile.weapon, point, IMPACT_GAIN_NORMAL, directImpact);
     this.#spawnImpact(
       projectile.weapon,
       directImpact,
@@ -970,7 +1013,9 @@ export class WorldProjectileSim implements WorldEffectsSource {
     bridge.impactSink.apply({
       impact: directImpact,
       point,
-      hitCollider
+      hitCollider,
+      sourceWeaponVisualKind: projectile.weapon.visualKind,
+      nowMs: this.#projectileTickNowMs
     });
   }
 
@@ -989,7 +1034,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
     projectile.position
       .copy(hit.point)
       .addScaledVector(hit.normal, BOUNCE_SURFACE_NUDGE * 0.35);
-    projectile.stuckDetonateAtMs = performance.now() + delayMs;
+    projectile.stuckDetonateAtMs = this.#projectileTickNowMs + delayMs;
     projectile.ricochetsRemaining = 0;
 
     if (projectile.flySlot !== null) {
@@ -997,7 +1042,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       projectile.flySlot = null;
     }
 
-    bridge.playImpact(
+    this.#audio.playImpact(
       projectile.weapon,
       projectile.position,
       STICK_IMPACT_GAIN,
@@ -1038,7 +1083,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       projectile.impact,
       projectile.ricochetsRemaining
     );
-    bridge.playImpact(projectile.weapon, position, impactGain, impact);
+    this.#audio.playImpact(projectile.weapon, position, impactGain, impact);
     if (projectile.weapon.visualKind === 'ripper') {
       this.#spawnRipperImpactBurst(projectile, position);
     } else {
@@ -1047,7 +1092,9 @@ export class WorldProjectileSim implements WorldEffectsSource {
     bridge.impactSink.apply({
       impact,
       point: position,
-      hitCollider
+      hitCollider,
+      sourceWeaponVisualKind: projectile.weapon.visualKind,
+      nowMs: this.#projectileTickNowMs
     });
   }
 
@@ -1073,7 +1120,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
         projectile.impact,
         projectile.ricochetsRemaining
       );
-      bridge.playImpact(projectile.weapon, hit.point, IMPACT_GAIN_NORMAL, gameplayImpact, {
+      this.#audio.playImpact(projectile.weapon, hit.point, IMPACT_GAIN_NORMAL, gameplayImpact, {
         ricochet: true
       });
       this.#spawnRipperImpactBurst(projectile, hit.point);
@@ -1151,7 +1198,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       .copy(hit.point)
       .addScaledVector(hit.normal, BOUNCE_SURFACE_NUDGE * 0.6);
 
-    bridge.playImpact(
+    this.#audio.playImpact(
       projectile.weapon,
       _shrapnelSpawnPoint,
       GRENADE_SPLIT_IMPACT_GAIN,
@@ -1161,7 +1208,9 @@ export class WorldProjectileSim implements WorldEffectsSource {
     bridge.impactSink.apply({
       impact,
       point: _shrapnelSpawnPoint,
-      hitCollider: hit.collider
+      hitCollider: hit.collider,
+      sourceWeaponVisualKind: projectile.weapon.visualKind,
+      nowMs: this.#projectileTickNowMs
     });
 
     const speed = impact.childShrapnelSpeed ?? 11;
@@ -1203,6 +1252,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
           childImpact,
           direction,
           _shrapnelSpawnPoint,
+          this.#projectileTickNowMs,
           limits
         );
       }
@@ -1221,7 +1271,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       return null;
     }
 
-    const burstNowMs = (nowMs ?? this.#projectileTickNowMs) || performance.now();
+    const burstNowMs = nowMs ?? this.#projectileTickNowMs;
     if (this.#impactEffects.length >= MAX_IMPACT_BURSTS) {
       this.#removeImpactEffectAt(0);
     }
@@ -1232,8 +1282,8 @@ export class WorldProjectileSim implements WorldEffectsSource {
       impact,
       position,
       kind,
-      impactRadiusOverride,
-      burstNowMs
+      burstNowMs,
+      impactRadiusOverride
     );
     if (burst !== null) {
       this.#impactEffects.push({ burst, expandingLethal: null });
@@ -1266,10 +1316,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
         continue;
       }
 
-      this.#disposeExpandingLethalAudio(effect.expandingLethal);
-      const lastIndex = this.#impactEffects.length - 1;
-      this.#impactEffects[index] = this.#impactEffects[lastIndex];
-      this.#impactEffects.length = lastIndex;
+      this.#removeImpactEffectAt(index);
     }
   }
 
@@ -1279,14 +1326,6 @@ export class WorldProjectileSim implements WorldEffectsSource {
     hitCollider?: Collider,
     impactGain = REDEEMER_GUIDED_IMPACT_GAIN
   ): void {
-    const bridge = this.#bridgeFor(projectile);
-    if (bridge === null) {
-      return;
-    }
-
-    const impact = projectile.impact;
-    this.#capExpandingLethalBlasts();
-
     if (projectile.weapon.visualKind === 'redeemer') {
       const flightLightSlot = projectile.lightSlot;
       projectile.lightSlot = -1;
@@ -1295,10 +1334,39 @@ export class WorldProjectileSim implements WorldEffectsSource {
         x: position.x,
         y: position.y,
         z: position.z,
-        spawnedAtMs: performance.now(),
-        expandMs: impact.impactExpandMs
+        spawnedAtMs: this.#projectileTickNowMs,
+        expandMs: projectile.impact.impactExpandMs
       });
     }
+
+    this.#spawnLethalDetonationAt(
+      projectile.ownerId,
+      projectile.weapon,
+      projectile.impact,
+      position,
+      this.#projectileTickNowMs,
+      impactGain,
+      hitCollider
+    );
+  }
+
+  #spawnLethalDetonationAt(
+    ownerId: string,
+    weapon: WeaponDefinition,
+    impact: ImpactProfile,
+    position: Vector3,
+    nowMs: number,
+    impactGain: number,
+    hitCollider?: Collider
+  ): void {
+    const bridge = this.#bridges.get(ownerId);
+    if (bridge === undefined) {
+      return;
+    }
+
+    const savedTickNow = this.#projectileTickNowMs;
+    this.#projectileTickNowMs = nowMs;
+    this.#capExpandingLethalBlasts();
 
     const expandingLethal = spawnExpandingLethalBlast(
       position,
@@ -1306,22 +1374,26 @@ export class WorldProjectileSim implements WorldEffectsSource {
       impact.impactExpandMs,
       bridge.sourceFaction(),
       bridge.ownerId,
+      weapon.visualKind,
       impact.splashFriendlyFire === true,
+      nowMs,
       hitCollider,
       this.#impactDeps
     );
-    expandingLethal.audioSlot = bridge.playRedeemerBlastSpread(position, impactGain);
+    expandingLethal.audioSlot = this.#audio.playRedeemerBlastSpread(position, impactGain);
 
-    const burst = this.#spawnImpact(projectile.weapon, impact, position, 'hit');
+    const burst = this.#spawnImpact(weapon, impact, position, 'hit', undefined, nowMs);
     if (burst !== null) {
       const effectIndex = this.#impactEffects.findIndex((entry) => entry.burst === burst);
       if (effectIndex >= 0) {
         this.#impactEffects[effectIndex].expandingLethal = expandingLethal;
       }
+      this.#projectileTickNowMs = savedTickNow;
       return;
     }
 
     this.#impactEffects.push({ burst: null, expandingLethal });
+    this.#projectileTickNowMs = savedTickNow;
   }
 
   #maybeSpawnExplosiveImpactFlash(
@@ -1333,7 +1405,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       return;
     }
 
-    const nowMs = performance.now();
+    const nowMs = this.#projectileTickNowMs;
     if (weapon.visualKind === 'rocket') {
       beginRocketImpactFlash(
         this.#pointLightPool,
@@ -1378,13 +1450,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       return;
     }
 
-    const bridge =
-      blast.sourceActorId !== undefined ? this.#bridges.get(blast.sourceActorId) : undefined;
-    if (bridge !== undefined) {
-      bridge.stopRedeemerBlastSpread(blast.audioSlot);
-    } else {
-      getAudioRedeemerImpact().detach(blast.audioSlot);
-    }
+    this.#audio.stopRedeemerBlastSpread(blast.audioSlot);
     blast.audioSlot = null;
   }
 
@@ -1396,6 +1462,10 @@ export class WorldProjectileSim implements WorldEffectsSource {
   }
 
   #spawnTrail(projectile: WorldProjectile, start: Vector3, end: Vector3, force = false): void {
+    if (this.#shedNonCriticalThisFrame && !force) {
+      return;
+    }
+
     if (projectile.weapon.visualKind === 'rocket') {
       this.#spawnRocketSmoke(projectile, force);
     }
@@ -1408,7 +1478,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       return;
     }
 
-    const nowMs = performance.now();
+    const nowMs = this.#projectileTickNowMs;
     if (!force && nowMs < projectile.lastTrailAt + TRAIL_SPAWN_INTERVAL_MS) {
       return;
     }
@@ -1418,16 +1488,21 @@ export class WorldProjectileSim implements WorldEffectsSource {
       start,
       end,
       projectileVisualColor(projectile),
-      TRAIL_REMOVE_AFTER_MS
+      TRAIL_REMOVE_AFTER_MS,
+      nowMs
     );
   }
 
   #spawnRocketSmoke(projectile: WorldProjectile, force = false): void {
+    if (this.#shedNonCriticalThisFrame && !force) {
+      return;
+    }
+
     if (this.#rocketSmoke === null) {
       return;
     }
 
-    const nowMs = performance.now();
+    const nowMs = this.#projectileTickNowMs;
     if (!force && nowMs < projectile.lastSmokeAt + ROCKET_SMOKE_SPAWN_INTERVAL_MS) {
       return;
     }
@@ -1443,8 +1518,26 @@ export class WorldProjectileSim implements WorldEffectsSource {
     );
   }
 
+  #removeProjectile(projectile: WorldProjectile): void {
+    if (!this.#projectileById.has(projectile.id)) {
+      return;
+    }
+
+    const index = this.#projectiles.indexOf(projectile);
+    if (index < 0) {
+      this.#projectileById.delete(projectile.id);
+      return;
+    }
+
+    this.#removeProjectileAt(index);
+  }
+
   #removeProjectileAt(index: number): void {
     const lastIndex = this.#projectiles.length - 1;
+    if (index < 0 || index > lastIndex) {
+      return;
+    }
+
     const projectile = this.#projectiles[index];
     this.#projectileById.delete(projectile.id);
     if (projectile.flySlot !== null) {
@@ -1460,7 +1553,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       releaseRedeemerFlightLight(this.#pointLightPool, projectile.lightSlot);
     }
     if (projectile.object !== null) {
-      detachSceneObject(projectile.object, { scene: this.#scene });
+      disposeSceneProjectileVisual(projectile.object, this.#scene);
     }
     releaseProjectileVectors(projectile);
     if (index !== lastIndex) {

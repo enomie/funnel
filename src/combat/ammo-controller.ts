@@ -12,9 +12,10 @@ export interface AmmoHudSnapshot {
   ammoMax: number;
   ammoCurrent: number;
   weaponColor: number;
-  
   reloadProgress: number;
   cellStates: readonly AmmoCellState[];
+  /** Bumps only when snapshot fields change — HUD dedup without rebuilding keys. */
+  hudRevision: number;
 }
 
 type ActiveReloadKind = 'none' | 'chamber' | 'magazine';
@@ -33,7 +34,8 @@ export class WeaponAmmoController {
   #beamActive = false;
   #reservedCount = 0;
   #bioPreviewCost = 0;
-  #lastHudStateKey = '';
+  #lastHudFingerprint = -1;
+  #hudRevision = 0;
   readonly #cachedCellStates: AmmoCellState[] = [];
   readonly #cachedHudSnapshot: AmmoHudSnapshot = {
     visible: false,
@@ -42,7 +44,8 @@ export class WeaponAmmoController {
     ammoCurrent: 0,
     weaponColor: 0,
     reloadProgress: 0,
-    cellStates: this.#cachedCellStates
+    cellStates: this.#cachedCellStates,
+    hudRevision: 0
   };
   readonly #reloadMechanicsScratch: {
     startedAtMs: number;
@@ -55,7 +58,7 @@ export class WeaponAmmoController {
   };
 
   selectWeapon(weapon: WeaponDefinition): void {
-    this.#lastHudStateKey = '';
+    this.#lastHudFingerprint = -1;
     const profile = weapon.ammo;
     if (profile === undefined) {
       this.#profile = null;
@@ -96,29 +99,28 @@ export class WeaponAmmoController {
     return false;
   }
 
-  getHudSnapshot(weapon: WeaponDefinition): AmmoHudSnapshot {
-    const stateKey = this.#hudStateKey(weapon);
-    if (stateKey === this.#lastHudStateKey) {
+  getHudSnapshot(weapon: WeaponDefinition, nowMs: number): AmmoHudSnapshot {
+    const fingerprint = this.#hudFingerprint(weapon, nowMs);
+    if (fingerprint === this.#lastHudFingerprint) {
       return this.#cachedHudSnapshot;
     }
 
-    this.#lastHudStateKey = stateKey;
-    return this.#rebuildHudSnapshot(weapon);
+    this.#lastHudFingerprint = fingerprint;
+    this.#hudRevision += 1;
+    return this.#rebuildHudSnapshot(weapon, nowMs);
   }
 
-  #hudStateKey(weapon: WeaponDefinition): string {
+  #hudFingerprint(weapon: WeaponDefinition, nowMs: number): number {
     const profile = weapon.ammo;
     if (profile === undefined) {
-      return `0|${weapon.name}|${String(weapon.color)}`;
+      return -(weapon.color + weapon.slotLabel.charCodeAt(0));
     }
 
-    const nowMs = performance.now();
     const ammoCurrent = Math.max(0, Math.min(profile.ammoMax, this.#current));
     let reloadProgressKey = 0;
     if (this.#activeReload === 'magazine' && this.#reloadEndsAtMs > nowMs && this.#reloadDurationMs > 0) {
       const elapsed = nowMs - this.#reloadStartedAtMs;
-      const reloadProgress = Math.min(1, Math.max(0, elapsed / this.#reloadDurationMs));
-      reloadProgressKey = Math.floor(reloadProgress * 1000);
+      reloadProgressKey = Math.floor(Math.min(1, Math.max(0, elapsed / this.#reloadDurationMs)) * 1000);
     }
 
     const chambering =
@@ -130,21 +132,19 @@ export class WeaponAmmoController {
         ? Math.min(this.#beamStartAmmo, pulseBeamAmmoCost(nowMs - this.#beamStartedAtMs, this.#profile))
         : 0;
 
-    return [
-      '1',
-      weapon.name,
-      String(profile.ammoMax),
-      String(ammoCurrent),
-      String(weapon.color),
-      String(reloadProgressKey),
-      String(chambering),
-      String(this.#bioPreviewCost),
-      String(this.#reservedCount),
-      String(beamPreview)
-    ].join('|');
+    let fp = weapon.slotLabel.charCodeAt(0);
+    fp = (fp * 16777619) ^ weapon.color;
+    fp = (fp * 16777619) ^ profile.ammoMax;
+    fp = (fp * 16777619) ^ ammoCurrent;
+    fp = (fp * 16777619) ^ reloadProgressKey;
+    fp = (fp * 16777619) ^ chambering;
+    fp = (fp * 16777619) ^ this.#bioPreviewCost;
+    fp = (fp * 16777619) ^ this.#reservedCount;
+    fp = (fp * 16777619) ^ beamPreview;
+    return fp | 0;
   }
 
-  #rebuildHudSnapshot(weapon: WeaponDefinition): AmmoHudSnapshot {
+  #rebuildHudSnapshot(weapon: WeaponDefinition, nowMs: number): AmmoHudSnapshot {
     const snapshot = this.#cachedHudSnapshot;
     const profile = weapon.ammo;
     if (profile === undefined) {
@@ -154,11 +154,11 @@ export class WeaponAmmoController {
       snapshot.ammoCurrent = 0;
       snapshot.weaponColor = weapon.color;
       snapshot.reloadProgress = 0;
+      snapshot.hudRevision = this.#hudRevision;
       this.#cachedCellStates.length = 0;
       return snapshot;
     }
 
-    const nowMs = performance.now();
     let reloadProgress = 0;
     if (this.#activeReload === 'magazine' && this.#reloadEndsAtMs > nowMs && this.#reloadDurationMs > 0) {
       const elapsed = nowMs - this.#reloadStartedAtMs;
@@ -172,6 +172,7 @@ export class WeaponAmmoController {
     snapshot.ammoCurrent = ammoCurrent;
     snapshot.weaponColor = weapon.color;
     snapshot.reloadProgress = reloadProgress;
+    snapshot.hudRevision = this.#hudRevision;
     this.#buildCellStates(profile.ammoMax, ammoCurrent, nowMs, this.#cachedCellStates);
     return snapshot;
   }
@@ -219,6 +220,19 @@ export class WeaponAmmoController {
 
   isBeamActive(): boolean {
     return this.#beamActive;
+  }
+
+  peekBeamHeatFraction(nowMs: number): number {
+    if (!this.#beamActive || this.#profile === null) {
+      return 0;
+    }
+
+    const maxHold = this.#profile.beamMaxHoldMs ?? 3000;
+    if (maxHold <= 0) {
+      return 0;
+    }
+
+    return Math.min(1, (nowMs - this.#beamStartedAtMs) / maxHold);
   }
 
   setReservedCount(count: number): void {

@@ -14,5 +14,9 @@
   {
     "name": "Crouch Behind Cover",
     "description": "Hold C to duck behind obstacles. You stay in place—crouch is for cover, not for moving."
+  },
+  {
+    "name": "Home Zone Alert",
+    "description": "The central ceiling orb glows in team color when enemies are in that home zone—yours means head back."
   }
 ]

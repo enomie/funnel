@@ -23,6 +23,11 @@ import {
   syncActorDeathState,
   type ActorDeathSnapshot
 } from '../player/actor-death';
+import {
+  fillHumanoidRenderTranslation,
+  PhysicsTranslationInterpolator,
+  type PhysicsTranslationSnapshot
+} from '../physics/physics-interpolation';
 import type { JumpStyle, JumpImpulseResult } from '../player/player-jump';
 import type { BotDriveCommand } from './bot-chase-drive';
 import { IDLE_MOVEMENT, planarSpeedTargetFromCommand } from './bot-chase-drive';
@@ -98,6 +103,9 @@ export class BotController {
   readonly #landingFrameScratch = { landedFromAir: false, landImpactMps: 0 };
   readonly #planarCorrectedScratch = { x: 0, z: 0 };
   readonly #jumpProbeScratch = { shouldJump: false, jumpStyle: 'idle' as JumpStyle, rearmVault: false };
+  readonly #translationInterp = new PhysicsTranslationInterpolator();
+  readonly #renderTranslationScratch: PhysicsTranslationSnapshot = { x: 0, y: 0, z: 0 };
+  #renderInterpolationBlend = 1;
 
   constructor(world: World, slot: BotSpawnSlot, navPhaseSlot = 0, navPhaseSlotCount = 1) {
     this.#world = world;
@@ -123,6 +131,7 @@ export class BotController {
     });
     this.body = humanoid.body;
     this.collider = humanoid.collider;
+    this.#translationInterp.seedFromBody(this.body);
 
     const spawnAirborne = slot.y > PLAYER_GROUNDED_CENTER_Y + 0.05;
     this.#grounded = !spawnAirborne;
@@ -139,6 +148,32 @@ export class BotController {
 
   get aimPitch(): number {
     return this.#aimPitch;
+  }
+
+  setRenderInterpolationBlend(blend: number): void {
+    this.#renderInterpolationBlend = blend;
+  }
+
+  capturePhysicsInterpolation(): void {
+    if (this.health.isDead) {
+      return;
+    }
+
+    this.#translationInterp.captureAfterPhysicsStep(this.body);
+  }
+
+  reseedPhysicsInterpolation(): void {
+    this.#translationInterp.seedFromBody(this.body);
+  }
+
+  fillRenderTranslation(out: PhysicsTranslationSnapshot = this.#renderTranslationScratch): PhysicsTranslationSnapshot {
+    return fillHumanoidRenderTranslation(
+      this.#translationInterp,
+      this.#renderInterpolationBlend,
+      this.body,
+      this.health.isDead,
+      out
+    );
   }
 
   get faction(): FactionTeam {
@@ -284,6 +319,8 @@ export class BotController {
     this.#reconcileGrounded();
   }
 
+  #frameNow = 0;
+
   fixedUpdate(
     fixedStep: number,
     drive: BotDriveCommand | null,
@@ -294,6 +331,7 @@ export class BotController {
       return;
     }
 
+    this.#frameNow = nowMs;
     this.#tryJump(drive, nowMs);
     this.#lastDrive = drive;
 
@@ -310,14 +348,20 @@ export class BotController {
     this.#updateStuckFrames(fixedStep, drive, corrected);
   }
 
-  syncDeathState(): void {
+  syncDeathState(nowMs: number): void {
+    const wasApplied = this.#death.applied;
     syncActorDeathState(
       this.body,
       this.collider,
       this.#death,
       this.health.isDead,
-      this.#yaw
+      this.#yaw,
+      nowMs
     );
+
+    if (!wasApplied && this.#death.applied) {
+      this.reseedPhysicsInterpolation();
+    }
 
     if (this.#death.applied) {
       this.#lastDrive = null;
@@ -332,6 +376,7 @@ export class BotController {
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.navigation.reset(slot.x, slot.z, slot.yaw, this.#navPhaseSlot, this.#navPhaseSlotCount);
     this.routeSteer.reset(slot.x, slot.z, slot.yaw, this.#navPhaseSlot, this.#navPhaseSlotCount);
+    this.reseedPhysicsInterpolation();
   }
 
   reviveInPlace(): void {
@@ -563,7 +608,7 @@ export class BotController {
 
     this.#vaultFailures = Math.min(this.#vaultFailures + 1, BOT_VAULT_FAIL_LIMIT);
     if (this.#vaultFailures >= BOT_VAULT_FAIL_LIMIT) {
-      this.#jumpBannedUntilMs = performance.now() + BOT_JUMP_BAN_MS;
+      this.#jumpBannedUntilMs = this.#frameNow + BOT_JUMP_BAN_MS;
     }
   }
 }

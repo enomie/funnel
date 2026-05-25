@@ -17,7 +17,12 @@ import {
 import type { FactionTeam } from '../combat/teams';
 import type { InputSnapshot } from '../input/input-state';
 import { IDLE_INPUT_SNAPSHOT } from '../input/input-state';
-import { syncHumanoidVisualRoot } from '../physics/synced-body';
+import { syncHumanoidVisualRootAt } from '../physics/synced-body';
+import {
+  fillHumanoidRenderTranslation,
+  fillInterpolatedBodyTranslation,
+  PhysicsTranslationInterpolator
+} from '../physics/physics-interpolation';
 import { PlayerHealth } from './player-health';
 import { FootstepController, type MutableFootstepFrameInput } from './footstep-controller';
 import { createHumanoidCharacterController } from './character-controller-setup';
@@ -116,7 +121,7 @@ export class PlayerController {
     deltaSeconds: number;
     syncDeathState: () => void;
     syncVisualFromBody: () => void;
-    updateLocomotion: (deltaSeconds: number, input: LocomotionAnimInput) => void;
+    updateLocomotion: (deltaSeconds: number, input: LocomotionAnimInput, nowMs: number) => void;
     weapon: WeaponArsenal;
     weaponAim: { yaw: number; pitch: number };
     weaponBodyPosition: Vector3;
@@ -151,6 +156,9 @@ export class PlayerController {
     rigId: undefined
   };
   readonly #planarWishScratch = { x: 0, z: 0 };
+  readonly #translationInterp = new PhysicsTranslationInterpolator();
+  readonly #renderTranslationScratch = { x: 0, y: 0, z: 0 };
+  #renderInterpolationBlend = 1;
   #capsuleMode: HumanoidCapsuleMode | null = null;
   constructor(world: World, visual: PlayerVisual) {
     this.#world = world;
@@ -167,6 +175,7 @@ export class PlayerController {
     });
     this.body = humanoid.body;
     this.collider = humanoid.collider;
+    this.#translationInterp.seedFromBody(this.body);
     this.#humanoidTickContext = {
       isDead: false,
       nowMs: 0,
@@ -185,10 +194,30 @@ export class PlayerController {
     return this.#death;
   }
 
+  applyDeathCommit(nowMs: number): void {
+    this.#syncDeathState(this.#lastInputSnapshot, nowMs);
+  }
+
+  setRenderInterpolationBlend(blend: number): void {
+    this.#renderInterpolationBlend = blend;
+  }
+
+  capturePhysicsInterpolation(): void {
+    if (this.health.isDead) {
+      return;
+    }
+
+    this.#translationInterp.captureAfterPhysicsStep(this.body);
+  }
+
+  reseedPhysicsInterpolation(): void {
+    this.#translationInterp.seedFromBody(this.body);
+  }
+
   
-  beginFrame(input: InputSnapshot): void {
+  beginFrame(input: InputSnapshot, nowMs: number): void {
     this.#lastInputSnapshot = input;
-    this.#frameNow = performance.now();
+    this.#frameNow = nowMs;
     this.#applyDevLifeKeys(input);
 
     if (this.health.isDead) {
@@ -254,6 +283,14 @@ export class PlayerController {
     tickContext.onRevive = onRevive;
     tickHumanoidRenderFrame(tickContext as HumanoidRenderTickContext, this.#locomotionScratch);
 
+    fillHumanoidRenderTranslation(
+      this.#translationInterp,
+      this.#renderInterpolationBlend,
+      this.body,
+      this.health.isDead,
+      this.#renderTranslationScratch
+    );
+
     const footInput = this.#footstepFrameScratch;
     footInput.grounded = this.#grounded && !this.#airborne;
     footInput.landedFromAir = landedFromAir;
@@ -261,9 +298,9 @@ export class PlayerController {
     footInput.isDead = this.health.isDead;
     footInput.sprint = this.#locomotionScratch.sprint;
     footInput.crouch = this.#locomotionScratch.crouch;
-    footInput.position.x = translation.x;
-    footInput.position.y = translation.y;
-    footInput.position.z = translation.z;
+    footInput.position.x = this.#renderTranslationScratch.x;
+    footInput.position.y = this.#renderTranslationScratch.y;
+    footInput.position.z = this.#renderTranslationScratch.z;
     footInput.planarSpeedBody = this.#locomotionScratch.planarSpeedBody;
     footInput.planarSpeedTarget = this.#locomotionScratch.planarSpeedTarget;
     footInput.locomotionClipId = this.visual.locomotionClipId;
@@ -271,7 +308,11 @@ export class PlayerController {
     this.#footsteps.update(footInput);
     this.#wasAirbornePrev = this.#airborne;
 
-    this.#framePosition.set(translation.x, translation.y, translation.z);
+    this.#framePosition.set(
+      this.#renderTranslationScratch.x,
+      this.#renderTranslationScratch.y,
+      this.#renderTranslationScratch.z
+    );
     if (this.health.isDead) {
       weapon.prepareWorldTickContext(undefined);
     } else {
@@ -289,22 +330,21 @@ export class PlayerController {
     frame.isDead = this.health.isDead;
     frame.health = this.health.health;
     frame.shield = this.health.shield;
-    frame.isRegenerating = this.health.isRegenerating;
+    frame.isRegenerating = this.health.isRegeneratingAt(now);
     frame.crouching = this.#isCrouch;
     return frame;
   }
 
-  handleContactForceEvent(event: TempContactForceEvent): void {
+  handleContactForceEvent(event: TempContactForceEvent, nowMs: number): void {
     const handle1 = event.collider1();
     const handle2 = event.collider2();
     if (handle1 !== this.collider.handle && handle2 !== this.collider.handle) {
       return;
     }
 
-    const now = performance.now();
-    if (Math.abs(event.totalForce().y) > 1 && now > this.#lastJumpAt + 100) {
+    if (Math.abs(event.totalForce().y) > 1 && nowMs > this.#lastJumpAt + 100) {
       this.#grounded = true;
-      this.#coyoteUntil = now + JUMP_COYOTE_MS;
+      this.#coyoteUntil = nowMs + JUMP_COYOTE_MS;
     }
   }
 
@@ -331,7 +371,12 @@ export class PlayerController {
     this.#lastJumpStyle = impulse.style;
     this.#jumpAirThrust = null;
     this.body.setLinvel({ x: impulse.x, y: impulse.y, z: impulse.z }, true);
-    this.#footsteps.playJumpAt(this.body.translation(), this.visual.rigId);
+    fillInterpolatedBodyTranslation(
+      this.#translationInterp,
+      1,
+      this.#renderTranslationScratch
+    );
+    this.#footsteps.playJumpAt(this.#renderTranslationScratch, this.visual.rigId);
   }
 
   
@@ -347,6 +392,7 @@ export class PlayerController {
     this.#coyoteUntil = 0;
     this.#pinnedGroundY = null;
     this.#jumpAirThrust = null;
+    this.reseedPhysicsInterpolation();
   }
 
   
@@ -361,6 +407,7 @@ export class PlayerController {
     this.#wasAirbornePrev = false;
     this.#jumpAirThrust = null;
     snapRigidBodyToGround(this.#world, this.body, false);
+    this.reseedPhysicsInterpolation();
   }
 
   
@@ -433,7 +480,12 @@ export class PlayerController {
             impulse.airThrustWishZ
           )
         : null;
-    this.#footsteps.playJumpAt(translation, this.visual.rigId);
+    fillInterpolatedBodyTranslation(
+      this.#translationInterp,
+      1,
+      this.#renderTranslationScratch
+    );
+    this.#footsteps.playJumpAt(this.#renderTranslationScratch, this.visual.rigId);
   }
 
   #reconcileGrounded(now: number): void {
@@ -565,20 +617,31 @@ export class PlayerController {
   }
 
   readonly #syncDeathStateBound = (): void => {
-    this.#syncDeathState(this.#lastInputSnapshot);
+    this.#syncDeathState(this.#lastInputSnapshot, this.#frameNow);
   };
 
   readonly #syncVisualFromBodyBound = (): void => {
-    syncHumanoidVisualRoot(
+    fillHumanoidRenderTranslation(
+      this.#translationInterp,
+      this.#renderInterpolationBlend,
       this.body,
+      this.health.isDead,
+      this.#renderTranslationScratch
+    );
+    syncHumanoidVisualRootAt(
       this.visual.root,
+      this.#renderTranslationScratch,
       this.#death,
       this.#lastInputSnapshot.yaw
     );
   };
 
-  readonly #updateLocomotionBound = (delta: number, animInput: LocomotionAnimInput): void => {
-    this.visual.updateLocomotion(delta, animInput);
+  readonly #updateLocomotionBound = (
+    delta: number,
+    animInput: LocomotionAnimInput,
+    nowMs: number
+  ): void => {
+    this.visual.updateLocomotion(delta, animInput, nowMs);
   };
 
   #lastInputSnapshot: InputSnapshot = IDLE_INPUT_SNAPSHOT;
@@ -589,14 +652,15 @@ export class PlayerController {
     }
   }
 
-  #syncDeathState(input: InputSnapshot): void {
+  #syncDeathState(input: InputSnapshot, nowMs: number): void {
     const wasApplied = this.#death.applied;
     syncActorDeathState(
       this.body,
       this.collider,
       this.#death,
       this.health.isDead,
-      input.yaw
+      input.yaw,
+      nowMs
     );
 
     if (!wasApplied && this.#death.applied) {
@@ -604,6 +668,7 @@ export class PlayerController {
       this.#isCrouch = false;
       this.#isSliding = false;
       this.#pinnedGroundY = null;
+      this.reseedPhysicsInterpolation();
     }
   }
 

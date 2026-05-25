@@ -2,7 +2,6 @@
 
 import {
   InstancedMesh,
-  Matrix4,
   Object3D,
   PerspectiveCamera,
   PlaneGeometry,
@@ -12,36 +11,16 @@ import {
 import { hiddenInstanceMatrix } from './instance-hidden-matrix';
 import { rocketSmokeTrailMaterial } from './materials/rocket-smoke-trail-tsl';
 
-export const ROCKET_SMOKE_SPAWN_INTERVAL_MS = 22;
-export const ROCKET_SMOKE_PUFF_LIFETIME_MS = 720;
-export const ROCKET_SMOKE_PUFFS_MAX = 128;
-const ROCKET_SMOKE_TRAIL_OFFSET_M = 0.18;
-const ROCKET_SMOKE_LATERAL_SPREAD_M = 0.13;
-const ROCKET_SMOKE_RIM_JITTER_M = 0.07;
-const ROCKET_SMOKE_EDGE_SCALE = 0.74;
-const ROCKET_SMOKE_EXTRA_RIM_CHANCE = 0.42;
-const ROCKET_SMOKE_EXTRA_RIM_SCALE = 0.62;
-const ROCKET_SMOKE_PUFF_START_SCALE = 0.09;
-const ROCKET_SMOKE_PUFF_PEAK_SCALE = 0.34;
-const ROCKET_SMOKE_PUFF_END_SCALE = 0.42;
-const ROCKET_SMOKE_RISE_M = 0.1;
-const ROCKET_SMOKE_CROSS_WIDTH = 0.52;
-const ROCKET_SMOKE_TRAIL_STRETCH_MIN = 0.55;
-const ROCKET_SMOKE_TRAIL_STRETCH_MAX = 2.35;
+export const ROCKET_SMOKE_SPAWN_INTERVAL_MS = 28;
+export const ROCKET_SMOKE_PUFF_LIFETIME_MS = 580;
+export const ROCKET_SMOKE_PUFFS_MAX = 96;
+
+const ROCKET_SMOKE_TRAIL_OFFSET_M = 0.24;
+const ROCKET_SMOKE_PUFF_SIZE_MIN = 0.1;
+const ROCKET_SMOKE_PUFF_SIZE_MAX = 0.36;
 
 const _direction = new Vector3();
-const _scale = new Vector3(1, 1, 1);
-const _syncMatrix = new Matrix4();
-const _billboard = new Object3D();
-const _toCamera = new Vector3();
-const _projectedFlight = new Vector3();
-const _localX = new Vector3();
-const _localY = new Vector3();
-const _worldUp = new Vector3(0, 1, 0);
-const _worldFallback = new Vector3(1, 0, 0);
-const _side = new Vector3();
-const _binormal = new Vector3();
-const _offset = new Vector3();
+const _dummy = new Object3D();
 
 interface ActiveSmokePuff {
   slot: number;
@@ -49,10 +28,6 @@ interface ActiveSmokePuff {
   x: number;
   y: number;
   z: number;
-  dirX: number;
-  dirY: number;
-  dirZ: number;
-  scaleMul: number;
 }
 
 let unitSmokeGeometry: PlaneGeometry | null = null;
@@ -62,42 +37,6 @@ function getUnitSmokeGeometry(): PlaneGeometry {
     unitSmokeGeometry = new PlaneGeometry(1, 1);
   }
   return unitSmokeGeometry;
-}
-
-function rollBillboardToFlight(
-  billboard: Object3D,
-  dirX: number,
-  dirY: number,
-  dirZ: number,
-  cameraPosition: Vector3
-): void {
-  _toCamera.subVectors(cameraPosition, billboard.position);
-  if (_toCamera.lengthSq() <= 0.0001) {
-    return;
-  }
-  _toCamera.normalize();
-
-  _projectedFlight.set(dirX, dirY, dirZ).addScaledVector(_toCamera, -(_projectedFlight.dot(_toCamera)));
-  if (_projectedFlight.lengthSq() <= 0.0001) {
-    return;
-  }
-  _projectedFlight.normalize();
-
-  _localY.set(0, 1, 0).applyQuaternion(billboard.quaternion);
-  _localX.set(1, 0, 0).applyQuaternion(billboard.quaternion);
-  billboard.rotateZ(
-    Math.atan2(_localX.dot(_projectedFlight), _localY.dot(_projectedFlight))
-  );
-}
-
-function buildTrailLateralFrame(dirX: number, dirY: number, dirZ: number): void {
-  _direction.set(dirX, dirY, dirZ);
-  _side.crossVectors(_direction, _worldUp);
-  if (_side.lengthSq() <= 0.0001) {
-    _side.crossVectors(_direction, _worldFallback);
-  }
-  _side.normalize();
-  _binormal.crossVectors(_direction, _side).normalize();
 }
 
 
@@ -143,7 +82,7 @@ export class RocketSmokeTrailInstancingService {
     dirX: number,
     dirY: number,
     dirZ: number,
-    spawnedAtMs = performance.now()
+    spawnedAtMs: number
   ): void {
     _direction.set(dirX, dirY, dirZ);
     if (_direction.lengthSq() <= 0.0001) {
@@ -152,73 +91,6 @@ export class RocketSmokeTrailInstancingService {
       _direction.normalize();
     }
 
-    buildTrailLateralFrame(_direction.x, _direction.y, _direction.z);
-
-    const baseX = x - _direction.x * ROCKET_SMOKE_TRAIL_OFFSET_M;
-    const baseY = y - _direction.y * ROCKET_SMOKE_TRAIL_OFFSET_M;
-    const baseZ = z - _direction.z * ROCKET_SMOKE_TRAIL_OFFSET_M;
-    const dirNormX = _direction.x;
-    const dirNormY = _direction.y;
-    const dirNormZ = _direction.z;
-
-    this.#emitPuffAt(baseX, baseY, baseZ, dirNormX, dirNormY, dirNormZ, 1, spawnedAtMs);
-
-    for (const sign of [-1, 1] as const) {
-      const sideOff = sign * ROCKET_SMOKE_LATERAL_SPREAD_M * (0.84 + Math.random() * 0.32);
-      const binOff = (Math.random() - 0.5) * ROCKET_SMOKE_RIM_JITTER_M;
-      const upOff = (Math.random() - 0.5) * ROCKET_SMOKE_RIM_JITTER_M * 0.55;
-      _offset
-        .copy(_side)
-        .multiplyScalar(sideOff)
-        .addScaledVector(_binormal, binOff)
-        .addScaledVector(_worldUp, upOff);
-      this.#emitPuffAt(
-        baseX + _offset.x,
-        baseY + _offset.y,
-        baseZ + _offset.z,
-        dirNormX,
-        dirNormY,
-        dirNormZ,
-        ROCKET_SMOKE_EDGE_SCALE,
-        spawnedAtMs
-      );
-    }
-
-    if (Math.random() < ROCKET_SMOKE_EXTRA_RIM_CHANCE) {
-      const rimSign = Math.random() < 0.5 ? -1 : 1;
-      const sideOff = rimSign * ROCKET_SMOKE_LATERAL_SPREAD_M * (0.55 + Math.random() * 0.35);
-      const binOff = rimSign * ROCKET_SMOKE_LATERAL_SPREAD_M * (0.28 + Math.random() * 0.22);
-      const upOff = (Math.random() - 0.5) * ROCKET_SMOKE_RIM_JITTER_M * 0.45;
-      _offset
-        .copy(_side)
-        .multiplyScalar(sideOff)
-        .addScaledVector(_binormal, binOff)
-        .addScaledVector(_worldUp, upOff);
-      this.#emitPuffAt(
-        baseX + _offset.x,
-        baseY + _offset.y,
-        baseZ + _offset.z,
-        dirNormX,
-        dirNormY,
-        dirNormZ,
-        ROCKET_SMOKE_EXTRA_RIM_SCALE,
-        spawnedAtMs
-      );
-    }
-
-    this.#mesh.instanceMatrix.needsUpdate = true;
-  }
-
-  #emitPuffAt(
-    x: number,
-    y: number,
-    z: number,
-    dirX: number,
-    dirY: number,
-    dirZ: number,
-    scaleMul: number,
-    spawnedAtMs: number
-  ): void {
     const slot = this.#acquireSlot();
     if (slot === undefined) {
       return;
@@ -229,16 +101,13 @@ export class RocketSmokeTrailInstancingService {
     const puff: ActiveSmokePuff = {
       slot,
       spawnedAtMs,
-      x,
-      y,
-      z,
-      dirX,
-      dirY,
-      dirZ,
-      scaleMul
+      x: x - _direction.x * ROCKET_SMOKE_TRAIL_OFFSET_M,
+      y: y - _direction.y * ROCKET_SMOKE_TRAIL_OFFSET_M,
+      z: z - _direction.z * ROCKET_SMOKE_TRAIL_OFFSET_M
     };
     this.#active.push(puff);
     this.#syncPuffSlot(puff, spawnedAtMs);
+    this.#mesh.instanceMatrix.needsUpdate = true;
   }
 
   #acquireSlot(): number | undefined {
@@ -296,36 +165,18 @@ export class RocketSmokeTrailInstancingService {
 
   #syncPuffSlot(puff: ActiveSmokePuff, nowMs: number): void {
     const progress = Math.min(1, (nowMs - puff.spawnedAtMs) / ROCKET_SMOKE_PUFF_LIFETIME_MS);
-    const growPhase = Math.min(1, progress / 0.38);
-    const fadePhase = Math.max(0, (progress - 0.5) / 0.5);
-    const growScale =
-      ROCKET_SMOKE_PUFF_START_SCALE +
-      (ROCKET_SMOKE_PUFF_PEAK_SCALE - ROCKET_SMOKE_PUFF_START_SCALE) * growPhase;
-    const endScale =
-      ROCKET_SMOKE_PUFF_PEAK_SCALE +
-      (ROCKET_SMOKE_PUFF_END_SCALE - ROCKET_SMOKE_PUFF_PEAK_SCALE) * fadePhase;
-    const scale = growPhase < 1 ? growScale : endScale * (1 - fadePhase * 0.88);
-    const scaled = scale * puff.scaleMul;
-    const riseY = ROCKET_SMOKE_RISE_M * progress * (1 - fadePhase * 0.6);
-    const lifetimeLeft = Math.max(0, 1 - progress);
-    const trailStretch =
-      ROCKET_SMOKE_TRAIL_STRETCH_MIN +
-      (ROCKET_SMOKE_TRAIL_STRETCH_MAX - ROCKET_SMOKE_TRAIL_STRETCH_MIN) * progress;
+    const grow = Math.min(1, progress * 2.8);
+    const fade = 1 - progress;
+    const size =
+      ROCKET_SMOKE_PUFF_SIZE_MIN +
+      (ROCKET_SMOKE_PUFF_SIZE_MAX - ROCKET_SMOKE_PUFF_SIZE_MIN) * grow;
+    const lifetimeLeft = fade * fade;
 
-    _billboard.position.set(puff.x, puff.y + riseY, puff.z);
-    _billboard.quaternion.identity();
-    _billboard.lookAt(this.#camera.position);
-    rollBillboardToFlight(_billboard, puff.dirX, puff.dirY, puff.dirZ, this.#camera.position);
-    _syncMatrix.compose(
-      _billboard.position,
-      _billboard.quaternion,
-      _scale.set(
-        scaled * ROCKET_SMOKE_CROSS_WIDTH,
-        scaled * trailStretch,
-        1
-      )
-    );
-    this.#mesh.setMatrixAt(puff.slot, _syncMatrix);
+    _dummy.position.set(puff.x, puff.y, puff.z);
+    _dummy.scale.setScalar(size);
+    _dummy.lookAt(this.#camera.position);
+    _dummy.updateMatrix();
+    this.#mesh.setMatrixAt(puff.slot, _dummy.matrix);
     this.#lifetimeData[puff.slot] = lifetimeLeft;
     this.#mesh.count = this.#maxSlotUsed + 1;
   }

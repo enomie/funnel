@@ -44,6 +44,14 @@ export interface ReviveHireChannelDeps {
 
 const IDLE_HUD: ReviveHireHudView = { visible: false, mode: null, progress: 0 };
 
+interface MutableReviveHireHudView {
+  visible: boolean;
+  mode: ReviveHireChannelMode | null;
+  progress: number;
+}
+
+const _spectatorHudScratch: MutableReviveHireHudView = { visible: true, mode: null, progress: 0 };
+
 export class ReviveHireChannel {
   #targetActorId: string | null = null;
   #targetActor: CombatActor | null = null;
@@ -51,7 +59,7 @@ export class ReviveHireChannel {
   #mode: ReviveHireChannelMode | null = null;
   #progress = 0;
   #durationSeconds = REVIVE_CHANNEL_SECONDS;
-  #hudView: ReviveHireHudView = IDLE_HUD;
+  #hudView: MutableReviveHireHudView = { visible: false, mode: null, progress: 0 };
 
   get isChanneling(): boolean {
     return this.#targetActorId !== null;
@@ -98,12 +106,13 @@ export class ReviveHireChannel {
     deltaSeconds: number,
     spectatorSnapshot: ActorDeathSnapshot | null
   ): ReviveHireHudView {
-    if (spectatorSnapshot !== null && spectatorSnapshot.channelerId !== null && !this.isChanneling) {
-      this.#hudView = {
-        visible: true,
-        mode: spectatorSnapshot.channelMode,
-        progress: spectatorSnapshot.channelProgress
-      };
+    if (
+      spectatorSnapshot !== null &&
+      spectatorSnapshot.channelerId !== null &&
+      spectatorSnapshot.channelMode !== null &&
+      !this.isChanneling
+    ) {
+      this.#setHudVisible(spectatorSnapshot.channelMode, spectatorSnapshot.channelProgress);
       return this.#hudView;
     }
 
@@ -112,7 +121,7 @@ export class ReviveHireChannel {
         this.#abortActive(nowMs);
       }
 
-      this.#hudView = IDLE_HUD;
+      this.#setHudIdle();
       return this.#hudView;
     }
 
@@ -121,13 +130,13 @@ export class ReviveHireChannel {
     }
 
     if (!reviveChannelHeld) {
-      this.#hudView = IDLE_HUD;
+      this.#setHudIdle();
       return this.#hudView;
     }
 
     const picked = pickNearestDownedTarget(deps, nowMs);
     if (picked === null) {
-      this.#hudView = IDLE_HUD;
+      this.#setHudIdle();
       return this.#hudView;
     }
 
@@ -140,7 +149,7 @@ export class ReviveHireChannel {
       this.#abortActive(nowMs);
     }
 
-    this.#hudView = IDLE_HUD;
+    this.#setHudIdle();
   }
 
   #beginChannel(
@@ -172,7 +181,7 @@ export class ReviveHireChannel {
     const targetActor = this.#targetActor;
     const mode = this.#mode;
     if (targetSnapshot === null || targetActorId === null || targetActor === null || mode === null) {
-      this.#hudView = IDLE_HUD;
+      this.#setHudIdle();
       return this.#hudView;
     }
 
@@ -183,14 +192,14 @@ export class ReviveHireChannel {
 
     if (!channelValid) {
       this.#abortActive(nowMs);
-      this.#hudView = IDLE_HUD;
+      this.#setHudIdle();
       return this.#hudView;
     }
 
     this.#progress += deltaSeconds;
     const progress01 = Math.min(1, this.#progress / this.#durationSeconds);
     targetSnapshot.channelProgress = progress01;
-    this.#hudView = { visible: true, mode, progress: progress01 };
+    this.#setHudVisible(mode, progress01);
 
     if (progress01 >= 1) {
       deps.onComplete({
@@ -200,7 +209,7 @@ export class ReviveHireChannel {
         targetSnapshot
       });
       this.#clearLocalChannel();
-      this.#hudView = IDLE_HUD;
+      this.#setHudIdle();
     }
 
     return this.#hudView;
@@ -222,6 +231,18 @@ export class ReviveHireChannel {
     this.#targetSnapshot = null;
     this.#mode = null;
     this.#progress = 0;
+  }
+
+  #setHudIdle(): void {
+    this.#hudView.visible = false;
+    this.#hudView.mode = null;
+    this.#hudView.progress = 0;
+  }
+
+  #setHudVisible(mode: ReviveHireChannelMode, progress: number): void {
+    this.#hudView.visible = true;
+    this.#hudView.mode = mode;
+    this.#hudView.progress = progress;
   }
 }
 
@@ -319,13 +340,11 @@ function pickNearestDownedTarget(
 export function readSpectatorReviveHireHud(
   snapshot: ActorDeathSnapshot | null
 ): ReviveHireHudView {
-  if (snapshot === null || snapshot.channelerId === null) {
+  if (snapshot === null || snapshot.channelerId === null || snapshot.channelMode === null) {
     return IDLE_HUD;
   }
 
-  return {
-    visible: true,
-    mode: snapshot.channelMode,
-    progress: snapshot.channelProgress
-  };
+  _spectatorHudScratch.mode = snapshot.channelMode;
+  _spectatorHudScratch.progress = snapshot.channelProgress;
+  return _spectatorHudScratch;
 }

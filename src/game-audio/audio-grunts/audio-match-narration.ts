@@ -1,7 +1,8 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-grunts/audio-match-narration.ts
 
-import { AudioContextEngine } from '../audio-mixer';
+import { tryResumeGameAudio } from '../audio-guard';
 import { getGruntSynth } from './audio-grunt-tts';
+import { getNarratorCountdownDestination } from './audio-narrator-reverb';
 import { COUNTDOWN_PHONETIC, NARRATORINE_VOICE } from './audio-narrator-voice-presets';
 
 
@@ -11,6 +12,11 @@ export function playCountdownNarratorine(secondsRemaining: number): void {
     return;
   }
 
-  AudioContextEngine.get().resume();
-  void getGruntSynth().playText(NARRATORINE_VOICE, text);
+  tryResumeGameAudio();
+  void getGruntSynth().playText(NARRATORINE_VOICE, text, getNarratorCountdownDestination());
+}
+
+/** Local viewer death respawn only — Web Audio is not shared with bots or other clients. */
+export function playLocalDeathRespawnCountdown(secondsRemaining: number): void {
+  playCountdownNarratorine(secondsRemaining);
 }

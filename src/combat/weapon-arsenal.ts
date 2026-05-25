@@ -133,6 +133,13 @@ export class WeaponArsenal implements WorldEffectsSource {
     bioHolding: false,
     bioChargeFraction: 0
   };
+  readonly #beamHoldMechanicsScratch: {
+    active: boolean;
+    heatFraction: number;
+  } = {
+    active: false,
+    heatFraction: 0
+  };
   readonly #guidedCameraScratch: GuidedRedeemerCameraState = {
     position: new Vector3(),
     lookAt: new Vector3(),
@@ -143,11 +150,13 @@ export class WeaponArsenal implements WorldEffectsSource {
   readonly #sourceActorId: string;
   readonly #bioChargePreviewParent: Object3D;
   readonly #impactSink: CombatImpactSink;
+  #combatNowMs = 0;
   readonly #impactScratch: ApplyImpactRequest = {
     sourceFaction: 'alpha',
     sourceActorId: '',
     impact: { directDamage: 0, impactRadius: 0, impactExpandMs: 0, ricochetMax: 0, explodeOnContact: false },
-    point: new Vector3()
+    point: new Vector3(),
+    nowMs: 0
   };
   readonly #shockComboContext: ShockComboFireContext = {
     orbs: [],
@@ -181,9 +190,11 @@ export class WeaponArsenal implements WorldEffectsSource {
         const scratch = this.#impactScratch;
         scratch.sourceFaction = this.#sourceFaction();
         scratch.sourceActorId = this.#sourceActorId;
+        scratch.sourceWeaponVisualKind = request.sourceWeaponVisualKind;
         scratch.impact = request.impact;
         scratch.point = request.point;
         scratch.hitCollider = request.hitCollider;
+        scratch.nowMs = request.nowMs;
         applyImpact(this.#impactDeps, scratch);
       }
     };
@@ -203,14 +214,6 @@ export class WeaponArsenal implements WorldEffectsSource {
       maxActive: budget.maxActiveProjectiles,
       sourceFaction,
       impactSink: this.#impactSink,
-      playImpact: (weapon, point, gain, impact, options) => {
-        this.#audio.playImpact(weapon, point, gain, impact, options);
-      },
-      playRedeemerBlastSpread: (position, gain) =>
-        this.#audio.playRedeemerBlastSpread(position, gain),
-      stopRedeemerBlastSpread: (slot) => {
-        this.#audio.stopRedeemerBlastSpread(slot);
-      },
       resolveShockCombo: (hit) => {
         this.#resolveShockCombo(hit);
       }
@@ -222,8 +225,8 @@ export class WeaponArsenal implements WorldEffectsSource {
     this.#projectileSim.setOwnerAim(this.#sourceActorId, aim);
   }
 
-  getAmmoHudSnapshot(): AmmoHudSnapshot {
-    return this.#ammo.getHudSnapshot(this.selectedWeapon);
+  getAmmoHudSnapshot(nowMs: number): AmmoHudSnapshot {
+    return this.#ammo.getHudSnapshot(this.selectedWeapon, nowMs);
   }
 
   get selectedWeapon(): WeaponDefinition {
@@ -286,7 +289,7 @@ export class WeaponArsenal implements WorldEffectsSource {
 
   
   needsMechanicsAudioTick(nowMs: number): boolean {
-    if (this.#bioCharge.isHolding || this.#rocketMagazine.isMarking) {
+    if (this.#bioCharge.isHolding || this.#rocketMagazine.isMarking || this.#ammo.isBeamActive()) {
       return true;
     }
 
@@ -316,6 +319,17 @@ export class WeaponArsenal implements WorldEffectsSource {
       this.#mechanicsAudioOrigin,
       this.#fillChargeHoldMechanics(nowMs)
     );
+    this.#audio.syncBeamHoldMechanics(
+      this.#mechanicsAudioOrigin,
+      this.#fillBeamHoldMechanics(nowMs)
+    );
+  }
+
+  #fillBeamHoldMechanics(nowMs: number): { active: boolean; heatFraction: number } {
+    const scratch = this.#beamHoldMechanicsScratch;
+    scratch.active = this.#ammo.isBeamActive();
+    scratch.heatFraction = this.#ammo.peekBeamHeatFraction(nowMs);
+    return scratch;
   }
 
   #fillChargeHoldMechanics(nowMs: number): ChargeHoldMechanicsState {
@@ -350,25 +364,26 @@ export class WeaponArsenal implements WorldEffectsSource {
     return started;
   }
 
-  releaseBeamStream(): void {
-    this.#ammo.releaseBeam(performance.now());
+  releaseBeamStream(nowMs: number): void {
+    this.#ammo.releaseBeam(nowMs);
     this.#hitscan.releaseBeamStream();
   }
 
-  suspendCombat(): void {
-    this.releaseBeamStream();
+  suspendCombat(nowMs: number): void {
+    this.#combatNowMs = nowMs;
+    this.releaseBeamStream(nowMs);
     this.#audio.stopReloadMechanics();
     this.#clearBioCharge();
     this.#rocketMagazine.cancelMarkHold();
     this.#clearPistolBurst();
     this.#clearRocketVolley();
     this.#redeemerGuided.end();
+    this.#hitscan.releaseAllEffects();
     this.#projectileSim.releaseOwner(this.#sourceActorId);
   }
 
   releaseAllWorldEffects(): void {
-    this.suspendCombat();
-    this.#hitscan.releaseAllEffects();
+    this.suspendCombat(this.#combatNowMs);
     this.#projectileSim.unregisterBridge(this.#sourceActorId);
     unregisterWorldEffectsSource(this);
   }
@@ -392,7 +407,7 @@ export class WeaponArsenal implements WorldEffectsSource {
       this.#ammo.beginBeam(nowMs);
     }
 
-    this.#hitscan.tickBeamStream(weapon, fire, weapon.secondaryImpact, muzzlePosition, direction);
+    this.#hitscan.tickBeamStream(weapon, fire, weapon.secondaryImpact, muzzlePosition, direction, nowMs);
   }
 
   isRedeemerGuidedActive(): boolean {
@@ -514,7 +529,7 @@ export class WeaponArsenal implements WorldEffectsSource {
 
     this.#clearBioCharge();
     this.#lastSecondaryFireAt = nowMs;
-    this.#fireChargedBioBlob(weapon, baseFire, baseImpact, charge, direction, muzzlePosition);
+    this.#fireChargedBioBlob(weapon, baseFire, baseImpact, charge, direction, muzzlePosition, nowMs);
     this.#ammo.commitFire(weapon, 'secondary', nowMs, ammoCost);
     return true;
   }
@@ -582,10 +597,11 @@ export class WeaponArsenal implements WorldEffectsSource {
     return this.#burstShotsRemaining > 0;
   }
 
-  tickWorld(nowMs: number, _deltaSeconds: number): void {
+  tickWorld(nowMs: number, _deltaSeconds: number, _shedNonCritical = false): void {
+    this.#combatNowMs = nowMs;
     this.#hitscan.update(nowMs);
     if (this.#ammo.tick(nowMs)) {
-      this.releaseBeamStream();
+      this.releaseBeamStream(nowMs);
     }
     if (this.isRocketLauncherSelected()) {
       this.#ammo.setReservedCount(this.#rocketMagazine.markedCount);
@@ -608,6 +624,7 @@ export class WeaponArsenal implements WorldEffectsSource {
     direction: Vector3,
     gates: WeaponFireGates
   ): boolean {
+    this.#combatNowMs = nowMs;
     const weapon = this.selectedWeapon;
     this.#noteMechanicsAudioOrigin(muzzlePosition);
 
@@ -657,7 +674,7 @@ export class WeaponArsenal implements WorldEffectsSource {
       this.#lastSecondaryFireAt = nowMs;
     }
 
-    this.#emitFireVolley(weapon, fire, impact, direction, muzzlePosition, mode);
+    this.#emitFireVolley(weapon, fire, impact, direction, muzzlePosition, mode, nowMs);
     this.#commitAmmoAfterFire(weapon, fire, mode, nowMs);
     this.#fireStarted = true;
     return true;
@@ -757,7 +774,7 @@ export class WeaponArsenal implements WorldEffectsSource {
       nowMs >= this.#burstNextShotAt &&
       this.selectedWeapon.slotLabel === weapon.slotLabel
     ) {
-      this.#emitFireVolley(weapon, fire, impact, burstDirection, this.#burstMuzzle, 'secondary');
+      this.#emitFireVolley(weapon, fire, impact, burstDirection, this.#burstMuzzle, 'secondary', nowMs);
       this.#burstShotsRemaining -= 1;
       this.#burstNextShotAt = nowMs + shotInterval;
     }
@@ -846,7 +863,7 @@ export class WeaponArsenal implements WorldEffectsSource {
       barrelCount,
       this.#barrelSpawnScratch
     );
-    this.#emitRocketShot(weapon, fire, weapon.primaryImpact, direction, spawnPosition, muzzlePosition);
+    this.#emitRocketShot(weapon, fire, weapon.primaryImpact, direction, spawnPosition, muzzlePosition, nowMs);
     this.#fireStarted = true;
     return true;
   }
@@ -857,10 +874,11 @@ export class WeaponArsenal implements WorldEffectsSource {
     impact: ImpactProfile,
     direction: Vector3,
     spawnPosition: Vector3,
-    audioPosition: Vector3
+    audioPosition: Vector3,
+    nowMs: number
   ): void {
     this.#audio.playFire(weapon, audioPosition, fire, impact);
-    this.#spawnProjectile(weapon, fire, impact, direction, spawnPosition);
+    this.#spawnProjectile(weapon, fire, impact, direction, spawnPosition, nowMs);
   }
 
   #emitRocketVolleyShot(
@@ -871,7 +889,8 @@ export class WeaponArsenal implements WorldEffectsSource {
     muzzlePosition: Vector3,
     shotIndex: number,
     totalCount: number,
-    barrelIndex: number
+    barrelIndex: number,
+    nowMs: number
   ): void {
     const barrelCount = weapon.barrelCount ?? 6;
     const spawnPosition = resolveRocketBarrelSpawn(
@@ -889,7 +908,7 @@ export class WeaponArsenal implements WorldEffectsSource {
       this.#volleyDirectionScratch
     );
     this.#audio.playFire(weapon, spawnPosition, fire, impact);
-    this.#spawnProjectile(weapon, fire, impact, shotDirection, spawnPosition);
+    this.#spawnProjectile(weapon, fire, impact, shotDirection, spawnPosition, nowMs);
   }
 
   #tickRocketVolley(nowMs: number): void {
@@ -919,7 +938,8 @@ export class WeaponArsenal implements WorldEffectsSource {
         this.#rocketVolleyMuzzle,
         this.#rocketVolleyShotIndex,
         this.#rocketVolleyTotal,
-        this.#rocketVolleyShotIndex % barrelCount
+        this.#rocketVolleyShotIndex % barrelCount,
+        nowMs
       );
       this.#rocketVolleyShotIndex += 1;
       this.#rocketVolleyRemaining -= 1;
@@ -952,7 +972,8 @@ export class WeaponArsenal implements WorldEffectsSource {
       stickDelayMs: number;
     },
     direction: Vector3,
-    muzzlePosition: Vector3
+    muzzlePosition: Vector3,
+    nowMs: number
   ): void {
     const fire: FireProfile = {
       ...baseFire,
@@ -974,7 +995,7 @@ export class WeaponArsenal implements WorldEffectsSource {
       lobBias !== undefined && lobBias > 0
         ? applyLobBiasInto(direction, lobBias, _lobDirectionScratch)
         : direction;
-    this.#spawnProjectile(weapon, fire, impact, shotDirection, muzzlePosition);
+    this.#spawnProjectile(weapon, fire, impact, shotDirection, muzzlePosition, nowMs);
   }
 
   #ensureBioChargePreview(weapon: WeaponDefinition): void {
@@ -1030,11 +1051,14 @@ export class WeaponArsenal implements WorldEffectsSource {
     }
 
     this.#audio.playImpact(weapon, hit.point, SHOCK_COMBO_IMPACT_GAIN, comboImpact);
-    this.#projectileSim.spawnImpactBurst(weapon, comboImpact, hit.point, 'hit');
-    this.#impactSink.apply({
-      impact: comboImpact,
-      point: hit.point
-    });
+    this.#projectileSim.spawnOwnerLethalDetonation(
+      this.#sourceActorId,
+      weapon,
+      comboImpact,
+      hit.point,
+      this.#combatNowMs,
+      SHOCK_COMBO_IMPACT_GAIN
+    );
   }
 
   #emitFireVolley(
@@ -1043,18 +1067,18 @@ export class WeaponArsenal implements WorldEffectsSource {
     impact: ImpactProfile,
     direction: Vector3,
     muzzlePosition: Vector3,
-    _mode: WeaponFireMode
+    _mode: WeaponFireMode,
+    nowMs: number
   ): void {
     const delivery = fireDeliveryFor(fire);
     if (delivery === 'beamTick') {
-      this.#audio.playFire(weapon, muzzlePosition, fire, impact);
       return;
     }
 
     if (delivery === 'hitscan') {
       const shockCombo =
         weapon.comboImpact !== undefined ? this.#refreshShockComboContext() : undefined;
-      this.#hitscan.fireVolley(weapon, fire, impact, direction, muzzlePosition, shockCombo);
+      this.#hitscan.fireVolley(weapon, fire, impact, direction, muzzlePosition, nowMs, shockCombo);
       return;
     }
 
@@ -1070,7 +1094,7 @@ export class WeaponArsenal implements WorldEffectsSource {
           lobBias !== undefined && lobBias > 0
             ? applyLobBiasInto(shotDirection, lobBias, _lobDirectionScratch)
             : shotDirection;
-        this.#spawnProjectile(weapon, fire, impact, resolvedDirection, muzzlePosition);
+        this.#spawnProjectile(weapon, fire, impact, resolvedDirection, muzzlePosition, nowMs);
       }
     );
   }
@@ -1080,7 +1104,8 @@ export class WeaponArsenal implements WorldEffectsSource {
     fire: FireProfile,
     impact: ImpactProfile,
     direction: Vector3,
-    muzzlePosition: Vector3
+    muzzlePosition: Vector3,
+    nowMs: number
   ): void {
     const id = this.#projectileSim.spawn(
       this.#sourceActorId,
@@ -1088,7 +1113,8 @@ export class WeaponArsenal implements WorldEffectsSource {
       fire,
       impact,
       direction,
-      muzzlePosition
+      muzzlePosition,
+      nowMs
     );
     if (id < 0) {
       return;
@@ -1096,7 +1122,7 @@ export class WeaponArsenal implements WorldEffectsSource {
 
     const tags = fire.projectileTags ?? [];
     if (projectileIsGuidedRedeemer(tags)) {
-      this.#redeemerGuided.begin(this.#projectileSim, id, performance.now());
+      this.#redeemerGuided.begin(this.#projectileSim, id, nowMs);
     }
   }
 }

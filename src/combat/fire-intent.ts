@@ -264,7 +264,7 @@ export function applySecondaryFireIntent(
     !fireInputOpen(secondaryFire, intent.secondary) &&
     !weapon.hasSecondaryBurstPending()
   ) {
-    weapon.releaseBeamStream();
+    weapon.releaseBeamStream(nowMs);
     return false;
   }
 

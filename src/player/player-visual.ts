@@ -72,12 +72,12 @@ export class PlayerVisual {
     applyRelativeTeamColors(this.root, 'ally');
   }
 
-  flashDamage(nowMs?: number): void {
+  flashDamage(nowMs: number): void {
     this.#humanoid.flashDamage(nowMs);
   }
 
-  updateLocomotion(deltaSeconds: number, input: LocomotionAnimInput): void {
-    this.#humanoid.updateLocomotion(deltaSeconds, input);
+  updateLocomotion(deltaSeconds: number, input: LocomotionAnimInput, nowMs: number): void {
+    this.#humanoid.updateLocomotion(deltaSeconds, input, nowMs);
   }
 
   reviveLocomotion(): void {

@@ -45,7 +45,11 @@ import type { BotCombatContext } from './bot-roster';
 import { BotTargetFocus } from './bot-target-focus';
 import { BotVisual } from './bot-visual';
 import type { LocomotionAnimInput } from '../player/locomotion-anim-controller';
-import { syncHumanoidVisualRoot } from '../physics/synced-body';
+import {
+  FootstepController,
+  type MutableFootstepFrameInput
+} from '../player/footstep-controller';
+import { syncHumanoidVisualRootAt } from '../physics/synced-body';
 
 const _muzzlePosition = new Vector3();
 const _aimDirection = new Vector3();
@@ -109,7 +113,7 @@ export class BotActor {
     deltaSeconds: number;
     syncDeathState: () => void;
     syncVisualFromBody: () => void;
-    updateLocomotion: (deltaSeconds: number, input: LocomotionAnimInput) => void;
+    updateLocomotion: (deltaSeconds: number, input: LocomotionAnimInput, nowMs: number) => void;
     weapon: WeaponArsenal;
     weaponAim: { yaw: number; pitch: number };
     weaponBodyPosition: Vector3;
@@ -140,6 +144,20 @@ export class BotActor {
     pressed: false,
     held: false,
     released: false
+  };
+  readonly #footsteps = new FootstepController();
+  readonly #footstepFrameScratch: MutableFootstepFrameInput = {
+    grounded: false,
+    landedFromAir: false,
+    landImpactMps: 0,
+    isDead: false,
+    sprint: false,
+    crouch: false,
+    position: { x: 0, y: 0, z: 0 },
+    planarSpeedBody: 0,
+    planarSpeedTarget: 0,
+    locomotionClipId: '',
+    rigId: undefined
   };
 
   constructor(
@@ -207,65 +225,76 @@ export class BotActor {
       suspendState: this.#combatSuspend
     };
 
-    syncHumanoidVisualRoot(
-      this.controller.body,
+    syncHumanoidVisualRootAt(
       this.visual.root,
+      this.controller.fillRenderTranslation(),
       this.controller.deathSnapshot,
       this.controller.yaw
     );
   }
 
   
-  preparePhysicsFrame(deltaSeconds: number, nowMs: number, context: BotCombatContext): void {
+  preparePhysicsFrame(
+    deltaSeconds: number,
+    nowMs: number,
+    context: BotCombatContext,
+    shedNonCritical = false
+  ): void {
     if (this.controller.health.isDead) {
       this.#driveActive = false;
       return;
     }
 
     const translation = this.controller.body.translation();
-    const brainFrame = this.#brain.update(deltaSeconds, () =>
-      this.#sampleBrainInput(context, translation, nowMs)
-    );
-    if (brainFrame.stepped) {
-      this.#combatStepPending = true;
+    let intent = this.#brain.intent;
+
+    if (!shedNonCritical) {
+      const brainFrame = this.#brain.update(deltaSeconds, () =>
+        this.#sampleBrainInput(context, translation, nowMs)
+      );
+      if (brainFrame.stepped) {
+        this.#combatStepPending = true;
+      }
+
+      intent = brainFrame.intent;
+
+      tickBotRouteSteerFrame(
+        context.world,
+        this.controller.body,
+        translation.x,
+        translation.y,
+        translation.z,
+        this.controller.routeSteer,
+        intent,
+        this.controller.stuckFrames,
+        this.controller.navigation.moveYaw
+      );
+
+      tickBotNavigationFrame(
+        context.world,
+        this.controller.body,
+        translation.x,
+        translation.y,
+        translation.z,
+        this.controller.faction,
+        this.controller.stuckFrames,
+        this.controller.navigation,
+        deltaSeconds,
+        intent
+      );
     }
-
-    tickBotRouteSteerFrame(
-      context.world,
-      this.controller.body,
-      translation.x,
-      translation.y,
-      translation.z,
-      this.controller.routeSteer,
-      brainFrame.intent,
-      this.controller.stuckFrames,
-      this.controller.navigation.moveYaw
-    );
-
-    tickBotNavigationFrame(
-      context.world,
-      this.controller.body,
-      translation.x,
-      translation.y,
-      translation.z,
-      this.controller.faction,
-      this.controller.stuckFrames,
-      this.controller.navigation,
-      deltaSeconds,
-      brainFrame.intent
-    );
 
     this.#driveActive = fillDriveFromBrainIntent(
       translation.x,
       translation.z,
-      brainFrame.intent,
+      intent,
       this.controller.navigation,
       this.controller.routeSteer,
       this.controller.stuckFrames,
       this.#driveScratch
     );
 
-    if (this.#driveActive && this.#driveScratch.moving) {
+    if (this.#driveActive && this.#driveScratch.moving && !shedNonCritical) {
       this.controller.probeJumpAhead(context.world, nowMs, this.#driveScratch);
     }
   }
@@ -277,6 +306,7 @@ export class BotActor {
     }
 
     this.#visualReducedLod = false;
+    const landing = this.controller.peekLandingFrame();
     const translation = this.controller.body.translation();
 
     _weaponBodyPosition.set(translation.x, translation.y, translation.z);
@@ -291,6 +321,32 @@ export class BotActor {
     this.#weaponAimScratch.pitch = 0;
 
     tickHumanoidRenderFrame(tickContext as HumanoidRenderTickContext, this.#locomotionScratch);
+    this.#tickFootsteps(landing);
+  }
+
+  #tickFootsteps(landing: { landedFromAir: boolean; landImpactMps: number }): void {
+    const renderPos = this.controller.fillRenderTranslation();
+    const loc = this.#locomotionScratch;
+    const footInput = this.#footstepFrameScratch;
+
+    footInput.grounded = loc.grounded && !loc.airborne;
+    footInput.landedFromAir = landing.landedFromAir;
+    footInput.landImpactMps = landing.landImpactMps;
+    footInput.isDead = loc.isDead;
+    footInput.sprint = loc.sprint;
+    footInput.crouch = loc.crouch;
+    footInput.position.x = renderPos.x;
+    footInput.position.y = renderPos.y;
+    footInput.position.z = renderPos.z;
+    footInput.planarSpeedBody = loc.planarSpeedBody;
+    footInput.planarSpeedTarget = loc.planarSpeedTarget;
+    footInput.locomotionClipId = this.visual.locomotionClipId;
+    footInput.rigId = this.visual.rigId;
+    this.#footsteps.update(footInput);
+
+    if (this.controller.consumeJumpedThisStep()) {
+      this.#footsteps.playJumpAt(renderPos, this.visual.rigId);
+    }
   }
 
   fixedUpdate(fixedStep: number, nowMs: number, _context: BotCombatContext): void {
@@ -310,6 +366,7 @@ export class BotActor {
   }
 
   update(deltaSeconds: number, nowMs: number, context: BotCombatContext): void {
+    const landing = this.controller.peekLandingFrame();
     const translation = this.controller.body.translation();
     _weaponBodyPosition.set(translation.x, translation.y, translation.z);
     this.controller.locomotionInputInto(this.#locomotionScratch);
@@ -337,6 +394,7 @@ export class BotActor {
     this.#weaponAimScratch.pitch = this.controller.aimPitch;
 
     tickHumanoidRenderFrame(tickContext as HumanoidRenderTickContext, this.#locomotionScratch);
+    this.#tickFootsteps(landing);
 
     if (!this.controller.health.isDead) {
       this.#tickCombat(nowMs, context);
@@ -348,25 +406,29 @@ export class BotActor {
   }
 
   readonly #syncDeathStateBound = (): void => {
-    this.controller.syncDeathState();
+    this.controller.syncDeathState(this.#humanoidTickContext.nowMs);
   };
 
   readonly #syncVisualFromBodyBound = (): void => {
-    syncHumanoidVisualRoot(
-      this.controller.body,
+    syncHumanoidVisualRootAt(
       this.visual.root,
+      this.controller.fillRenderTranslation(),
       this.controller.deathSnapshot,
       this.controller.yaw
     );
   };
 
-  readonly #updateLocomotionBound = (delta: number, input: LocomotionAnimInput): void => {
+  readonly #updateLocomotionBound = (
+    delta: number,
+    input: LocomotionAnimInput,
+    nowMs: number
+  ): void => {
     this.visual.updateLocomotion(
       delta,
       input,
       this.controller.aimPitch,
       this.#visualReducedLod,
-      this.#humanoidTickContext.nowMs
+      nowMs
     );
   };
 
@@ -442,6 +504,11 @@ export class BotActor {
 
   applyViewerColors(viewerTeam: PlayerTeam): void {
     this.visual.applyViewerColors(viewerTeam);
+  }
+
+  resetVisibilityClock(): void {
+    this.#brain.reset();
+    this.controller.navigation.flushAccumulator();
   }
 
   reviveInPlace(): void {
@@ -522,8 +589,8 @@ export class BotActor {
   }
 
   
-  prepareMatchRestart(): void {
-    this.weapon.suspendCombat();
+  prepareMatchRestart(nowMs: number): void {
+    this.weapon.suspendCombat(nowMs);
     this.controller.beginMatchStartDrop(this.#matchStartSlot);
     this.#brain.reset();
     this.#targetFocus.reset();

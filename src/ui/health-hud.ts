@@ -28,12 +28,7 @@ export class HealthHud {
   ): void {
     const healthFraction = maxHealth > 0 ? Math.max(0, Math.min(1, health / maxHealth)) : 0;
     const shieldFraction = maxShield > 0 ? Math.max(0, Math.min(1, shield / maxShield)) : 0;
-    const stateKey = [
-      healthFraction.toFixed(3),
-      shieldFraction.toFixed(3),
-      isDead ? '1' : '0',
-      isRegenerating ? '1' : '0'
-    ].join('|');
+    const stateKey = `${healthFraction.toFixed(3)}|${shieldFraction.toFixed(3)}|${isDead ? '1' : '0'}|${isRegenerating ? '1' : '0'}`;
 
     if (stateKey === this.#lastStateKey) {
       return;

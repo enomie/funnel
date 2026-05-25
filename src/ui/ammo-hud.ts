@@ -5,7 +5,6 @@ import type { AmmoCellState, AmmoHudSnapshot } from '../combat/ammo-controller';
 export interface AmmoHudNodes {
   root: HTMLDivElement;
   title: HTMLSpanElement;
-  count: HTMLSpanElement;
   magazine: HTMLDivElement;
   reloadFill: HTMLDivElement;
 }
@@ -13,40 +12,26 @@ export interface AmmoHudNodes {
 export class AmmoHud {
   readonly #root: HTMLDivElement;
   readonly #title: HTMLSpanElement;
-  readonly #count: HTMLSpanElement;
   readonly #magazine: HTMLDivElement;
   readonly #reloadFill: HTMLDivElement;
   #cells: HTMLDivElement[] = [];
   #lastAmmoMax = 0;
-  #lastStateKey = '';
+  #lastHudRevision = -1;
 
   constructor(nodes: AmmoHudNodes) {
     this.#root = nodes.root;
     this.#title = nodes.title;
-    this.#count = nodes.count;
     this.#magazine = nodes.magazine;
     this.#reloadFill = nodes.reloadFill;
     this.#root.hidden = true;
   }
 
   update(snapshot: AmmoHudSnapshot): void {
-    const stateKey = snapshot.visible
-      ? [
-          '1',
-          snapshot.weaponName,
-          String(snapshot.ammoCurrent),
-          String(snapshot.ammoMax),
-          String(snapshot.weaponColor),
-          snapshot.reloadProgress.toFixed(3),
-          snapshot.cellStates.join('')
-        ].join('|')
-      : '0';
-
-    if (stateKey === this.#lastStateKey) {
+    if (snapshot.hudRevision === this.#lastHudRevision) {
       return;
     }
 
-    this.#lastStateKey = stateKey;
+    this.#lastHudRevision = snapshot.hudRevision;
 
     if (!snapshot.visible) {
       this.#root.hidden = true;
@@ -55,9 +40,8 @@ export class AmmoHud {
     }
 
     this.#root.hidden = false;
-    this.#title.textContent = snapshot.weaponName;
+    this.#title.textContent = `${snapshot.weaponName} · ${String(snapshot.ammoCurrent)}`;
     setAmmoAccentColor(this.#root, snapshot.weaponColor);
-    this.#count.textContent = String(snapshot.ammoCurrent);
     this.#syncMagazineCells(snapshot);
     const reloadPercent = Math.round(snapshot.reloadProgress * 100);
     this.#reloadFill.style.width = `${reloadPercent.toString()}%`;

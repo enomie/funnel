@@ -3,10 +3,12 @@
 import { PerspectiveCamera, Vector3, type Scene, type WebGPURenderer } from 'three/webgpu';
 import {
   createWeaponAudio,
+  bindGameAudioUserGestureResume,
   resumeGameAudio,
   syncAudioListenerFromCamera,
   warmGameAudio
 } from '../game-audio/audio-manager';
+import { tickFrameHousekeeping } from '../core/frame-housekeeping';
 import { playCountdownNarratorine } from '../game-audio/audio-grunts/audio-match-narration';
 import { EnvironmentRainSpawner } from '../arena/environment-rain-spawner';
 import { playHitConfirm, playKillConfirm } from '../game-audio/audio-one-shots/audio-hit-confirm';
@@ -21,15 +23,19 @@ import type { BotActor } from '../bots/bot-actor';
 import { beginNavRayBudgetFrame } from '../bots/bot-nav-ray-budget';
 import { beginBotRespawnBudgetFrame } from '../bots/bot-respawn-budget';
 import { ActorRegistry } from '../combat/actor-registry';
+import {
+  commitActorDeath,
+  type ActorDeathLifecycleDeps
+} from '../combat/actor-death-lifecycle';
+import type { ApplyImpactDeps } from '../combat/apply-impact';
 import { DownedActorIndex } from '../combat/downed-actor-index';
-import { ReviveHireChannel, readSpectatorReviveHireHud } from '../combat/revive-hire-channel';
+import { ReviveHireChannel } from '../combat/revive-hire-channel';
 import type { ReviveHireChannelComplete, ReviveHireChannelDeps } from '../combat/revive-hire-channel';
 import { createCombatActor, LOCAL_PLAYER_ACTOR_ID } from '../combat/combat-actor';
 import { PersonalMatchStats } from '../combat/personal-match-stats';
 import { TeamKillScore } from '../combat/team-kill-score';
 import {
-  createPresenceTickAccumulator,
-  tickTeamPresenceScoring
+  createPresenceTickAccumulator
 } from '../combat/team-presence-scoring';
 import { TeamMatchPoints } from '../combat/team-match-points';
 import { type FactionTeam } from '../combat/teams';
@@ -47,7 +53,6 @@ import {
 import { WeaponArsenal, WEAPON_ARSENAL_PLAYER_BUDGET } from '../combat/weapon-arsenal';
 import { redeemerWeaponDefinition } from '../combat/spawn-weapon-roll';
 import { WorldProjectileSim } from '../combat/world-projectile-sim';
-import { tickAllWorldEffects } from '../combat/world-effects-registry';
 import { DEBUG_CONFIG } from '../config/game-config';
 import { isEnvironmentRainEnabled } from '../arena/environment-rain-waves';
 import { GameFrameClock } from '../core/game-frame-clock';
@@ -62,7 +67,6 @@ import { createRapierRuntime } from '../physics/rapier-world';
 import { CapsuleColliderDebugLayer } from '../physics/capsule-collider-debug';
 import { PlayerCamera } from '../player/player-camera';
 import { PlayerController } from '../player/player-controller';
-import { playerAutoRespawnCountdownSeconds, playerAutoRespawnDue } from '../player/player-auto-respawn';
 import type { HumanoidRigId } from '../player/humanoid-rig';
 import { loadShooterPackCharacter } from '../player/shooter-pack-loader';
 import { PlayerVisual } from '../player/player-visual';
@@ -93,6 +97,7 @@ import { StatusToast } from '../ui/status-toast';
 import { TeamHud } from '../ui/team-hud';
 import { getRendererPixelRatio, getRuntimeProfile } from '../platform/chrome-macos-arm-profile';
 import { createAppDom } from './dom';
+import { createMatchLiveUiController, tickMatchLiveReviveHire } from './match-live-ui-tick';
 
 const _muzzlePosition = new Vector3();
 const _inputSnapshot: InputSnapshot = {
@@ -192,6 +197,44 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   const teamMatchPoints = new TeamMatchPoints();
   const actorRegistry = new ActorRegistry();
   const weaponAudio = createWeaponAudio();
+  const deathRuntime: {
+    player: PlayerController | null;
+    weapon: WeaponArsenal | null;
+    botRoster: BotRoster | null;
+  } = {
+    player: null,
+    weapon: null,
+    botRoster: null
+  };
+
+  const deathLifecycle: ActorDeathLifecycleDeps = {
+    bus: gameEvents,
+    weaponAudio,
+    isLocalPlayer: (actorId) => actorId === LOCAL_PLAYER_ACTOR_ID,
+    resolveWeapon: (actorId) => {
+      if (actorId === LOCAL_PLAYER_ACTOR_ID) {
+        return deathRuntime.weapon ?? undefined;
+      }
+
+      return deathRuntime.botRoster?.resolveBot(actorId)?.weapon;
+    },
+    onActorDeathPhysics: (actorId, nowMs) => {
+      if (actorId === LOCAL_PLAYER_ACTOR_ID) {
+        deathRuntime.player?.applyDeathCommit(nowMs);
+        return;
+      }
+
+      deathRuntime.botRoster?.resolveBot(actorId)?.controller.syncDeathState(nowMs);
+    }
+  };
+
+  const impactDeps: ApplyImpactDeps = {
+    registry: actorRegistry,
+    bus: gameEvents,
+    world,
+    deathLifecycle
+  };
+
   const shadowLod = new ShadowLodController();
   const sphereInstancing = new SphereInstancingService(scene);
   const segmentLineInstancing = new SegmentLineInstancingService(scene);
@@ -200,15 +243,15 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   const projectileSim = new WorldProjectileSim(
     scene,
     world,
-    { registry: actorRegistry, bus: gameEvents, world },
+    impactDeps,
     weaponAudio,
     sphereInstancing,
     segmentLineInstancing,
     boltInstancing,
     rocketSmokeTrailInstancing
   );
-  const botRoster = new BotRoster(scene, world, playerTeam, actorRegistry, {
-    impactDeps: { registry: actorRegistry, bus: gameEvents, world },
+  deathRuntime.botRoster = new BotRoster(scene, world, playerTeam, actorRegistry, {
+    impactDeps,
     weaponAudio,
     shadowLod,
     sphereInstancing,
@@ -216,6 +259,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     projectileSim,
     capsuleDebug
   });
+  const botRoster = deathRuntime.botRoster;
   const teamSpawnMascots = new TeamSpawnMascots(scene, playerTeam);
 
   matchFlow.setLoadingProgress(55, 'Loading gameplay animations…');
@@ -264,31 +308,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   });
   let matchLive = false;
   const presenceTickAccumulator = createPresenceTickAccumulator();
-  let lastTeamHudKey = '';
   const teamRosterCounter = new TeamRosterCounter();
-  let lastLocalPlayerDead = false;
-
-  const refreshTeamHud = (): void => {
-    const roster = teamRosterCounter.counts;
-    const viewerFaction = playerTeam.faction;
-    const hudKey = [
-      viewerFaction,
-      roster.alpha,
-      roster.beta,
-      teamKillScore.killsBy('alpha'),
-      teamKillScore.killsBy('beta'),
-      teamMatchPoints.formatDisplayPoints('alpha'),
-      teamMatchPoints.formatDisplayPoints('beta'),
-      teamMatchPoints.winner ?? ''
-    ].join('|');
-
-    if (hudKey === lastTeamHudKey) {
-      return;
-    }
-
-    lastTeamHudKey = hudKey;
-    teamHud.update(viewerFaction, teamKillScore, roster, teamMatchPoints);
-  };
 
   const crosshairHud = new CrosshairHud(dom.crosshair);
   const fpsHud = new FpsHud({
@@ -300,9 +320,9 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   gameEvents.on('actor-damaged', (event) => {
     if (event.actorId === LOCAL_PLAYER_ACTOR_ID) {
       damageVignetteHud.flash(event.amount);
-      visual.flashDamage();
+      visual.flashDamage(event.nowMs);
     } else {
-      botRoster.flashDamage(event.actorId);
+      botRoster.flashDamage(event.actorId, event.nowMs);
     }
     if (event.sourceActorId === LOCAL_PLAYER_ACTOR_ID && event.actorId !== LOCAL_PLAYER_ACTOR_ID) {
       crosshairHud.flashHit();
@@ -315,7 +335,6 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   const ammoHud = new AmmoHud({
     root: dom.ammoHud,
     title: dom.ammoTitle,
-    count: dom.ammoCount,
     magazine: dom.ammoMagazine,
     reloadFill: dom.ammoReloadFill
   });
@@ -335,7 +354,8 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   const downedActorIndex = new DownedActorIndex();
   const reviveHireChannel = new ReviveHireChannel();
   const matchResultScreen = new MatchResultScreen({ shell: dom.shell });
-  const player = new PlayerController(world, visual);
+  deathRuntime.player = new PlayerController(world, visual);
+  const player = deathRuntime.player;
   const localPlayerActor = createCombatActor({
     id: LOCAL_PLAYER_ACTOR_ID,
     kind: 'player',
@@ -346,16 +366,6 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   });
   actorRegistry.register(localPlayerActor);
   teamRosterCounter.rebuild(actorRegistry);
-  playerTeam.onChange((event) => {
-    localPlayerActor.setFaction(playerTeam.faction);
-    if (!player.health.isDead) {
-      teamRosterCounter.onFactionChange(LOCAL_PLAYER_ACTOR_ID, event.previousTeam, event.team);
-      refreshTeamHud();
-    }
-    if (event.reason !== 'spawn' && matchLive && !player.health.isDead) {
-      player.spawnAtFaction(playerTeam.faction);
-    }
-  });
   const playerCamera = new PlayerCamera(camera, world, player.collider, scene);
   playerCamera.attachViewmodel(
     visual.root,
@@ -364,11 +374,39 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     () => visual.muzzleOffsetThirdPerson(),
     () => visual.muzzleOffsetFirstPerson()
   );
-  const weapon = new WeaponArsenal(scene, world, player.body, weaponAudio, {
-    registry: actorRegistry,
-    bus: gameEvents,
-    world
-  }, () => playerTeam.faction, LOCAL_PLAYER_ACTOR_ID, visual.muzzleSocket, projectileSim, WEAPON_ARSENAL_PLAYER_BUDGET, sphereInstancing, segmentLineInstancing);
+  deathRuntime.weapon = new WeaponArsenal(scene, world, player.body, weaponAudio, impactDeps, () => playerTeam.faction, LOCAL_PLAYER_ACTOR_ID, visual.muzzleSocket, projectileSim, WEAPON_ARSENAL_PLAYER_BUDGET, sphereInstancing, segmentLineInstancing);
+  const weapon = deathRuntime.weapon;
+  const intrusionPressureCache = new IntrusionPressureCache();
+  const matchLiveUi = createMatchLiveUiController({
+    hudRoot: dom.hud,
+    teamHud,
+    weaponBarHud,
+    ammoHud,
+    healthHud,
+    deathRespawnHud,
+    playerTeam,
+    player,
+    weapon,
+    teamKillScore,
+    teamMatchPoints,
+    teamRosterCounter,
+    actorRegistry,
+    intrusionPressureCache,
+    presenceTickAccumulator,
+    lighting,
+    gameEvents
+  });
+
+  playerTeam.onChange((event) => {
+    localPlayerActor.setFaction(playerTeam.faction);
+    if (!player.health.isDead) {
+      teamRosterCounter.onFactionChange(LOCAL_PLAYER_ACTOR_ID, event.previousTeam, event.team);
+      matchLiveUi.refreshTeamHud();
+    }
+    if (event.reason !== 'spawn' && matchLive && !player.health.isDead) {
+      player.spawnAtFaction(playerTeam.faction);
+    }
+  });
 
   const registerDownedFromBot = (bot: BotActor): void => {
     downedActorIndex.add({
@@ -403,6 +441,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
         faction: playerTeam.faction,
         reviverId: LOCAL_PLAYER_ACTOR_ID
       });
+      matchLiveUi.clearPlayerKilledByWeapon();
       deathRespawnHud.update(false, 0);
       return;
     }
@@ -442,7 +481,12 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     onComplete: completeReviveHire
   };
 
+  let lastFrameNowMs = 0;
+
   gameEvents.on('actor-died', (event) => {
+    if (event.actorId === LOCAL_PLAYER_ACTOR_ID && event.sourceWeaponVisualKind !== undefined) {
+      matchLiveUi.setPlayerKilledByWeapon(event.sourceWeaponVisualKind);
+    }
     if (event.sourceActorId === LOCAL_PLAYER_ACTOR_ID && event.actorId !== LOCAL_PLAYER_ACTOR_ID) {
       crosshairHud.flashKill();
       playKillConfirm();
@@ -452,7 +496,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     personalStatsHud.update(personalMatchStats);
     teamKillScore.recordKill(event.sourceFaction, event.faction);
     teamMatchPoints.recordCrossFactionKill(event.sourceFaction, event.faction);
-    refreshTeamHud();
+    matchLiveUi.refreshTeamHud();
     registerDownedActor(event.actorId);
     const winner = teamMatchPoints.winner;
     if (winner !== null) {
@@ -460,19 +504,25 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     }
   });
   gameEvents.on('actor-respawned', (event) => {
+    if (event.actorId === LOCAL_PLAYER_ACTOR_ID) {
+      matchLiveUi.clearPlayerKilledByWeapon();
+    }
     downedActorIndex.remove(event.actorId);
     teamRosterCounter.onRevive(event.actorId, event.faction);
-    refreshTeamHud();
+    matchLiveUi.refreshTeamHud();
   });
   gameEvents.on('actor-revived', (event) => {
+    if (event.actorId === LOCAL_PLAYER_ACTOR_ID) {
+      matchLiveUi.clearPlayerKilledByWeapon();
+    }
     downedActorIndex.remove(event.actorId);
     teamRosterCounter.onRevive(event.actorId, event.faction);
-    refreshTeamHud();
+    matchLiveUi.refreshTeamHud();
   });
   gameEvents.on('actor-hired', (event) => {
     downedActorIndex.remove(event.actorId);
     teamRosterCounter.onHired(event.actorId, event.previousFaction, event.newFaction);
-    refreshTeamHud();
+    matchLiveUi.refreshTeamHud();
   });
   const pickupField = new PickupField({
     scene,
@@ -496,7 +546,6 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
       botRoster.equipRedeemer(collector.id);
     }
   });
-  const intrusionPressureCache = new IntrusionPressureCache();
   const playerSnapshot = {
     x: 0,
     y: 0,
@@ -506,7 +555,6 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     body: player.body,
     colliders: [player.collider] as const
   };
-  let lastAimingHud = '';
   const botContextBase = {
     matchLive: false,
     world,
@@ -521,7 +569,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   resizeObserver.observe(dom.shell);
   resizeRenderer(renderer, dom.canvas, camera);
   playerTeam.assign(playerTeam.faction, 'spawn');
-  refreshTeamHud();
+  matchLiveUi.refreshTeamHud();
 
   matchFlow.setLoadingProgress(100, 'Ready');
   player.setMovementLocked(true);
@@ -537,8 +585,8 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     matchLive = false;
     player.setMovementLocked(true);
     lighting.updateFightFocus(null);
-    refreshTeamHud();
-    reviveHireChannel.abortAll(performance.now());
+    matchLiveUi.refreshTeamHud();
+    reviveHireChannel.abortAll(lastFrameNowMs);
     reviveHireHud.update(false, null, 0);
     deathRespawnHud.update(false, 0);
     matchFlow.setMatchPhase('ended');
@@ -559,6 +607,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   player.beginMatchStartDrop(playerTeam.faction);
   introDropActive = true;
   input.connect();
+  bindGameAudioUserGestureResume(dom.canvas);
   enterArenaDisplayMode(dom.canvas);
 
   
@@ -573,14 +622,18 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
       })
     : undefined;
 
+  frameClock.setVisibilityResetHandler(() => {
+    botRoster.resetVisibilityClock();
+  });
+
   void renderer.setAnimationLoop((now) => {
-    const loopStartMs = performance.now();
     const renderTick = frameClock.beginRenderFrame(now);
     if (renderTick === null) {
       return;
     }
 
     const { deltaSeconds, nowMs: frameNowMs, frameId: renderFrameId } = renderTick;
+    lastFrameNowMs = frameNowMs;
     actorRegistry.beginFrame(renderFrameId);
     beginNavRayBudgetFrame();
     beginBotRespawnBudgetFrame();
@@ -597,17 +650,35 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
       player.health.tickRegen(frameNowMs, deltaSeconds);
     }
 
-    const snapshot = matchLive
-      ? input.snapshot(_inputSnapshot)
-      : introDropActive
-        ? applyPreMatchLookOnly(input.snapshot(_inputSnapshot))
-        : IDLE_INPUT_SNAPSHOT;
-    player.setMovementLocked(!matchLive || weapon.isRedeemerGuidedActive());
-    player.beginFrame(snapshot);
+    let snapshot: InputSnapshot;
+    if (matchLive) {
+      snapshot = input.snapshot(_inputSnapshot);
+    } else if (introDropActive) {
+      snapshot = applyPreMatchLookOnly(input.snapshot(_inputSnapshot));
+    } else {
+      snapshot = IDLE_INPUT_SNAPSHOT;
+    }
+    const redeemerGuided = weapon.isRedeemerGuidedActive();
+    player.setMovementLocked(!matchLive || redeemerGuided);
+    player.beginFrame(snapshot, frameNowMs);
+
+    if (
+      player.health.isDead &&
+      !player.deathSnapshot.applied &&
+      snapshot.killPressed
+    ) {
+      commitActorDeath(deathLifecycle, {
+        actorId: LOCAL_PLAYER_ACTOR_ID,
+        faction: playerTeam.faction,
+        nowMs: frameNowMs,
+        sourceFaction: playerTeam.faction,
+        sourceActorId: LOCAL_PLAYER_ACTOR_ID
+      });
+    }
 
     if (matchLive && snapshot.teamFlipPressed) {
       playerTeam.flip('dev');
-      refreshTeamHud();
+      matchLiveUi.refreshTeamHud();
       toast.show(`Faction flip — now ${playerTeam.definition.label}.`, 1400);
     }
 
@@ -618,27 +689,39 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     playerSnapshot.z = playerTranslation.z;
     playerSnapshot.faction = playerTeam.faction;
     playerSnapshot.isDead = player.health.isDead;
-    botRoster.preparePhysicsFrame(deltaSeconds, frameNowMs, botContextBase);
     profileMark('funnel-physics-start');
-    frameClock.consumePhysicsSteps((step) => {
+    const physicsBatch = frameClock.consumePhysicsSteps((step) => {
       player.fixedUpdate(step, snapshot);
       botRoster.fixedUpdate(step, frameNowMs, botContextBase);
       world.step(eventQueue);
+      player.capturePhysicsInterpolation();
+      botRoster.capturePhysicsInterpolation();
+      arena.dynamicInstances.capturePhysicsInterpolation();
     });
+    botRoster.preparePhysicsFrame(
+      deltaSeconds,
+      frameNowMs,
+      botContextBase,
+      physicsBatch.loadShedNonCritical
+    );
+    const renderInterpolationBlend = frameClock.renderInterpolationBlend(physicsBatch.subSteps);
+    player.setRenderInterpolationBlend(renderInterpolationBlend);
+    botRoster.setRenderInterpolationBlend(renderInterpolationBlend);
+    arena.dynamicInstances.setRenderInterpolationBlend(renderInterpolationBlend);
     profileMark('funnel-physics-end');
     profileMeasure('funnel-physics', 'funnel-physics-start', 'funnel-physics-end');
 
     eventQueue.drainContactForceEvents((event) => {
-      player.handleContactForceEvent(event);
+      player.handleContactForceEvent(event, frameNowMs);
     });
 
     player.afterPhysics();
     botRoster.afterPhysics();
+    if (!player.health.isDead) {
+      jumpPadField.tickPlayer(player, snapshot, frameNowMs);
+    }
     if (matchLive) {
-      jumpPadField.tickPlayer(player, snapshot, frameNowMs);
       botRoster.tickJumpPads(jumpPadField, frameNowMs);
-    } else if (!player.health.isDead) {
-      jumpPadField.tickPlayer(player, snapshot, frameNowMs);
     }
     if (introDropActive) {
       botRoster.tickCountdownDrop(deltaSeconds, frameNowMs);
@@ -653,56 +736,35 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     });
     botRoster.update(deltaSeconds, frameNowMs, botContextBase);
     const reviveChannelHeld = input.reviveChannelHeldNow();
-    if (matchLive && (reviveChannelHeld || reviveHireChannel.isChanneling)) {
-      botRoster.syncDownedActors(registerDownedFromBot);
-    }
     if (matchLive) {
-      const deathSnapshotForChannel = player.deathSnapshot;
-      const spectatorSnapshot =
-        frame.isDead &&
-        (deathSnapshotForChannel.applied || deathSnapshotForChannel.diedAtMs > 0)
-          ? deathSnapshotForChannel
-          : null;
-      let reviveHireHudView = readSpectatorReviveHireHud(spectatorSnapshot);
-      if (
-        reviveHireChannel.mayTick(
-          matchLive,
-          downedActorIndex.count,
-          reviveChannelHeld,
-          spectatorSnapshot
-        )
-      ) {
-        reviveHireHudView = reviveHireChannel.tick(
+      tickMatchLiveReviveHire(
+        {
+          player,
+          reviveHireChannel,
           reviveHireChannelDeps,
-          reviveChannelHeld,
+          reviveHireHud,
+          downedActorIndex
+        },
+        {
           frameNowMs,
           deltaSeconds,
-          spectatorSnapshot
-        );
-      }
-      reviveHireHud.update(
-        reviveHireHudView.visible,
-        reviveHireHudView.mode,
-        reviveHireHudView.progress
+          frameIsDead: frame.isDead,
+          reviveChannelHeld,
+          syncDownedBots: () => {
+            botRoster.syncDownedActors(registerDownedFromBot);
+          },
+          tryAutoRespawn: () => {
+            botRoster.tryAutoRespawn(frameNowMs);
+          }
+        }
       );
-      botRoster.tryAutoRespawn(frameNowMs);
     }
     profileMark('funnel-bots-end');
     profileMeasure('funnel-bots', 'funnel-bots-start', 'funnel-bots-end');
-    if (frame.isDead !== lastLocalPlayerDead) {
-      if (frame.isDead) {
-        teamRosterCounter.onDeath(LOCAL_PLAYER_ACTOR_ID, playerTeam.faction);
-        registerDownedActor(LOCAL_PLAYER_ACTOR_ID);
-      } else {
-        teamRosterCounter.onRevive(LOCAL_PLAYER_ACTOR_ID, playerTeam.faction);
-        downedActorIndex.remove(LOCAL_PLAYER_ACTOR_ID);
-      }
-      lastLocalPlayerDead = frame.isDead;
-    }
     const selectedWeapon = weapon.selectedWeapon;
     const sniperZoom =
       matchLive &&
-      !weapon.isRedeemerGuidedActive() &&
+      !redeemerGuided &&
       snapshot.secondaryHeld &&
       selectedWeapon.sniperZoomFovScale !== undefined
         ? selectedWeapon.sniperZoomFovScale
@@ -720,51 +782,14 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     lighting.updateShadowFocus(frame.position.x, frame.position.z);
     shadowLod.update(frame.position.x, frame.position.y, frame.position.z);
     if (matchLive) {
-      lighting.updateFightFocus(intrusionPressureCache.focusFactionForFrame(renderFrameId, actorRegistry));
-      const aimingHud = cameraFrame.firstPersonBlend > 0.65 ? 'true' : 'false';
-      if (aimingHud !== lastAimingHud) {
-        lastAimingHud = aimingHud;
-        dom.hud.dataset.aiming = aimingHud;
-      }
-      const presenceWinner = tickTeamPresenceScoring(
+      matchLiveUi.tick({
+        frameNowMs,
         deltaSeconds,
-        presenceTickAccumulator,
-        actorRegistry,
-        teamMatchPoints
-      );
-      if (presenceWinner !== null) {
-        endMatch(presenceWinner);
-      }
-      refreshTeamHud();
-      personalStatsHud.update(personalMatchStats);
-      weaponBarHud.update(!frame.isDead, weapon.selectedSlotIndex);
-      ammoHud.update(weapon.getAmmoHudSnapshot());
-      healthHud.update(
-        frame.health,
-        player.health.maxHealth,
-        frame.shield,
-        player.health.maxShield,
-        frame.isDead,
-        frame.isRegenerating
-      );
-
-      const deathSnapshot = player.deathSnapshot;
-      if (frame.isDead && deathSnapshot.diedAtMs > 0) {
-        const countdownSeconds = playerAutoRespawnCountdownSeconds(frameNowMs, deathSnapshot);
-        if (!playerAutoRespawnDue(frameNowMs, deathSnapshot)) {
-          deathRespawnHud.update(true, countdownSeconds);
-        } else {
-          player.respawnAtFaction(playerTeam.faction);
-          gameEvents.emit('actor-respawned', {
-            actorId: LOCAL_PLAYER_ACTOR_ID,
-            faction: playerTeam.faction
-          });
-          deathRespawnHud.update(false, 0);
-          refreshTeamHud();
-        }
-      } else {
-        deathRespawnHud.update(false, 0);
-      }
+        renderFrameId,
+        firstPersonBlend: cameraFrame.firstPersonBlend,
+        frame,
+        onMatchEnd: endMatch
+      });
     }
 
     arena.dynamicInstances.sync();
@@ -773,9 +798,6 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     }
     if (matchLive || redeemerPickup.isStarted) {
       redeemerPickup.tick(frameNowMs, deltaSeconds);
-    }
-    if (segmentLineInstancing.hasActive()) {
-      segmentLineInstancing.tick(frameNowMs);
     }
 
     if (matchLive && !frame.isDead && !reviveHireChannel.isChanneling) {
@@ -786,7 +808,9 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
 
       const muzzlePosition = playerCamera.resolveMuzzleWorldPosition(_muzzlePosition, cameraVectors);
       weapon.trackMechanicsAudioOrigin(muzzlePosition);
-      weapon.tickMechanicsAudio(frameNowMs);
+      if (weapon.needsMechanicsAudioTick(frameNowMs)) {
+        weapon.tickMechanicsAudio(frameNowMs);
+      }
       const fireIntent = fillFireIntentFromInput(snapshot, selectedWeapon, PLAYER_FIRE_INTENT_SCRATCH);
       const hold = fillSecondaryHoldFromInput(snapshot, selectedWeapon, PLAYER_SECONDARY_HOLD_SCRATCH);
       const holdBlocksPrimary =
@@ -797,7 +821,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
           weapon.isRocketMarking() ||
           weapon.isRocketVolleyPending());
 
-      if (!weapon.isRedeemerGuidedActive() && !holdBlocksPrimary) {
+      if (!redeemerGuided && !holdBlocksPrimary) {
         applyPrimaryFireIntent(
           weapon,
           fireIntent,
@@ -808,7 +832,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
         );
       }
 
-      if (!weapon.isRedeemerGuidedActive()) {
+      if (!redeemerGuided) {
         applyCombinedSecondaryIntent(
           weapon,
           fireIntent,
@@ -823,10 +847,13 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     }
 
     profileMark('funnel-effects-start');
-    tickAllWorldEffects(frameNowMs, deltaSeconds);
+    tickFrameHousekeeping(frameNowMs, deltaSeconds, physicsBatch.loadShedNonCritical, {
+      segmentLineInstancing
+    });
+    profileMark('funnel-effects-end');
     profileMeasure('funnel-effects', 'funnel-effects-start', 'funnel-effects-end');
     renderer.render(scene, camera);
-    const loopWallMs = performance.now() - loopStartMs;
+    const loopWallMs = performance.now() - now;
     frameClock.recordFrameWallMs(loopWallMs);
     fpsHud.tick(loopWallMs, frameNowMs);
   });
