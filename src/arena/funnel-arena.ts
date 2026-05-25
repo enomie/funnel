@@ -1,168 +1,135 @@
 import RAPIER from '@dimforge/rapier3d-simd-compat';
-import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
-import {
-  BoxGeometry,
-  CylinderGeometry,
-  GridHelper,
-  InstancedMesh,
-  Matrix4,
-  Mesh,
-  MeshStandardMaterial,
-  PlaneGeometry,
-  Scene
-} from 'three/webgpu';
-import { FUNNEL_DIMENSIONS } from '../config/game-config';
-import type { SyncedBody } from '../physics/synced-body';
+import type { World } from '@dimforge/rapier3d-simd-compat';
+import { BoxGeometry, Mesh, PlaneGeometry, Scene } from 'three/webgpu';
+import { ArenaStaticInstances } from './arena-static-instances';
+import { createCeilingFixtures } from './ceiling-fixtures';
+import { FUNNEL_DIMENSIONS, FUNNEL_ZONE_COUNT, funnelZoneExtentZ } from '../config/game-config';
+import { DynamicEnvironmentInstances, type DynamicSyncedBody } from './environment-dynamic-instances';
+import { zoneGridMaterial } from '../render/materials/environment-grid-material';
+import { createNeutralCornerCubes } from './neutral-corner-cubes';
+import { createNeutralCrosswalk } from './neutral-crosswalk';
+import { createNeutralSideWallRamps } from './neutral-side-wall-ramps';
+import { createNeutralPodium } from './neutral-podium';
+import { createNeutralPodiumRamps } from './neutral-podium-ramps';
+import { createTeamZonePodiums } from './team-zone-podiums';
+import { createTeamZonePillars } from './team-zone-pillars';
+import { createTeamZonePodiumRamps } from './team-zone-podium-ramps';
+import { createSideWallCeilingRamps } from './side-wall-ceiling-ramps';
+import { createSpawnShieldCanopies } from './spawn-shield-canopy';
+import { createSpawnShieldCubes } from './spawn-shield-cubes';
+import type { FunnelZoneId } from './funnel-zones';
+import { createZoneBorderRamps } from './zone-border-ramps';
+import { ENVIRONMENT_COLLISION_GROUPS } from '../physics/collision-groups';
 
 export interface FunnelArena {
-  dynamicBodies: SyncedBody[];
+  dynamicBodies: DynamicSyncedBody[];
+  dynamicInstances: DynamicEnvironmentInstances;
+  staticInstances: ArenaStaticInstances;
 }
 
-const WALL_MATERIAL = new MeshStandardMaterial({
-  color: 0x2b3437,
-  roughness: 0.82,
-  metalness: 0.18
-});
-
-const FLOOR_MATERIAL = new MeshStandardMaterial({
-  color: 0x171d1c,
-  roughness: 0.92,
-  metalness: 0.08
-});
-
-const BLUE_METAL = new MeshStandardMaterial({
-  color: 0x243b4d,
-  roughness: 0.62,
-  metalness: 0.35
-});
-
-const HAZARD_MATERIAL = new MeshStandardMaterial({
-  color: 0x6e5b30,
-  roughness: 0.58,
-  metalness: 0.42,
-  emissive: 0x2a1900,
-  emissiveIntensity: 0.2
-});
+const ZONE_ORDER: readonly FunnelZoneId[] = ['alpha', 'neutral', 'beta'];
+const SHELL_WALL_THICKNESS_M = 0.5;
 
 export function createFunnelArena(scene: Scene, world: World): FunnelArena {
-  const dynamicBodies: SyncedBody[] = [];
+  const staticInstances = new ArenaStaticInstances(scene);
   createShell(scene, world);
-  createCeilingLights(scene);
-  createInstancedPillars(scene, world);
-  createDynamicCrates(scene, world, dynamicBodies);
+  createCeilingFixtures(staticInstances);
+  createSpawnShieldCubes(staticInstances, world);
+  createSpawnShieldCanopies(staticInstances, world);
+  createNeutralCornerCubes(staticInstances, world);
+  createNeutralSideWallRamps(staticInstances, world);
+  createSideWallCeilingRamps(staticInstances, world);
+  createNeutralCrosswalk(staticInstances, world);
+  createNeutralPodium(staticInstances, world);
+  createNeutralPodiumRamps(staticInstances, world);
+  createTeamZonePodiums(staticInstances, world);
+  createTeamZonePillars(staticInstances, world);
+  createTeamZonePodiumRamps(staticInstances, world);
+  createZoneBorderRamps(staticInstances, world);
 
-  const grid = new GridHelper(FUNNEL_DIMENSIONS.length, 60, 0x31515f, 0x1b2b30);
-  grid.position.y = 0.018;
-  scene.add(grid);
+  const dynamicInstances = new DynamicEnvironmentInstances(scene);
 
-  return { dynamicBodies };
+  return { dynamicBodies: [], dynamicInstances, staticInstances };
 }
 
 function createShell(scene: Scene, world: World): void {
   const { width, length, height } = FUNNEL_DIMENSIONS;
-  const floor = new Mesh(new PlaneGeometry(width, length), FLOOR_MATERIAL);
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
+  const halfW = width * 0.5;
+  const halfL = length * 0.5;
+  const t = SHELL_WALL_THICKNESS_M;
 
-  addFixedBox(scene, world, 'floor-body', [0, -0.5, 0], [width / 2, 0.5, length / 2], FLOOR_MATERIAL);
-  addFixedBox(scene, world, 'ceiling', [0, height + 0.5, 0], [width / 2, 0.5, length / 2], WALL_MATERIAL);
-  addFixedBox(scene, world, 'left-wall', [-width / 2 - 0.5, height / 2, 0], [0.5, height / 2, length / 2], WALL_MATERIAL);
-  addFixedBox(scene, world, 'right-wall', [width / 2 + 0.5, height / 2, 0], [0.5, height / 2, length / 2], WALL_MATERIAL);
-  addFixedBox(scene, world, 'north-bulkhead', [0, height / 2, -length / 2 - 0.5], [width / 2, height / 2, 0.5], WALL_MATERIAL);
-  addFixedBox(scene, world, 'south-bulkhead', [0, height / 2, length / 2 + 0.5], [width / 2, height / 2, 0.5], WALL_MATERIAL);
-}
+  for (let zoneIndex = 0; zoneIndex < FUNNEL_ZONE_COUNT; zoneIndex += 1) {
+    const zoneId = ZONE_ORDER[zoneIndex] ?? 'neutral';
+    const { minZ, maxZ } = funnelZoneExtentZ(zoneIndex);
+    const zoneLen = maxZ - minZ;
+    const centerZ = (minZ + maxZ) * 0.5;
 
-function addFixedBox(
-  scene: Scene,
-  world: World,
-  name: string,
-  position: [number, number, number],
-  halfExtents: [number, number, number],
-  material: MeshStandardMaterial
-): RigidBody {
-  const mesh = new Mesh(
-    new BoxGeometry(halfExtents[0] * 2, halfExtents[1] * 2, halfExtents[2] * 2),
-    material
+    const floor = new Mesh(new PlaneGeometry(width, zoneLen), zoneGridMaterial(zoneId));
+    floor.name = `floor-${zoneId}`;
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0, centerZ);
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const ceiling = new Mesh(new BoxGeometry(width, t, zoneLen), zoneGridMaterial(zoneId));
+    ceiling.name = `ceiling-${zoneId}`;
+    ceiling.position.set(0, height + t * 0.5, centerZ);
+    ceiling.receiveShadow = true;
+    scene.add(ceiling);
+
+    const leftWall = new Mesh(new BoxGeometry(t, height, zoneLen), zoneGridMaterial(zoneId));
+    leftWall.name = `left-wall-${zoneId}`;
+    leftWall.position.set(-halfW - t * 0.5, height * 0.5, centerZ);
+    leftWall.castShadow = true;
+    leftWall.receiveShadow = true;
+    scene.add(leftWall);
+
+    const rightWall = new Mesh(new BoxGeometry(t, height, zoneLen), zoneGridMaterial(zoneId));
+    rightWall.name = `right-wall-${zoneId}`;
+    rightWall.position.set(halfW + t * 0.5, height * 0.5, centerZ);
+    rightWall.castShadow = true;
+    rightWall.receiveShadow = true;
+    scene.add(rightWall);
+  }
+
+  const northBulkhead = new Mesh(
+    new BoxGeometry(width, height, t),
+    zoneGridMaterial('alpha')
   );
-  mesh.name = name;
-  mesh.position.set(...position);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  scene.add(mesh);
+  northBulkhead.name = 'north-bulkhead';
+  northBulkhead.position.set(0, height * 0.5, -halfL - t * 0.5);
+  northBulkhead.castShadow = true;
+  northBulkhead.receiveShadow = true;
+  scene.add(northBulkhead);
 
+  const southBulkhead = new Mesh(
+    new BoxGeometry(width, height, t),
+    zoneGridMaterial('beta')
+  );
+  southBulkhead.name = 'south-bulkhead';
+  southBulkhead.position.set(0, height * 0.5, halfL + t * 0.5);
+  southBulkhead.castShadow = true;
+  southBulkhead.receiveShadow = true;
+  scene.add(southBulkhead);
+
+  addFixedCollider(world, [0, -t * 0.5, 0], [halfW, t * 0.5, halfL]);
+  addFixedCollider(world, [0, height + t * 0.5, 0], [halfW, t * 0.5, halfL]);
+  addFixedCollider(world, [-halfW - t * 0.5, height * 0.5, 0], [t * 0.5, height * 0.5, halfL]);
+  addFixedCollider(world, [halfW + t * 0.5, height * 0.5, 0], [t * 0.5, height * 0.5, halfL]);
+  addFixedCollider(world, [0, height * 0.5, -halfL - t * 0.5], [halfW, height * 0.5, t * 0.5]);
+  addFixedCollider(world, [0, height * 0.5, halfL + t * 0.5], [halfW, height * 0.5, t * 0.5]);
+}
+
+function addFixedCollider(
+  world: World,
+  position: [number, number, number],
+  halfExtents: [number, number, number]
+): void {
   const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(...position));
-  world.createCollider(RAPIER.ColliderDesc.cuboid(...halfExtents).setFriction(1.1), body);
-  return body;
-}
-
-function createCeilingLights(scene: Scene): void {
-  const tubeGeometry = new BoxGeometry(1.4, 0.08, 12);
-  const tubeMaterial = new MeshStandardMaterial({
-    color: 0xbceeff,
-    emissive: 0x75d7ff,
-    emissiveIntensity: 3.2,
-    roughness: 0.26
-  });
-
-  for (let z = -130; z <= 130; z += 20) {
-    for (const x of [-14, 0, 14]) {
-      const light = new Mesh(tubeGeometry, tubeMaterial);
-      light.position.set(x, FUNNEL_DIMENSIONS.height - 0.35, z);
-      scene.add(light);
-    }
-  }
-}
-
-function createInstancedPillars(scene: Scene, world: World): void {
-  const geometry = new CylinderGeometry(1.15, 1.35, 14, 12);
-  const count = 36;
-  const pillars = new InstancedMesh(geometry, BLUE_METAL, count);
-  pillars.castShadow = true;
-  pillars.receiveShadow = true;
-
-  const matrix = new Matrix4();
-  let index = 0;
-  for (let z = -110; z <= 110; z += 20) {
-    for (const x of [-16, 16, 0]) {
-      const offsetX = x === 0 ? Math.sin(z * 0.07) * 4 : x;
-      matrix.makeTranslation(offsetX, 7, z);
-      pillars.setMatrixAt(index, matrix);
-
-      const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(offsetX, 7, z));
-      world.createCollider(RAPIER.ColliderDesc.cylinder(7, 1.25).setFriction(0.95), body);
-      index += 1;
-    }
-  }
-
-  scene.add(pillars);
-}
-
-function createDynamicCrates(scene: Scene, world: World, dynamicBodies: SyncedBody[]): void {
-  const geometry = new BoxGeometry(2.1, 2.1, 2.1);
-
-  for (let i = 0; i < 22; i += 1) {
-    const mesh = new Mesh(geometry, HAZARD_MATERIAL.clone());
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    const x = ((i % 5) - 2) * 4.2 + Math.sin(i) * 1.3;
-    const z = -58 + Math.floor(i / 5) * 9;
-    mesh.position.set(x, 1.1, z);
-    scene.add(mesh);
-
-    const body = world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(x, 1.1, z)
-        .setLinearDamping(0.2)
-        .setAngularDamping(0.35)
-    );
-    world.createCollider(
-      RAPIER.ColliderDesc.cuboid(1.05, 1.05, 1.05)
-        .setDensity(0.8)
-        .setFriction(0.72)
-        .setRestitution(0.08),
-      body
-    );
-    dynamicBodies.push({ object: mesh, body });
-  }
+  world.createCollider(
+    RAPIER.ColliderDesc.cuboid(...halfExtents)
+      .setFriction(1.1)
+      .setCollisionGroups(ENVIRONMENT_COLLISION_GROUPS),
+    body
+  );
 }

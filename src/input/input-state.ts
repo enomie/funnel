@@ -1,7 +1,5 @@
 import { PLAYER_CONFIG } from '../config/game-config';
-
-export type BuildMode = 'wall' | 'floor' | 'ramp' | 'cone';
-export type PlayerMode = 'weapon' | 'build';
+import { requestArenaPointerLock } from './pointer-lock';
 
 const MOVEMENT_KEYS = new Set<string>(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
 
@@ -13,37 +11,89 @@ export interface InputSnapshot {
     right: boolean;
   };
   jumpPressed: boolean;
-  crouchPressed: boolean;
+  /** `KeyC` held (stance, not edge). */
+  crouchHeld: boolean;
   sprintHeld: boolean;
-  fireHeld: boolean;
-  aimHeld: boolean;
+  primaryHeld: boolean;
+  primaryPressed: boolean;
+  primaryReleased: boolean;
+  secondaryHeld: boolean;
+  secondaryPressed: boolean;
+  secondaryReleased: boolean;
+  /** `true` = first person (default); `V` toggles third person. */
+  firstPersonView: boolean;
   yaw: number;
   pitch: number;
-  mode: PlayerMode;
-  buildMode: BuildMode;
-  weaponSlot: number;
-  consumePlacePressed: () => boolean;
+  /** Set only on digit-key press (`1`–`0`); not re-applied every frame. */
+  weaponSlotSelect: number | null;
   /** Dev/test: trigger death animation (`K`). */
   killPressed: boolean;
-  /** Respawn after death (`R`). */
+  /** Reserved for Revive/Hire channel (`R` hold) — not instant respawn. */
   respawnPressed: boolean;
+  /** Dev: flip faction (`T`) — hire mechanic prep. */
+  teamFlipPressed: boolean;
 }
+
+/** Strip gameplay actions during pre-match countdown; keep look (yaw/pitch/view mode). */
+export function applyPreMatchLookOnly(out: InputSnapshot): InputSnapshot {
+  out.movement.forward = false;
+  out.movement.back = false;
+  out.movement.left = false;
+  out.movement.right = false;
+  out.jumpPressed = false;
+  out.crouchHeld = false;
+  out.sprintHeld = false;
+  out.primaryHeld = false;
+  out.primaryPressed = false;
+  out.primaryReleased = false;
+  out.secondaryHeld = false;
+  out.secondaryPressed = false;
+  out.secondaryReleased = false;
+  out.weaponSlotSelect = null;
+  out.killPressed = false;
+  out.respawnPressed = false;
+  out.teamFlipPressed = false;
+  return out;
+}
+
+/** No movement or actions — pre-match countdown / locked phases. */
+export const IDLE_INPUT_SNAPSHOT: InputSnapshot = {
+  movement: { forward: false, back: false, left: false, right: false },
+  jumpPressed: false,
+  crouchHeld: false,
+  sprintHeld: false,
+  primaryHeld: false,
+  primaryPressed: false,
+  primaryReleased: false,
+  secondaryHeld: false,
+  secondaryPressed: false,
+  secondaryReleased: false,
+  firstPersonView: true,
+  yaw: Math.PI,
+  pitch: -0.05,
+  weaponSlotSelect: null,
+  killPressed: false,
+  respawnPressed: false,
+  teamFlipPressed: false
+};
 
 export class InputState {
   readonly #canvas: HTMLCanvasElement;
   readonly #keys = new Set<string>();
-  #fireHeld = false;
-  #aimHeld = false;
+  #primaryHeld = false;
+  #secondaryHeld = false;
+  #firstPersonView = true;
+  #primaryPressed = false;
+  #primaryReleased = false;
+  #secondaryPressed = false;
+  #secondaryReleased = false;
   #jumpPressed = false;
-  #crouchPressed = false;
-  #placePressed = false;
   #killPressed = false;
   #respawnPressed = false;
+  #teamFlipPressed = false;
   #yaw = Math.PI;
   #pitch = -0.05;
-  #mode: PlayerMode = 'weapon';
-  #buildMode: BuildMode = 'wall';
-  #weaponSlot = 0;
+  #weaponSlotSelect: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
@@ -58,6 +108,7 @@ export class InputState {
     window.addEventListener('mouseup', this.#onMouseUp);
     window.addEventListener('mousemove', this.#onMouseMove);
     this.#canvas.addEventListener('contextmenu', this.#preventContextMenu);
+    requestArenaPointerLock(this.#canvas);
   }
 
   dispose(): void {
@@ -71,47 +122,74 @@ export class InputState {
     this.#canvas.removeEventListener('contextmenu', this.#preventContextMenu);
   }
 
-  snapshot(): InputSnapshot {
+  snapshot(out: InputSnapshot = this.#snapshotScratch): InputSnapshot {
     const forward = this.#keys.has('KeyW') ? 1 : 0;
     const back = this.#keys.has('KeyS') ? 1 : 0;
     const left = this.#keys.has('KeyA') ? 1 : 0;
     const right = this.#keys.has('KeyD') ? 1 : 0;
     const jumpPressed = this.#jumpPressed;
-    const crouchPressed = this.#crouchPressed;
+    const crouchHeld = this.#keys.has('KeyC');
     const killPressed = this.#killPressed;
     const respawnPressed = this.#respawnPressed;
+    const teamFlipPressed = this.#teamFlipPressed;
+    const primaryPressed = this.#primaryPressed;
+    const primaryReleased = this.#primaryReleased;
+    const secondaryPressed = this.#secondaryPressed;
+    const secondaryReleased = this.#secondaryReleased;
 
     this.#jumpPressed = false;
-    this.#crouchPressed = false;
     this.#killPressed = false;
     this.#respawnPressed = false;
+    this.#teamFlipPressed = false;
+    this.#primaryPressed = false;
+    this.#primaryReleased = false;
+    this.#secondaryPressed = false;
+    this.#secondaryReleased = false;
+    const weaponSlotSelect = this.#weaponSlotSelect;
+    this.#weaponSlotSelect = null;
 
-    return {
-      movement: {
-        forward: forward === 1,
-        back: back === 1,
-        left: left === 1,
-        right: right === 1
-      },
-      jumpPressed,
-      crouchPressed,
-      sprintHeld: this.#keys.has('ShiftLeft') || this.#keys.has('ShiftRight'),
-      fireHeld: this.#fireHeld,
-      aimHeld: this.#aimHeld,
-      yaw: this.#yaw,
-      pitch: this.#pitch,
-      mode: this.#mode,
-      buildMode: this.#buildMode,
-      weaponSlot: this.#weaponSlot,
-      consumePlacePressed: () => {
-        const placePressed = this.#placePressed;
-        this.#placePressed = false;
-        return placePressed;
-      },
-      killPressed,
-      respawnPressed
-    };
+    out.movement.forward = forward === 1;
+    out.movement.back = back === 1;
+    out.movement.left = left === 1;
+    out.movement.right = right === 1;
+    out.jumpPressed = jumpPressed;
+    out.crouchHeld = crouchHeld;
+    out.sprintHeld = this.#keys.has('ShiftLeft') || this.#keys.has('ShiftRight');
+    out.primaryHeld = this.#primaryHeld;
+    out.primaryPressed = primaryPressed;
+    out.primaryReleased = primaryReleased;
+    out.secondaryHeld = this.#secondaryHeld;
+    out.secondaryPressed = secondaryPressed;
+    out.secondaryReleased = secondaryReleased;
+    out.firstPersonView = this.#firstPersonView;
+    out.yaw = this.#yaw;
+    out.pitch = this.#pitch;
+    out.weaponSlotSelect = weaponSlotSelect;
+    out.killPressed = killPressed;
+    out.respawnPressed = respawnPressed;
+    out.teamFlipPressed = teamFlipPressed;
+    return out;
   }
+
+  readonly #snapshotScratch: InputSnapshot = {
+    movement: { forward: false, back: false, left: false, right: false },
+    jumpPressed: false,
+    crouchHeld: false,
+    sprintHeld: false,
+    primaryHeld: false,
+    primaryPressed: false,
+    primaryReleased: false,
+    secondaryHeld: false,
+    secondaryPressed: false,
+    secondaryReleased: false,
+    firstPersonView: true,
+    yaw: Math.PI,
+    pitch: -0.05,
+    weaponSlotSelect: null,
+    killPressed: false,
+    respawnPressed: false,
+    teamFlipPressed: false
+  };
 
   #onKeyDown = (event: KeyboardEvent): void => {
     if (event.code === 'Space' || event.code === 'Tab') {
@@ -130,24 +208,16 @@ export class InputState {
       this.#togglePointerLock();
     }
 
-    if (event.code === 'KeyF' && !event.repeat) {
-      this.#mode = 'weapon';
-    }
-
     if (event.code.startsWith('Digit') && !event.repeat) {
       this.#selectWeaponSlot(event.code);
     }
 
-    if (event.code === 'KeyQ' && !event.repeat) {
-      this.#setBuildMode('wall');
+    if (event.code === 'KeyC') {
+      this.#keys.add('KeyC');
     }
 
-    if (event.code === 'KeyZ' && !event.repeat) {
-      this.#setBuildMode('floor');
-    }
-
-    if (event.code === 'KeyC' && !event.repeat) {
-      this.#crouchPressed = true;
+    if (event.code === 'KeyV' && !event.repeat) {
+      this.#firstPersonView = !this.#firstPersonView;
     }
 
     if (event.code === 'KeyK' && !event.repeat) {
@@ -158,45 +228,46 @@ export class InputState {
       this.#respawnPressed = true;
     }
 
-    if (event.code === 'KeyV' && !event.repeat) {
-      this.#setBuildMode('ramp');
-    }
-
-    if (event.code === 'Tab' && !event.repeat) {
-      this.#setBuildMode('cone');
+    if (event.code === 'KeyT' && !event.repeat) {
+      this.#teamFlipPressed = true;
     }
   };
 
   #onKeyUp = (event: KeyboardEvent): void => {
     this.#keys.delete(event.code);
-
   };
 
   #onBlur = (): void => {
     this.#keys.clear();
-    this.#fireHeld = false;
-    this.#aimHeld = false;
-    this.#crouchPressed = false;
+    this.#primaryHeld = false;
+    this.#secondaryHeld = false;
   };
 
   #onMouseDown = (event: MouseEvent): void => {
+    if (event.button === 2) {
+      event.preventDefault();
+    }
+
     if (event.button === 0) {
-      this.#fireHeld = true;
-      this.#placePressed = true;
+      this.#primaryHeld = true;
+      this.#primaryPressed = true;
     }
 
     if (event.button === 2) {
-      this.#aimHeld = true;
+      this.#secondaryHeld = true;
+      this.#secondaryPressed = true;
     }
   };
 
   #onMouseUp = (event: MouseEvent): void => {
     if (event.button === 0) {
-      this.#fireHeld = false;
+      this.#primaryHeld = false;
+      this.#primaryReleased = true;
     }
 
     if (event.button === 2) {
-      this.#aimHeld = false;
+      this.#secondaryHeld = false;
+      this.#secondaryReleased = true;
     }
   };
 
@@ -228,20 +299,7 @@ export class InputState {
   }
 
   #safeRequestPointerLock(): void {
-    try {
-      if (window.self !== window.top) {
-        return;
-      }
-
-      void this.#canvas.requestPointerLock().catch(() => undefined);
-    } catch {
-      // Embedded browsers can reject pointer lock before returning a promise.
-    }
-  }
-
-  #setBuildMode(mode: BuildMode): void {
-    this.#mode = 'build';
-    this.#buildMode = mode;
+    requestArenaPointerLock(this.#canvas);
   }
 
   #selectWeaponSlot(code: string): void {
@@ -250,7 +308,7 @@ export class InputState {
       return;
     }
 
-    this.#mode = 'weapon';
-    this.#weaponSlot = digit === 0 ? 9 : digit - 1;
+    const index = digit === 0 ? 9 : digit - 1;
+    this.#weaponSlotSelect = index;
   }
 }

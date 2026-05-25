@@ -3,21 +3,26 @@ import {
   SRGBColorSpace,
   WebGPURenderer
 } from 'three/webgpu';
+import { getRendererPixelRatio, getRuntimeProfile } from '../platform/chrome-macos-arm-profile';
 
 export async function createRenderer(canvas: HTMLCanvasElement): Promise<WebGPURenderer> {
+  const profile = getRuntimeProfile();
+
   const renderer = new WebGPURenderer({
     canvas,
-    antialias: true,
+    antialias: profile.rendererAntialias,
+    samples: profile.rendererSamples,
     alpha: false,
+    forceWebGL: false,
     powerPreference: 'high-performance'
   });
 
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
-  renderer.shadowMap.enabled = true;
+  renderer.toneMappingExposure = 0.82;
+  renderer.shadowMap.enabled = profile.shadowsEnabled;
   renderer.setClearColor(0x050607, 1);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(getRendererPixelRatio());
   await renderer.init();
 
   return renderer;

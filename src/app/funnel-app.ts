@@ -1,111 +1,709 @@
-import { Vector3, type WebGPURenderer } from 'three/webgpu';
-import { BuildingSystem } from '../arena/building-system';
+import { PerspectiveCamera, Vector3, type Scene, type WebGPURenderer } from 'three/webgpu';
+import {
+  createWeaponAudio,
+  resumeGameAudio,
+  syncAudioListenerFromCamera,
+  warmGameAudio
+} from '../game-audio/audio-manager';
+import { playCountdownNarratorine } from '../game-audio/audio-grunts/audio-match-narration';
+import { EnvironmentRainSpawner } from '../arena/environment-rain-spawner';
+import { playHitConfirm, playKillConfirm } from '../game-audio/audio-one-shots/audio-hit-confirm';
+import { playPickupAt, playRedeemerPickupAt } from '../game-audio/audio-one-shots/audio-pickup';
+import { PickupField } from '../arena/pickup-field';
+import { RedeemerPickup } from '../arena/redeemer-pickup';
+import { JumpPadField } from '../arena/jump-pad-field';
 import { createFunnelArena } from '../arena/funnel-arena';
-import { WeaponArsenal } from '../combat/weapon-arsenal';
-import { PHYSICS_CONFIG } from '../config/game-config';
-import { InputState } from '../input/input-state';
-import { syncRigidBodyObjects } from '../physics/synced-body';
+import { TeamSpawnMascots } from '../arena/team-spawn-mascots';
+import { BotRoster } from '../bots/bot-roster';
+import { beginNavRayBudgetFrame } from '../bots/bot-nav-ray-budget';
+import { beginBotRespawnBudgetFrame } from '../bots/bot-respawn-budget';
+import { ActorRegistry } from '../combat/actor-registry';
+import { createCombatActor, LOCAL_PLAYER_ACTOR_ID } from '../combat/combat-actor';
+import { PersonalMatchStats } from '../combat/personal-match-stats';
+import { TeamKillScore } from '../combat/team-kill-score';
+import {
+  createPresenceTickAccumulator,
+  tickTeamPresenceScoring
+} from '../combat/team-presence-scoring';
+import { TeamMatchPoints } from '../combat/team-match-points';
+import { type FactionTeam } from '../combat/teams';
+import { IntrusionPressureCache } from '../combat/intrusion-pressure-cache';
+import { TeamRosterCounter } from '../combat/team-roster-count';
+import {
+  applyCombinedSecondaryIntent,
+  applyPrimaryFireIntent,
+  fillFireIntentFromInput,
+  fillSecondaryHoldFromInput,
+  PLAYER_FIRE_INTENT_SCRATCH,
+  PLAYER_SECONDARY_HOLD_SCRATCH,
+  weaponUsesHoldSecondary
+} from '../combat/fire-intent';
+import { WeaponArsenal, WEAPON_ARSENAL_PLAYER_BUDGET } from '../combat/weapon-arsenal';
+import { redeemerWeaponDefinition } from '../combat/spawn-weapon-roll';
+import { WorldProjectileSim } from '../combat/world-projectile-sim';
+import { tickAllWorldEffects } from '../combat/world-effects-registry';
+import { DEBUG_CONFIG } from '../config/game-config';
+import { isEnvironmentRainEnabled } from '../arena/environment-rain-waves';
+import { GameFrameClock } from '../core/game-frame-clock';
+import { GameEventBus } from '../core/event-bus';
+import {
+  applyPreMatchLookOnly,
+  IDLE_INPUT_SNAPSHOT,
+  InputState,
+  type InputSnapshot
+} from '../input/input-state';
 import { createRapierRuntime } from '../physics/rapier-world';
+import { CapsuleColliderDebugLayer } from '../physics/capsule-collider-debug';
 import { PlayerCamera } from '../player/player-camera';
 import { PlayerController } from '../player/player-controller';
+import { playerAutoRespawnCountdownSeconds } from '../player/player-auto-respawn';
+import type { HumanoidRigId } from '../player/humanoid-rig';
+import { loadShooterPackCharacter } from '../player/shooter-pack-loader';
 import { PlayerVisual } from '../player/player-visual';
+import { enterArenaDisplayMode } from '../platform/browser-fullscreen';
 import { createRenderer } from '../render/create-renderer';
 import { createRenderScene } from '../render/create-scene';
+import { ShadowLodController } from '../render/shadow-lod';
+import { SphereInstancingService } from '../render/sphere-instancing';
+import { SegmentLineInstancingService } from '../render/segment-line-instancing';
+import { BoltInstancingService } from '../render/bolt-instancing';
+import { RocketSmokeTrailInstancingService } from '../render/rocket-smoke-trail-instancing';
+import { PlayerTeam } from '../player/player-team';
+import { FpsHud } from '../ui/fps-hud';
+import { WeaponBarHud } from '../ui/weapon-bar-hud';
+import { AmmoHud } from '../ui/ammo-hud';
+import { CrosshairHud } from '../ui/crosshair-hud';
+import { DamageVignetteHud } from '../ui/damage-vignette-hud';
+import { DeathRespawnHud } from '../ui/death-respawn-hud';
+import { HealthHud } from '../ui/health-hud';
+import { PersonalStatsHud } from '../ui/personal-stats-hud';
+import { MATCH_COUNTDOWN_SECONDS, MatchFlowScreen } from '../ui/match-flow-screen';
+import { runCharacterSelect } from '../ui/character-select-scene';
+import { MatchResultScreen } from '../ui/match-result-screen';
+import { buildMatchResultSummary } from '../ui/match-result-summary';
 import { StatusToast } from '../ui/status-toast';
+import { TeamHud } from '../ui/team-hud';
+import { getRendererPixelRatio, getRuntimeProfile } from '../platform/chrome-macos-arm-profile';
 import { createAppDom } from './dom';
+
+const _muzzlePosition = new Vector3();
+const _inputSnapshot: InputSnapshot = {
+  movement: { forward: false, back: false, left: false, right: false },
+  jumpPressed: false,
+  crouchHeld: false,
+  sprintHeld: false,
+  primaryHeld: false,
+  primaryPressed: false,
+  primaryReleased: false,
+  secondaryHeld: false,
+  secondaryPressed: false,
+  secondaryReleased: false,
+  firstPersonView: true,
+  yaw: Math.PI,
+  pitch: -0.05,
+  weaponSlotSelect: null,
+  killPressed: false,
+  respawnPressed: false,
+  teamFlipPressed: false
+};
+
+function profileMark(name: string): void {
+  if (DEBUG_CONFIG.profileFrameMarks) {
+    performance.mark(name);
+  }
+}
+
+let profileMeasureFrames = 0;
+
+function profileMeasure(name: string, startMark: string, endMark: string): void {
+  if (!DEBUG_CONFIG.profileFrameMarks) {
+    return;
+  }
+
+  performance.measure(name, startMark, endMark);
+  profileMeasureFrames += 1;
+  if (profileMeasureFrames >= 600) {
+    profileMeasureFrames = 0;
+    performance.clearMarks();
+    performance.clearMeasures();
+  }
+}
 
 export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   const dom = createAppDom(root);
-  const toast = new StatusToast(dom.status);
+  const matchFlow = new MatchFlowScreen({
+    preMatchHost: dom.preMatchHost,
+    shell: dom.shell
+  });
+
+  matchFlow.beginFromHomeNavigation();
+  resumeGameAudio();
+
   const renderer = await createRenderer(dom.canvas);
-  const { scene, camera, dynamicLightRig } = createRenderScene();
+
+  const selectedRig = await runCharacterSelect({
+    canvas: dom.canvas,
+    renderer,
+    matchFlow
+  });
+
+  matchFlow.setLoadingProgress(10, 'Starting physics…');
+  const { scene, camera, lighting } = createRenderScene();
+  const capsuleDebug = new CapsuleColliderDebugLayer(scene);
   const { world, eventQueue } = await createRapierRuntime();
+
+  matchFlow.setLoadingProgress(42, 'Preparing audio…');
+  await warmGameAudio();
+
+  matchFlow.setLoadingProgress(48, 'Building arena…');
   const arena = createFunnelArena(scene, world);
+  const jumpPadField = new JumpPadField({ scene });
+
+  const toast = new StatusToast(dom.status);
   const input = new InputState(dom.canvas);
   const visual = new PlayerVisual(scene);
+  const playerTeam = new PlayerTeam();
+  const gameEvents = new GameEventBus();
+  const teamKillScore = new TeamKillScore();
+  const personalMatchStats = new PersonalMatchStats();
+  const teamMatchPoints = new TeamMatchPoints();
+  const actorRegistry = new ActorRegistry();
+  const weaponAudio = createWeaponAudio();
+  const shadowLod = new ShadowLodController();
+  const sphereInstancing = new SphereInstancingService(scene);
+  const segmentLineInstancing = new SegmentLineInstancingService(scene);
+  const boltInstancing = new BoltInstancingService(scene);
+  const rocketSmokeTrailInstancing = new RocketSmokeTrailInstancingService(scene, camera);
+  const projectileSim = new WorldProjectileSim(
+    scene,
+    world,
+    { registry: actorRegistry, bus: gameEvents, world },
+    weaponAudio,
+    sphereInstancing,
+    segmentLineInstancing,
+    boltInstancing,
+    rocketSmokeTrailInstancing
+  );
+  const botRoster = new BotRoster(scene, world, playerTeam, actorRegistry, {
+    impactDeps: { registry: actorRegistry, bus: gameEvents, world },
+    weaponAudio,
+    shadowLod,
+    sphereInstancing,
+    segmentLineInstancing,
+    projectileSim,
+    capsuleDebug
+  });
+  const teamSpawnMascots = new TeamSpawnMascots(scene, playerTeam);
 
+  matchFlow.setLoadingProgress(52, 'Loading character…');
+  const alternateRig: HumanoidRigId = selectedRig === 'y-bot' ? 'x-bot' : 'y-bot';
   try {
-    await visual.load();
+    const [playerPack, alternatePack] = await Promise.all([
+      loadShooterPackCharacter(selectedRig),
+      loadShooterPackCharacter(alternateRig)
+    ]);
+    visual.mountShooterPack(playerPack);
+    shadowLod.register(visual.root, { alwaysFull: true });
+    botRoster.spawn({
+      [selectedRig]: playerPack,
+      [alternateRig]: alternatePack
+    });
+    teamSpawnMascots.spawn({
+      [selectedRig]: playerPack,
+      [alternateRig]: alternatePack
+    });
   } catch (error) {
     visual.useFallbackMesh();
+    shadowLod.register(visual.root, { alwaysFull: true });
+    botRoster.spawn();
+    teamSpawnMascots.spawn();
     toast.show(
       `Shooter-Pack character could not be loaded, fallback player is active: ${String(error)}`,
       5200
     );
   }
 
+  matchFlow.setLoadingProgress(78, 'Wiring combat…');
+  const teamHud = new TeamHud({
+    ownBadge: dom.teamOwnBadge,
+    ownLabel: dom.teamOwnLabel,
+    ownMembers: dom.teamOwnMembers,
+    ownKills: dom.teamOwnKills,
+    ownPoints: dom.teamOwnPoints,
+    enemyBadge: dom.teamEnemyBadge,
+    enemyLabel: dom.teamEnemyLabel,
+    enemyMembers: dom.teamEnemyMembers,
+    enemyKills: dom.teamEnemyKills,
+    enemyPoints: dom.teamEnemyPoints
+  });
+  let matchLive = false;
+  const presenceTickAccumulator = createPresenceTickAccumulator();
+  let lastTeamHudKey = '';
+  const teamRosterCounter = new TeamRosterCounter();
+  let lastLocalPlayerDead = false;
+  teamRosterCounter.rebuild(actorRegistry);
+
+  const refreshTeamHud = (): void => {
+    const roster = teamRosterCounter.counts;
+    const viewerFaction = playerTeam.faction;
+    const hudKey = [
+      viewerFaction,
+      roster.alpha,
+      roster.beta,
+      teamKillScore.killsBy('alpha'),
+      teamKillScore.killsBy('beta'),
+      teamMatchPoints.formatDisplayPoints('alpha'),
+      teamMatchPoints.formatDisplayPoints('beta'),
+      teamMatchPoints.winner ?? ''
+    ].join('|');
+
+    if (hudKey === lastTeamHudKey) {
+      return;
+    }
+
+    lastTeamHudKey = hudKey;
+    teamHud.update(viewerFaction, teamKillScore, roster, teamMatchPoints);
+  };
+
+  const crosshairHud = new CrosshairHud(dom.crosshair);
+  const fpsHud = new FpsHud({
+    root: dom.fpsHud,
+    value: dom.fpsValue,
+    canvas: dom.fpsCanvas
+  });
+  const damageVignetteHud = new DamageVignetteHud(dom.damageVignette);
+  gameEvents.on('actor-damaged', (event) => {
+    if (event.actorId === LOCAL_PLAYER_ACTOR_ID) {
+      damageVignetteHud.flash(event.amount);
+      visual.flashDamage();
+    } else {
+      botRoster.flashDamage(event.actorId);
+    }
+    if (event.sourceActorId === LOCAL_PLAYER_ACTOR_ID && event.actorId !== LOCAL_PLAYER_ACTOR_ID) {
+      crosshairHud.flashHit();
+      if (event.remaining > 0) {
+        playHitConfirm();
+      }
+    }
+  });
+  const weaponBarHud = new WeaponBarHud({ root: dom.weaponBar });
+  const ammoHud = new AmmoHud({
+    root: dom.ammoHud,
+    title: dom.ammoTitle,
+    count: dom.ammoCount,
+    magazine: dom.ammoMagazine,
+    reloadFill: dom.ammoReloadFill
+  });
+  const healthHud = new HealthHud({
+    root: dom.healthHud,
+    shieldFill: dom.shieldFill,
+    healthFill: dom.healthFill
+  });
+  const personalStatsHud = new PersonalStatsHud({
+    root: dom.personalStatsHud,
+    kills: dom.personalStatsKills,
+    deaths: dom.personalStatsDeaths,
+    kdRatio: dom.personalStatsKdRatio
+  });
+  gameEvents.on('actor-died', (event) => {
+    if (event.sourceActorId === LOCAL_PLAYER_ACTOR_ID && event.actorId !== LOCAL_PLAYER_ACTOR_ID) {
+      crosshairHud.flashKill();
+      playKillConfirm();
+    }
+    teamRosterCounter.onDeath(event.actorId, event.faction);
+    personalMatchStats.recordActorDied(event);
+    personalStatsHud.update(personalMatchStats);
+    teamKillScore.recordKill(event.sourceFaction, event.faction);
+    teamMatchPoints.recordCrossFactionKill(event.sourceFaction, event.faction);
+    refreshTeamHud();
+    const winner = teamMatchPoints.winner;
+    if (winner !== null) {
+      endMatch(winner);
+    }
+  });
+  gameEvents.on('actor-respawned', (event) => {
+    teamRosterCounter.onRevive(event.actorId, event.faction);
+    refreshTeamHud();
+  });
+  const deathRespawnHud = new DeathRespawnHud({ shell: dom.shell });
+  const matchResultScreen = new MatchResultScreen({ shell: dom.shell });
   const player = new PlayerController(world, visual);
-  const playerCamera = new PlayerCamera(camera, world, player.collider);
-  const buildingSystem = new BuildingSystem(scene, world);
-  const weapon = new WeaponArsenal(scene, world, player.collider, buildingSystem);
-  visual.setWeapon(weapon.selectedWeapon);
+  const localPlayerActor = createCombatActor({
+    id: LOCAL_PLAYER_ACTOR_ID,
+    kind: 'player',
+    faction: playerTeam.faction,
+    health: player.health,
+    body: player.body,
+    colliders: [player.collider]
+  });
+  actorRegistry.register(localPlayerActor);
+  playerTeam.onChange((event) => {
+    localPlayerActor.setFaction(playerTeam.faction);
+    if (!player.health.isDead) {
+      teamRosterCounter.onFactionChange(LOCAL_PLAYER_ACTOR_ID, event.previousTeam, event.team);
+      refreshTeamHud();
+    }
+    if (event.reason !== 'spawn' && matchLive && !player.health.isDead) {
+      player.spawnAtFaction(playerTeam.faction);
+    }
+  });
+  const playerCamera = new PlayerCamera(camera, world, player.collider, scene);
+  playerCamera.attachViewmodel(
+    visual.root,
+    visual.weaponSocket,
+    visual.muzzleSocket,
+    () => visual.muzzleOffsetThirdPerson(),
+    () => visual.muzzleOffsetFirstPerson()
+  );
+  const weapon = new WeaponArsenal(scene, world, player.body, weaponAudio, {
+    registry: actorRegistry,
+    bus: gameEvents,
+    world
+  }, () => playerTeam.faction, LOCAL_PLAYER_ACTOR_ID, visual.muzzleSocket, projectileSim, WEAPON_ARSENAL_PLAYER_BUDGET, sphereInstancing, segmentLineInstancing);
+  const pickupField = new PickupField({
+    scene,
+    world,
+    registry: actorRegistry,
+    onCollected: (kind, origin) => {
+      playPickupAt(origin, kind);
+    }
+  });
+  const redeemerPickup = new RedeemerPickup({
+    scene,
+    registry: actorRegistry,
+    onCollected: (collector, origin) => {
+      playRedeemerPickupAt(origin);
+      if (collector.id === LOCAL_PLAYER_ACTOR_ID) {
+        visual.setWeapon(weapon.equipWeapon(redeemerWeaponDefinition()));
+        toast.show('Redeemer acquired.', 1200);
+        return;
+      }
+
+      botRoster.equipRedeemer(collector.id);
+    }
+  });
+  const intrusionPressureCache = new IntrusionPressureCache();
+  const playerSnapshot = {
+    x: 0,
+    y: 0,
+    z: 0,
+    faction: playerTeam.faction,
+    isDead: false,
+    body: player.body,
+    colliders: [player.collider] as const
+  };
+  let lastAimingHud = '';
+  const botContextBase = {
+    matchLive: false,
+    world,
+    registry: actorRegistry,
+    player: playerSnapshot
+  };
+
+  matchFlow.setLoadingProgress(92, 'Finalizing…');
   const resizeObserver = new ResizeObserver(() => {
     resizeRenderer(renderer, dom.canvas, camera);
   });
-
-  input.connect();
   resizeObserver.observe(dom.shell);
   resizeRenderer(renderer, dom.canvas, camera);
-  dom.weaponReadout.textContent = weapon.selectedWeaponLabel;
-  toast.show('Modernized mTPS demo is running as FUNNEL playable slice.');
+  playerTeam.assign(playerTeam.faction, 'spawn');
+  refreshTeamHud();
 
-  let accumulator = 0;
-  let lastFrameAt = performance.now();
-  await renderer.setAnimationLoop(() => {
-    const now = performance.now();
-    const deltaSeconds = Math.min((now - lastFrameAt) / 1000, 0.05);
-    lastFrameAt = now;
-    const snapshot = input.snapshot();
-    const frame = player.update(deltaSeconds, snapshot);
-    const cameraVectors = playerCamera.update(frame);
+  matchFlow.setLoadingProgress(100, 'Ready');
+  player.setMovementLocked(true);
 
-    accumulator += deltaSeconds;
-    let subSteps = 0;
-    while (accumulator >= PHYSICS_CONFIG.fixedStep && subSteps < PHYSICS_CONFIG.maxSubSteps) {
+  let rainActive = false;
+  let introDropActive = false;
+
+  const endMatch = (winnerFaction: FactionTeam): void => {
+    if (!matchLive) {
+      return;
+    }
+
+    matchLive = false;
+    player.setMovementLocked(true);
+    lighting.updateFightFocus(null);
+    refreshTeamHud();
+    deathRespawnHud.update(false, 0);
+    matchFlow.setMatchPhase('ended');
+    matchResultScreen.show(
+      buildMatchResultSummary(
+        playerTeam.faction,
+        winnerFaction,
+        personalMatchStats,
+        teamKillScore,
+        teamMatchPoints
+      )
+    );
+    void matchResultScreen.waitForNewMatch();
+  };
+
+  matchFlow.revealMap();
+  resizeRenderer(renderer, dom.canvas, camera);
+  player.beginMatchStartDrop(playerTeam.faction);
+  introDropActive = true;
+  input.connect();
+  enterArenaDisplayMode(dom.canvas);
+
+  // Canvas still holds the last character-select frame until we paint the arena.
+  primeArenaFrame(renderer, scene, camera);
+
+  const frameClock = new GameFrameClock(getRuntimeProfile().physicsMaxSubSteps);
+  const rainSpawner = isEnvironmentRainEnabled()
+    ? new EnvironmentRainSpawner({
+        instances: arena.dynamicInstances,
+        world,
+        dynamicBodies: arena.dynamicBodies
+      })
+    : undefined;
+
+  void renderer.setAnimationLoop((now) => {
+    const loopStartMs = performance.now();
+    const renderTick = frameClock.beginRenderFrame(now);
+    if (renderTick === null) {
+      return;
+    }
+
+    const { deltaSeconds, nowMs: frameNowMs, frameId: renderFrameId } = renderTick;
+    actorRegistry.beginFrame(renderFrameId);
+    beginNavRayBudgetFrame();
+    beginBotRespawnBudgetFrame();
+
+    botContextBase.matchLive = matchLive;
+    if (rainActive && rainSpawner !== undefined) {
+      rainSpawner.tick(deltaSeconds);
+      if (rainSpawner.isComplete()) {
+        rainActive = false;
+        pickupField.begin();
+      }
+    }
+    if (matchLive && !player.health.isDead) {
+      player.health.tickRegen(frameNowMs, deltaSeconds);
+    }
+
+    const snapshot = matchLive
+      ? input.snapshot(_inputSnapshot)
+      : introDropActive
+        ? applyPreMatchLookOnly(input.snapshot(_inputSnapshot))
+        : IDLE_INPUT_SNAPSHOT;
+    player.setMovementLocked(!matchLive || weapon.isRedeemerGuidedActive());
+    player.beginFrame(snapshot);
+
+    if (matchLive && snapshot.teamFlipPressed) {
+      playerTeam.flip('dev');
+      refreshTeamHud();
+      toast.show(`Faction flip — now ${playerTeam.definition.label}.`, 1400);
+    }
+
+    frameClock.accumulatePhysics(deltaSeconds);
+    const playerTranslation = player.body.translation();
+    playerSnapshot.x = playerTranslation.x;
+    playerSnapshot.y = playerTranslation.y;
+    playerSnapshot.z = playerTranslation.z;
+    playerSnapshot.faction = playerTeam.faction;
+    playerSnapshot.isDead = player.health.isDead;
+    botRoster.preparePhysicsFrame(deltaSeconds, frameNowMs, botContextBase);
+    profileMark('funnel-physics-start');
+    frameClock.consumePhysicsSteps((step) => {
+      player.fixedUpdate(step, snapshot);
+      botRoster.fixedUpdate(step, frameNowMs, botContextBase);
       world.step(eventQueue);
-      accumulator -= PHYSICS_CONFIG.fixedStep;
-      subSteps += 1;
-    }
-
-    if (subSteps === PHYSICS_CONFIG.maxSubSteps) {
-      accumulator = 0;
-    }
+    });
+    profileMark('funnel-physics-end');
+    profileMeasure('funnel-physics', 'funnel-physics-start', 'funnel-physics-end');
 
     eventQueue.drainContactForceEvents((event) => {
       player.handleContactForceEvent(event);
     });
 
-    syncRigidBodyObjects(arena.dynamicBodies);
-    updateLightRig(dynamicLightRig, frame.position, cameraVectors.direction);
-    buildingSystem.update(
-      frame.position,
-      frame.yaw,
-      frame.pitch,
-      frame.buildMode,
-      frame.mode === 'build'
-    );
-
-    if (weapon.selectSlot(snapshot.weaponSlot)) {
-      visual.setWeapon(weapon.selectedWeapon);
-      dom.weaponReadout.textContent = weapon.selectedWeaponLabel;
-      toast.show(`Selected ${weapon.selectedWeaponLabel}.`, 900);
+    player.afterPhysics();
+    botRoster.afterPhysics();
+    if (matchLive) {
+      jumpPadField.tickPlayer(player, snapshot, frameNowMs);
+      botRoster.tickJumpPads(jumpPadField, frameNowMs);
+    } else if (!player.health.isDead) {
+      jumpPadField.tickPlayer(player, snapshot, frameNowMs);
     }
+    if (introDropActive) {
+      botRoster.tickCountdownDrop(deltaSeconds, frameNowMs);
+    }
+    if (DEBUG_CONFIG.showCapsuleColliders) {
+      capsuleDebug.sync(LOCAL_PLAYER_ACTOR_ID, player.collider);
+      botRoster.syncCapsuleDebug();
+    }
+    profileMark('funnel-bots-start');
+    const frame = player.finishFrame(deltaSeconds, snapshot, weapon, () => {
+      visual.setWeapon(weapon.equipSpawnWeapon());
+    });
+    botRoster.update(deltaSeconds, frameNowMs, botContextBase);
+    profileMark('funnel-bots-end');
+    profileMeasure('funnel-bots', 'funnel-bots-start', 'funnel-bots-end');
+    if (frame.isDead !== lastLocalPlayerDead) {
+      if (frame.isDead) {
+        teamRosterCounter.onDeath(LOCAL_PLAYER_ACTOR_ID, playerTeam.faction);
+      } else {
+        teamRosterCounter.onRevive(LOCAL_PLAYER_ACTOR_ID, playerTeam.faction);
+      }
+      lastLocalPlayerDead = frame.isDead;
+    }
+    const selectedWeapon = weapon.selectedWeapon;
+    const sniperZoom =
+      matchLive &&
+      !weapon.isRedeemerGuidedActive() &&
+      snapshot.secondaryHeld &&
+      selectedWeapon.sniperZoomFovScale !== undefined
+        ? selectedWeapon.sniperZoomFovScale
+        : 1;
+    playerCamera.setWeaponZoomFovScale(sniperZoom);
 
-    if (frame.mode === 'build' && snapshot.consumePlacePressed()) {
-      if (buildingSystem.placeActive()) {
-        toast.show(`Placed ${frame.buildMode}.`);
+    playerCamera.setGuidedOverride(weapon.resolveGuidedRedeemerCamera());
+
+    const cameraFrame = playerCamera.update(frame, deltaSeconds);
+    const cameraVectors = cameraFrame.vectors;
+    syncAudioListenerFromCamera(cameraVectors);
+    visual.syncThirdPersonWeaponStance(frame.crouching, cameraFrame.firstPersonBlend);
+    visual.updateCameraPresentation(cameraFrame.firstPersonBlend);
+    visual.updateAimSpine(frame.pitch, cameraFrame.firstPersonBlend, frame.isDead);
+    lighting.updateShadowFocus(frame.position.x, frame.position.z);
+    shadowLod.update(frame.position.x, frame.position.y, frame.position.z);
+    if (matchLive) {
+      lighting.updateFightFocus(intrusionPressureCache.focusFactionForFrame(renderFrameId, actorRegistry));
+      const aimingHud = cameraFrame.firstPersonBlend > 0.65 ? 'true' : 'false';
+      if (aimingHud !== lastAimingHud) {
+        lastAimingHud = aimingHud;
+        dom.hud.dataset.aiming = aimingHud;
+      }
+      const presenceWinner = tickTeamPresenceScoring(
+        deltaSeconds,
+        presenceTickAccumulator,
+        actorRegistry,
+        teamMatchPoints
+      );
+      if (presenceWinner !== null) {
+        endMatch(presenceWinner);
+      }
+      refreshTeamHud();
+      personalStatsHud.update(personalMatchStats);
+      weaponBarHud.update(!frame.isDead, weapon.selectedSlotIndex);
+      ammoHud.update(weapon.getAmmoHudSnapshot());
+      healthHud.update(
+        frame.health,
+        player.health.maxHealth,
+        frame.shield,
+        player.health.maxShield,
+        frame.isDead,
+        frame.isRegenerating
+      );
+
+      const deathSnapshot = player.deathSnapshot;
+      if (frame.isDead && deathSnapshot.applied && deathSnapshot.diedAtMs > 0) {
+        const countdownSeconds = playerAutoRespawnCountdownSeconds(
+          frameNowMs,
+          deathSnapshot.diedAtMs
+        );
+        if (countdownSeconds > 0) {
+          deathRespawnHud.update(true, countdownSeconds);
+        } else {
+          player.respawnAtFaction(playerTeam.faction);
+          gameEvents.emit('actor-respawned', {
+            actorId: LOCAL_PLAYER_ACTOR_ID,
+            faction: playerTeam.faction
+          });
+          deathRespawnHud.update(false, 0);
+          refreshTeamHud();
+        }
+      } else {
+        deathRespawnHud.update(false, 0);
       }
     }
 
-    weapon.update(now, deltaSeconds);
-
-    if (frame.mode === 'weapon' && snapshot.fireHeld) {
-      const muzzlePosition = visual.muzzleSocket.getWorldPosition(new Vector3());
-      weapon.tryPrimaryFire(now, cameraVectors, muzzlePosition);
+    arena.dynamicInstances.sync();
+    if (matchLive || pickupField.isStarted) {
+      pickupField.tick();
+    }
+    if (matchLive || redeemerPickup.isStarted) {
+      redeemerPickup.tick(frameNowMs, deltaSeconds);
+    }
+    if (segmentLineInstancing.hasActive()) {
+      segmentLineInstancing.tick(frameNowMs);
     }
 
+    if (matchLive && !frame.isDead) {
+      if (snapshot.weaponSlotSelect !== null && weapon.selectSlot(snapshot.weaponSlotSelect)) {
+        visual.setWeapon(weapon.selectedWeapon);
+        toast.show(`Selected ${weapon.selectedWeaponLabel}.`, 900);
+      }
+
+      const muzzlePosition = playerCamera.resolveMuzzleWorldPosition(_muzzlePosition, cameraVectors);
+      weapon.trackMechanicsAudioOrigin(muzzlePosition);
+      weapon.tickMechanicsAudio(frameNowMs);
+      const fireIntent = fillFireIntentFromInput(snapshot, selectedWeapon, PLAYER_FIRE_INTENT_SCRATCH);
+      const hold = fillSecondaryHoldFromInput(snapshot, selectedWeapon, PLAYER_SECONDARY_HOLD_SCRATCH);
+      const holdBlocksPrimary =
+        weaponUsesHoldSecondary(selectedWeapon) &&
+        (hold.held ||
+          hold.pressed ||
+          weapon.isBioChargeHolding() ||
+          weapon.isRocketMarking() ||
+          weapon.isRocketVolleyPending());
+
+      if (!weapon.isRedeemerGuidedActive() && !holdBlocksPrimary) {
+        applyPrimaryFireIntent(
+          weapon,
+          fireIntent,
+          frameNowMs,
+          muzzlePosition,
+          cameraVectors.direction,
+          matchLive
+        );
+      }
+
+      if (!weapon.isRedeemerGuidedActive()) {
+        applyCombinedSecondaryIntent(
+          weapon,
+          fireIntent,
+          hold,
+          frameNowMs,
+          muzzlePosition,
+          cameraVectors.direction,
+          matchLive,
+          cameraFrame.firstPersonBlend > 0.5
+        );
+      }
+    }
+
+    profileMark('funnel-effects-start');
+    tickAllWorldEffects(frameNowMs, deltaSeconds);
+    profileMeasure('funnel-effects', 'funnel-effects-start', 'funnel-effects-end');
     renderer.render(scene, camera);
+    const loopWallMs = performance.now() - loopStartMs;
+    frameClock.recordFrameWallMs(loopWallMs);
+    fpsHud.tick(loopWallMs, frameNowMs);
   });
+
+  await waitNextAnimationFrame();
+  primeArenaFrame(renderer, scene, camera);
+
+  if (rainSpawner !== undefined) {
+    rainSpawner.start();
+    rainActive = true;
+  }
+
+  await matchFlow.runCountdown(MATCH_COUNTDOWN_SECONDS, playCountdownNarratorine);
+  introDropActive = false;
+  matchFlow.dismissCountdown();
+  enterArenaDisplayMode(dom.canvas);
+  dom.hud.style.visibility = 'visible';
+  matchLive = true;
+  if (rainSpawner === undefined) {
+    pickupField.begin();
+  }
+  redeemerPickup.begin();
+  player.setMovementLocked(false);
+  botRoster.rollSpawnWeapons();
+  visual.setWeapon(weapon.equipSpawnWeapon());
+  shadowLod.refresh(visual.root);
+  toast.show('Match live.');
 }
 
 function resizeRenderer(
@@ -116,17 +714,20 @@ function resizeRenderer(
   const bounds = canvas.getBoundingClientRect();
   const width = Math.max(1, Math.floor(bounds.width));
   const height = Math.max(1, Math.floor(bounds.height));
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(getRendererPixelRatio());
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
 }
 
-function updateLightRig(
-  dynamicLightRig: { position: Vector3; lookAt: (target: Vector3) => void },
-  position: Vector3,
-  direction: Vector3
-): void {
-  dynamicLightRig.position.copy(position).add(new Vector3(0, 2.2, 0));
-  dynamicLightRig.lookAt(position.clone().addScaledVector(direction, 18));
+function primeArenaFrame(renderer: WebGPURenderer, scene: Scene, camera: PerspectiveCamera): void {
+  renderer.render(scene, camera);
+}
+
+function waitNextAnimationFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      resolve();
+    });
+  });
 }

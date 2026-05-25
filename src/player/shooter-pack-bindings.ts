@@ -2,7 +2,12 @@
 export const SHOOTER_PACK_KNOWN_BINDINGS: Record<string, string> = {
   'firing-rifle': 'combat.fire',
   'jump-backward': 'locomotion.jumpBack',
+  'jump-down': 'locomotion.jumpDownFull',
+  'jump-down-land': 'locomotion.jumpLand',
   'jump-forward': 'locomotion.jumpForward',
+  'jump-up': 'locomotion.jumpUpFull',
+  'jump-up-takeoff': 'locomotion.jumpTakeoff',
+  'crouch-idle': 'locomotion.crouchIdle',
   'rifle-aiming-idle': 'locomotion.idle',
   'rifle-run': 'locomotion.forwardRun',
   'run-backwards': 'locomotion.backwardRun',

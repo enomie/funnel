@@ -1,145 +1,336 @@
 import RAPIER from '@dimforge/rapier3d-simd-compat';
-import type { Collider, World } from '@dimforge/rapier3d-simd-compat';
+import type { Collider, RigidBody, World } from '@dimforge/rapier3d-simd-compat';
+import { Scene, Vector3 } from 'three/webgpu';
+import { ACTOR_RAY_QUERY_GROUPS } from '../physics/collision-groups';
 import {
-  BufferGeometry,
-  Line,
-  LineBasicMaterial,
-  Scene,
-  SphereGeometry,
-  Mesh,
-  MeshBasicMaterial,
-  Vector3
-} from 'three/webgpu';
+  createBeamStreamVisual,
+  disposeBeamStreamVisual,
+  updateBeamStreamVisual,
+  type BeamStreamVisual
+} from './beam-stream-visual';
+import {
+  disposeImpactBurst,
+  spawnProjectileImpactBurst,
+  updateImpactBurst,
+  type ImpactBurst
+} from './projectile-impact-visual';
+import { IMPACT_GAIN_NORMAL } from '../game-audio/audio-config';
+import type { WeaponAudio } from '../game-audio/audio-weapon/audio-weapon';
 import { WEAPON_CONFIG } from '../config/game-config';
-import type { BuildingSystem } from '../arena/building-system';
-import type { CameraVectors } from '../player/player-camera';
+import { findFirstShockOrbAlongRay, type ShockOrbRayHit, type ShockOrbTarget } from './shock-combo';
+import type { CombatImpactRequest, CombatImpactSink } from './apply-impact';
+import type { FireProfile, ImpactProfile, WeaponDefinition } from './weapon-definitions';
+import type { SphereInstancingService } from '../render/sphere-instancing';
+import type { SegmentLineInstancingService } from '../render/segment-line-instancing';
+import { eachProjectileDirection } from './world-projectile-sim';
+
+export interface ShockComboFireContext {
+  orbs: readonly ShockOrbTarget[];
+  onComboHit: (hit: ShockOrbRayHit) => void;
+}
+
+const BEAM_IMPACT_GAIN = IMPACT_GAIN_NORMAL * 0.42;
+const BEAM_IMPACT_INTERVAL_MS = 96;
+const MAX_HITSCAN_IMPACT_BURSTS = 48;
+/** Skip muzzle plane so rays do not re-hit the shooter capsule edge. */
+const MUZZLE_RAY_ORIGIN_NUDGE = 0.08;
+
+let _hitscanCastRay: RAPIER.Ray | null = null;
+
+function hitscanCastRay(origin: Vector3, direction: Vector3): RAPIER.Ray {
+  if (_hitscanCastRay === null) {
+    _hitscanCastRay = new RAPIER.Ray(
+      { x: origin.x, y: origin.y, z: origin.z },
+      { x: direction.x, y: direction.y, z: direction.z }
+    );
+    return _hitscanCastRay;
+  }
+
+  _hitscanCastRay.origin.x = origin.x;
+  _hitscanCastRay.origin.y = origin.y;
+  _hitscanCastRay.origin.z = origin.z;
+  _hitscanCastRay.dir.x = direction.x;
+  _hitscanCastRay.dir.y = direction.y;
+  _hitscanCastRay.dir.z = direction.z;
+  return _hitscanCastRay;
+}
 
 export class HitscanWeapon {
   readonly #scene: Scene;
   readonly #world: World;
-  readonly #ignoredCollider: Collider;
-  readonly #buildingSystem: BuildingSystem;
-  readonly #audio = new WeaponAudio();
-  readonly #temporaryObjects: Array<{ object: Line | Mesh; removeAt: number }> = [];
-  #lastFireAt = 0;
+  readonly #ignoredRigidBody: RigidBody;
+  readonly #audio: WeaponAudio;
+  readonly #impactBursts: ImpactBurst[] = [];
+  readonly #rayOrigin = new Vector3();
+  readonly #rayDirection = new Vector3();
+  readonly #hitPoint = new Vector3();
+  #beamStream: BeamStreamVisual | null = null;
+  #beamStreamColor: number | null = null;
+  #lastBeamImpactAt = 0;
+  readonly #impactSink: CombatImpactSink | null;
+  readonly #sphereInstancing: SphereInstancingService | null;
+  readonly #segmentLines: SegmentLineInstancingService | null;
+  readonly #impactScratch: CombatImpactRequest;
 
-  constructor(scene: Scene, world: World, ignoredCollider: Collider, buildingSystem: BuildingSystem) {
+  constructor(
+    scene: Scene,
+    world: World,
+    ignoredRigidBody: RigidBody,
+    weaponAudio: WeaponAudio,
+    impactSink: CombatImpactSink | null = null,
+    sphereInstancing: SphereInstancingService | null = null,
+    segmentLines: SegmentLineInstancingService | null = null
+  ) {
     this.#scene = scene;
     this.#world = world;
-    this.#ignoredCollider = ignoredCollider;
-    this.#buildingSystem = buildingSystem;
+    this.#ignoredRigidBody = ignoredRigidBody;
+    this.#audio = weaponAudio;
+    this.#impactSink = impactSink;
+    this.#sphereInstancing = sphereInstancing;
+    this.#segmentLines = segmentLines;
+    this.#impactScratch = {
+      impact: {
+        directDamage: 0,
+        impactRadius: 0,
+        impactExpandMs: 0,
+        ricochetMax: 0,
+        explodeOnContact: false
+      },
+      point: this.#hitPoint
+    };
   }
 
   update(nowMs: number): void {
-    while (this.#temporaryObjects.length > 0 && this.#temporaryObjects[0].removeAt <= nowMs) {
-      const item = this.#temporaryObjects.shift();
-      if (item !== undefined) {
-        this.#scene.remove(item.object);
-        if (item.object instanceof Line) {
-          item.object.geometry.dispose();
-        }
-        const material = item.object.material;
-        if (Array.isArray(material)) {
-          for (const entry of material) {
-            entry.dispose();
-          }
-        } else {
-          material.dispose();
-        }
+    if (this.#sphereInstancing === null) {
+      return;
+    }
+
+    for (let index = this.#impactBursts.length - 1; index >= 0; index -= 1) {
+      const burst = this.#impactBursts[index];
+      if (!updateImpactBurst(this.#sphereInstancing, burst, nowMs)) {
+        continue;
+      }
+      const lastIndex = this.#impactBursts.length - 1;
+      this.#impactBursts[index] = this.#impactBursts[lastIndex];
+      this.#impactBursts.length = lastIndex;
+    }
+  }
+
+  needsWorldTick(): boolean {
+    return this.#impactBursts.length > 0 || this.#beamStream !== null;
+  }
+
+  releaseAllEffects(): void {
+    this.releaseBeamStream();
+    if (this.#sphereInstancing !== null) {
+      for (const burst of this.#impactBursts) {
+        disposeImpactBurst(this.#sphereInstancing, burst);
       }
     }
+    this.#impactBursts.length = 0;
   }
 
-  tryFire(nowMs: number, vectors: CameraVectors, muzzlePosition: Vector3): boolean {
-    if (nowMs < this.#lastFireAt + WEAPON_CONFIG.fireIntervalMs) {
-      return false;
+  releaseBeamStream(): void {
+    if (this.#beamStream === null) {
+      return;
     }
 
-    this.#lastFireAt = nowMs;
-    this.#audio.playShot();
+    disposeBeamStreamVisual(this.#beamStream, this.#scene);
+    this.#beamStream = null;
+    this.#beamStreamColor = null;
+    this.#lastBeamImpactAt = 0;
+  }
 
-    const ray = new RAPIER.Ray(vectors.origin, vectors.direction);
-    const hit = this.#world.castRay(
-      ray,
-      WEAPON_CONFIG.range,
-      true,
-      undefined,
-      undefined,
-      this.#ignoredCollider
+  /** Per-frame beam aim + mesh sync (Pulse RMB). Raycast uses muzzle nudge; visual starts at bore. */
+  tickBeamStream(
+    weapon: WeaponDefinition,
+    fire: FireProfile,
+    impact: ImpactProfile,
+    muzzlePosition: Vector3,
+    direction: Vector3
+  ): void {
+    const range = resolveHitscanRange(fire);
+    this.#prepareHitscanRay(muzzlePosition, direction);
+    const hit = this.#raycastWorld(range);
+    const nowMs = performance.now();
+    if (
+      hit !== null &&
+      this.#impactSink !== null &&
+      nowMs >= this.#lastBeamImpactAt + BEAM_IMPACT_INTERVAL_MS
+    ) {
+      this.#commitImpact(impact, hit.collider);
+      this.#lastBeamImpactAt = nowMs;
+    }
+    this.#updateBeamStream(weapon.color, muzzlePosition, this.#hitPoint);
+  }
+
+  fireVolley(
+    weapon: WeaponDefinition,
+    fire: FireProfile,
+    impact: ImpactProfile,
+    direction: Vector3,
+    muzzlePosition: Vector3,
+    shockCombo?: ShockComboFireContext
+  ): void {
+    this.#audio.playFire(weapon, muzzlePosition, fire, impact);
+
+    const range = resolveHitscanRange(fire);
+
+    eachProjectileDirection(
+      direction,
+      fire.projectileCount,
+      fire.spreadRadians,
+      (shotDirection) => {
+        this.#fireRay(weapon, impact, muzzlePosition, shotDirection, range, fire, shockCombo);
+      }
     );
-    const hitPoint =
-      hit === null
-        ? vectors.origin.clone().addScaledVector(vectors.direction, WEAPON_CONFIG.range)
-        : new Vector3(
-            ray.pointAt(hit.timeOfImpact).x,
-            ray.pointAt(hit.timeOfImpact).y,
-            ray.pointAt(hit.timeOfImpact).z
-          );
+  }
+
+  #fireRay(
+    weapon: WeaponDefinition,
+    impact: ImpactProfile,
+    muzzlePosition: Vector3,
+    direction: Vector3,
+    range: number,
+    fire: FireProfile,
+    shockCombo?: ShockComboFireContext
+  ): void {
+    this.#prepareHitscanRay(muzzlePosition, direction);
+
+    if (shockCombo !== undefined && shockCombo.orbs.length > 0) {
+      const orbHit = findFirstShockOrbAlongRay(
+        this.#rayOrigin,
+        this.#rayDirection,
+        range,
+        shockCombo.orbs
+      );
+      if (orbHit !== null) {
+        shockCombo.onComboHit(orbHit);
+        this.#hitPoint.copy(orbHit.point);
+        this.#spawnTracer(muzzlePosition, this.#hitPoint, weapon.color, WEAPON_CONFIG.tracerDurationMs);
+        return;
+      }
+    }
+
+    const hit = this.#raycastWorld(range);
 
     if (hit !== null) {
-      const damagedBuild = this.#buildingSystem.damage(hit.collider, WEAPON_CONFIG.damage);
-      this.#audio.playImpact(damagedBuild ? 0.22 : 0.08);
-      this.#spawnImpact(hitPoint);
+      const nowMs = performance.now();
+      const impactGain = fire.delivery === 'beamTick' ? BEAM_IMPACT_GAIN : IMPACT_GAIN_NORMAL;
+      if (
+        fire.delivery !== 'beamTick' ||
+        nowMs >= this.#lastBeamImpactAt + BEAM_IMPACT_INTERVAL_MS
+      ) {
+        this.#audio.playImpact(weapon, this.#hitPoint, impactGain, impact);
+        this.#spawnImpact(weapon, this.#hitPoint, 'hit', impact);
+        this.#commitImpact(impact, hit.collider);
+        this.#lastBeamImpactAt = nowMs;
+      }
     }
 
-    this.#spawnTracer(muzzlePosition, hitPoint);
-    return true;
+    if (fire.delivery === 'beamTick') {
+      this.#updateBeamStream(weapon.color, muzzlePosition, this.#hitPoint);
+      return;
+    }
+
+    this.#spawnTracer(muzzlePosition, this.#hitPoint, weapon.color, WEAPON_CONFIG.tracerDurationMs);
   }
 
-  #spawnTracer(start: Vector3, end: Vector3): void {
-    const geometry = new BufferGeometry().setFromPoints([start, end]);
-    const material = new LineBasicMaterial({ color: 0xffd17a });
-    const line = new Line(geometry, material);
-    this.#scene.add(line);
-    this.#temporaryObjects.push({
-      object: line,
-      removeAt: performance.now() + WEAPON_CONFIG.tracerDurationMs
-    });
+  #prepareHitscanRay(muzzlePosition: Vector3, direction: Vector3): void {
+    this.#rayDirection.copy(direction).normalize();
+    this.#rayOrigin
+      .copy(muzzlePosition)
+      .addScaledVector(this.#rayDirection, MUZZLE_RAY_ORIGIN_NUDGE);
   }
 
-  #spawnImpact(position: Vector3): void {
-    const mesh = new Mesh(
-      new SphereGeometry(0.16, 10, 8),
-      new MeshBasicMaterial({ color: 0xff8f3a })
+  #commitImpact(impact: ImpactProfile, hitCollider: Collider | undefined): void {
+    if (this.#impactSink === null) {
+      return;
+    }
+
+    const scratch = this.#impactScratch;
+    scratch.impact = impact;
+    scratch.hitCollider = hitCollider;
+    this.#impactSink.apply(scratch);
+  }
+
+  /** World raycast from prepared `#rayOrigin` / `#rayDirection`; writes `#hitPoint`. */
+  #raycastWorld(range: number): RAPIER.RayColliderHit | null {
+    const ray = hitscanCastRay(this.#rayOrigin, this.#rayDirection);
+    const hit = this.#world.castRay(
+      ray,
+      range,
+      true,
+      undefined,
+      ACTOR_RAY_QUERY_GROUPS,
+      undefined,
+      this.#ignoredRigidBody
     );
-    mesh.position.copy(position);
-    this.#scene.add(mesh);
-    this.#temporaryObjects.push({
-      object: mesh,
-      removeAt: performance.now() + 190
-    });
+
+    if (hit === null) {
+      this.#hitPoint.copy(this.#rayOrigin).addScaledVector(this.#rayDirection, range);
+      return null;
+    }
+
+    const impactPoint = ray.pointAt(hit.timeOfImpact);
+    this.#hitPoint.set(impactPoint.x, impactPoint.y, impactPoint.z);
+    return hit;
+  }
+
+  #updateBeamStream(color: number, start: Vector3, end: Vector3): void {
+    if (this.#beamStream === null || this.#beamStreamColor !== color) {
+      this.releaseBeamStream();
+      this.#beamStream = createBeamStreamVisual(this.#scene, color);
+      this.#beamStreamColor = color;
+    }
+
+    updateBeamStreamVisual(this.#beamStream, start, end);
+  }
+
+  #spawnTracer(start: Vector3, end: Vector3, color: number, durationMs: number): void {
+    if (this.#segmentLines === null) {
+      return;
+    }
+
+    this.#segmentLines.spawnSegment(start, end, color, durationMs);
+  }
+
+  #spawnImpact(weapon: WeaponDefinition, position: Vector3, kind: 'hit' | 'ricochet', impact: ImpactProfile): void {
+    if (this.#sphereInstancing === null) {
+      return;
+    }
+
+    if (this.#impactBursts.length >= MAX_HITSCAN_IMPACT_BURSTS) {
+      const oldest = this.#impactBursts[0];
+      disposeImpactBurst(this.#sphereInstancing, oldest);
+      const lastIndex = this.#impactBursts.length - 1;
+      this.#impactBursts[0] = this.#impactBursts[lastIndex];
+      this.#impactBursts.length = lastIndex;
+    }
+
+    const burst = spawnProjectileImpactBurst(
+      this.#sphereInstancing,
+      weapon,
+      impact,
+      position,
+      kind,
+      undefined,
+      performance.now()
+    );
+    if (burst !== null) {
+      this.#impactBursts.push(burst);
+    }
   }
 }
 
-class WeaponAudio {
-  #context: AudioContext | null = null;
-
-  playShot(): void {
-    this.#playTone(110, 0.038, 0.08, 'sawtooth');
-    this.#playTone(680, 0.022, 0.035, 'square');
+export function resolveHitscanRange(fire: FireProfile): number {
+  if (fire.hitscanRangeM !== undefined && fire.hitscanRangeM > 0) {
+    return fire.hitscanRangeM;
   }
 
-  playImpact(volume: number): void {
-    this.#playTone(190, 0.045, volume, 'triangle');
+  if (fire.speed > 0) {
+    return fire.speed;
   }
 
-  #playTone(frequency: number, duration: number, volume: number, type: OscillatorType): void {
-    const context = this.#context ?? new AudioContext();
-    this.#context = context;
-
-    if (context.state === 'suspended') {
-      void context.resume();
-    }
-
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = type;
-    oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(volume, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + duration);
-  }
+  return WEAPON_CONFIG.range;
 }

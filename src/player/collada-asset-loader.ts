@@ -1,11 +1,6 @@
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
-import {
-  BufferGeometry,
-  Mesh,
-  type AnimationClip,
-  type Material,
-  type Object3D
-} from 'three/webgpu';
+import type { AnimationClip, Object3D } from 'three/webgpu';
+import { disposeObject3DMeshes } from '../render/dispose-three';
 import { fetchColladaXml } from './collada-zip';
 
 export interface ParsedColladaAsset {
@@ -35,19 +30,5 @@ export async function loadColladaFromUrl(url: string): Promise<ParsedColladaAsse
 }
 
 export function disposeColladaScene(scene: Object3D): void {
-  scene.traverse((object) => {
-    if (!(object instanceof Mesh)) {
-      return;
-    }
-
-    (object.geometry as BufferGeometry).dispose();
-    disposeMeshMaterials(object.material as Material | Material[]);
-  });
-}
-
-function disposeMeshMaterials(material: Material | Material[]): void {
-  const materials = Array.isArray(material) ? material : [material];
-  for (const entry of materials) {
-    entry.dispose();
-  }
+  disposeObject3DMeshes(scene);
 }

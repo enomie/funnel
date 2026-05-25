@@ -3,16 +3,73 @@ import {
   Color,
   DirectionalLight,
   Fog,
-  Group,
+  Mesh,
+  MeshStandardMaterial,
   PerspectiveCamera,
-  Scene,
-  SpotLight
+  PointLight,
+  Scene
 } from 'three/webgpu';
+import { getUnitLowPolySphereGeometry } from './low-poly-sphere-geometry';
+import { TEAM_BASE_HEX } from '../combat/team-color-derive';
+import type { FactionTeam } from '../combat/teams';
+import { FUNNEL_DIMENSIONS } from '../config/game-config';
+import { defaultPlayerSpawnPosition } from '../player/player-spawn';
+import { getRuntimeProfile } from '../platform/chrome-macos-arm-profile';
+
+const FACTION_FIGHT_LIGHT_HEX: Record<FactionTeam, number> = {
+  alpha: TEAM_BASE_HEX.enemy,
+  beta: TEAM_BASE_HEX.ally
+};
+
+const FUNNEL_LIGHT_Y = FUNNEL_DIMENSIONS.height - 1;
+const FUNNEL_LIGHT_SPHERE_RADIUS = 7;
+/** Low-poly ceiling orb — emissive only, no shadow cast. */
+/** Directional key — neutral ceiling wash (unchanged during fight focus). */
+const FUNNEL_KEY_LIGHT_COLOR = 0xe7f7ff;
+const FUNNEL_IDLE_LIGHT_COLOR = 0xffffff;
+const FUNNEL_LIGHT_RANGE = 0;
+const FUNNEL_LIGHT_DECAY = 2;
+const FUNNEL_IDLE_LIGHT_INTENSITY = 3200;
+const FUNNEL_FIGHT_LIGHT_INTENSITY = 4200;
+const FUNNEL_ORB_IDLE_EMISSIVE_INTENSITY = 0.9;
+const FUNNEL_ORB_FIGHT_EMISSIVE_INTENSITY = 3;
+const FUNNEL_AMBIENT_INTENSITY = 0.05;
+/** Key von oben — einzige Shadow-Quelle. */
+const FUNNEL_KEY_LIGHT_INTENSITY = 0.38;
+/** Shadow-Texel-Auflösung: kleines Frustum um den Spieler (nicht ganze 300 m Arena). */
+const SHADOW_FOCUS_HALF_M = 22;
+const SHADOW_MAP_SIZE = getRuntimeProfile().shadowMapSize;
+
+export interface ArenaLighting {
+  updateShadowFocus(x: number, z: number): void;
+  /** Center orb + point light — faction hue when one home has more intruders than the other. */
+  updateFightFocus(focusFaction: FactionTeam | null): void;
+}
 
 export interface RenderScene {
   scene: Scene;
   camera: PerspectiveCamera;
-  dynamicLightRig: Group;
+  lighting: ArenaLighting;
+}
+
+function configureShadowLight(light: DirectionalLight, shadowsEnabled: boolean): void {
+  light.castShadow = shadowsEnabled;
+  if (!shadowsEnabled) {
+    return;
+  }
+
+  light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+  light.shadow.bias = -0.00015;
+  light.shadow.normalBias = 0.018;
+
+  const camera = light.shadow.camera;
+  camera.near = 4;
+  camera.far = FUNNEL_DIMENSIONS.height + 30;
+  camera.left = -SHADOW_FOCUS_HALF_M;
+  camera.right = SHADOW_FOCUS_HALF_M;
+  camera.top = SHADOW_FOCUS_HALF_M;
+  camera.bottom = -SHADOW_FOCUS_HALF_M;
+  camera.updateProjectionMatrix();
 }
 
 export function createRenderScene(): RenderScene {
@@ -23,27 +80,87 @@ export function createRenderScene(): RenderScene {
   const camera = new PerspectiveCamera(76, 1, 0.05, 500);
   camera.position.set(0, 4, 136);
 
-  const ambient = new AmbientLight(0x7f98ad, 0.42);
-  scene.add(ambient);
+  scene.add(new AmbientLight(0x7f98ad, FUNNEL_AMBIENT_INTENSITY));
 
-  const sun = new DirectionalLight(0xe7f7ff, 2.1);
-  sun.position.set(-24, 38, 18);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 140;
-  sun.shadow.camera.left = -70;
-  sun.shadow.camera.right = 70;
-  sun.shadow.camera.top = 80;
-  sun.shadow.camera.bottom = -50;
-  scene.add(sun);
+  const keyLight = new DirectionalLight(FUNNEL_KEY_LIGHT_COLOR, FUNNEL_KEY_LIGHT_INTENSITY);
+  configureShadowLight(keyLight, getRuntimeProfile().shadowsEnabled);
+  scene.add(keyLight);
+  scene.add(keyLight.target);
 
-  const dynamicLightRig = new Group();
-  const playerSpot = new SpotLight(0x92d8ff, 750, 46, Math.PI / 6, 0.55, 1.25);
-  playerSpot.position.set(0, 5, 10);
-  playerSpot.target.position.set(0, 1.5, -12);
-  dynamicLightRig.add(playerSpot, playerSpot.target);
-  scene.add(dynamicLightRig);
+  const funnelLight = new PointLight(
+    FUNNEL_IDLE_LIGHT_COLOR,
+    FUNNEL_IDLE_LIGHT_INTENSITY,
+    FUNNEL_LIGHT_RANGE,
+    FUNNEL_LIGHT_DECAY
+  );
+  funnelLight.position.set(0, FUNNEL_LIGHT_Y, 0);
+  funnelLight.castShadow = false;
+  scene.add(funnelLight);
 
-  return { scene, camera, dynamicLightRig };
+  const lightOrbMaterial = new MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.85,
+    roughness: 0.18,
+    metalness: 0.02
+  });
+  const lightOrb = new Mesh(
+    getUnitLowPolySphereGeometry(),
+    lightOrbMaterial
+  );
+  lightOrb.scale.setScalar(FUNNEL_LIGHT_SPHERE_RADIUS);
+  lightOrb.name = 'funnel-light-orb';
+  lightOrb.position.set(0, FUNNEL_LIGHT_Y, 0);
+  lightOrb.castShadow = false;
+  lightOrb.receiveShadow = false;
+  scene.add(lightOrb);
+
+  const fightTint = new Color();
+  const idleOrbTint = new Color(0xffffff);
+  const orbOffTint = new Color(0x000000);
+  let lastShadowX = Number.NaN;
+  let lastShadowZ = Number.NaN;
+  let lastFocusFaction: FactionTeam | null | undefined;
+
+  const lighting: ArenaLighting = {
+    updateShadowFocus(x: number, z: number): void {
+      if (x === lastShadowX && z === lastShadowZ) {
+        return;
+      }
+
+      lastShadowX = x;
+      lastShadowZ = z;
+      keyLight.target.position.set(x, 0, z);
+      keyLight.position.set(x, FUNNEL_DIMENSIONS.height + 16, z);
+    },
+    updateFightFocus(focusFaction: FactionTeam | null): void {
+      if (focusFaction === lastFocusFaction) {
+        return;
+      }
+
+      lastFocusFaction = focusFaction;
+
+      if (focusFaction === null) {
+        fightTint.setHex(FUNNEL_IDLE_LIGHT_COLOR);
+        funnelLight.color.copy(fightTint);
+        funnelLight.intensity = FUNNEL_IDLE_LIGHT_INTENSITY;
+        lightOrbMaterial.color.copy(idleOrbTint);
+        lightOrbMaterial.emissive.copy(idleOrbTint);
+        lightOrbMaterial.emissiveIntensity = FUNNEL_ORB_IDLE_EMISSIVE_INTENSITY;
+        return;
+      }
+
+      fightTint.setHex(FACTION_FIGHT_LIGHT_HEX[focusFaction]);
+      funnelLight.color.copy(fightTint);
+      funnelLight.intensity = FUNNEL_FIGHT_LIGHT_INTENSITY;
+      // Emissive-only orb — no white key-light wash on albedo.
+      lightOrbMaterial.color.copy(orbOffTint);
+      lightOrbMaterial.emissive.copy(fightTint);
+      lightOrbMaterial.emissiveIntensity = FUNNEL_ORB_FIGHT_EMISSIVE_INTENSITY;
+    }
+  };
+
+  lighting.updateShadowFocus(0, defaultPlayerSpawnPosition().z);
+
+  return { scene, camera, lighting };
 }

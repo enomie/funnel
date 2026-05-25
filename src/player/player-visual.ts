@@ -1,120 +1,157 @@
+import { Group, Scene, Vector3 } from 'three/webgpu';
+import { detachSceneObject } from '../render/dispose-three';
 import {
-  BoxGeometry,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  Object3D,
-  Scene
-} from 'three/webgpu';
-import type { WeaponDefinition } from '../combat/weapon-definitions';
+  applyWeaponPlaceholderToSocket,
+  firstPersonMuzzleSocketPosition,
+  thirdPersonMuzzleSocketPosition,
+  THIRD_PERSON_WEAPON_SOCKET_POSITION
+} from '../combat/weapon-placeholder-visual';
+import { WEAPON_DEFINITIONS, type WeaponDefinition } from '../combat/weapon-definitions';
 import { PLAYER_CONFIG } from '../config/game-config';
-import {
-  LocomotionAnimController,
-  type LocomotionAnimInput
-} from './locomotion-anim-controller';
-import { loadShooterPackCharacter } from './shooter-pack-loader';
+import { DEFAULT_HUMANOID_RIG, type HumanoidRigId } from './humanoid-rig';
+import type { LocomotionAnimInput } from './locomotion-anim-controller';
+import { HumanoidVisual } from './humanoid-visual';
+import { loadShooterPackCharacter, type ShooterPackCharacter } from './shooter-pack-loader';
+import { PlayerAimSpine } from './player-aim-spine';
+import { applyRelativeTeamColors } from './team-visual-colors';
+
+/** Match eye pivot drop on capsule-root weapon socket when crouched. */
+const THIRD_PERSON_CROUCH_WEAPON_DROP_Y =
+  PLAYER_CONFIG.cameraHeight - PLAYER_CONFIG.crouchCameraHeight;
 
 export class PlayerVisual {
-  readonly root = new Group();
+  readonly #humanoid: HumanoidVisual;
   readonly weaponSocket = new Group();
   readonly muzzleSocket = new Group();
-  #character: Object3D | null = null;
-  #locomotion: LocomotionAnimController | null = null;
-  #footOffsetY = 0;
-  #weaponMesh: Mesh | null = null;
+  readonly #aimSpine = new PlayerAimSpine();
+  #weaponMesh: Group | null = null;
+  #activeWeapon: WeaponDefinition = WEAPON_DEFINITIONS[0];
+  #rigId: HumanoidRigId = DEFAULT_HUMANOID_RIG;
+  #lastFirstPersonVisible = false;
+  #lastCrouchWeaponStance = false;
 
   constructor(scene: Scene) {
-    this.root.name = 'player-visual-root';
-    this.weaponSocket.position.set(-0.22, 0.88, -0.48);
-    this.weaponSocket.visible = false;
-    this.muzzleSocket.position.set(-0.16, 0.84, -1.1);
-    this.root.add(this.weaponSocket, this.muzzleSocket);
-    scene.add(this.root);
+    this.#humanoid = new HumanoidVisual('player-visual-root', scene);
+    this.weaponSocket.position.copy(THIRD_PERSON_WEAPON_SOCKET_POSITION);
+    this.muzzleSocket.position.copy(thirdPersonMuzzleSocketPosition(this.#activeWeapon));
+    this.weaponSocket.add(this.muzzleSocket);
+    this.root.add(this.weaponSocket);
+  }
+
+  get root(): Group {
+    return this.#humanoid.root;
+  }
+
+  get rigId(): HumanoidRigId {
+    return this.#rigId;
   }
 
   async load(): Promise<void> {
-    const { model, mixer, registry } = await loadShooterPackCharacter();
-    this.#configureCharacter(model, new LocomotionAnimController(registry, mixer));
+    this.mountShooterPack(await loadShooterPackCharacter());
+  }
+
+  mountShooterPack(pack: ShooterPackCharacter): void {
+    this.#rigId = pack.rigId;
+    this.#humanoid.mountShooterPack(pack, false, {
+      bindAimSpine: (character) => {
+        this.#aimSpine.bind(character);
+      }
+    });
+    this.applyLocalAllyColors();
   }
 
   useFallbackMesh(): void {
-    const body = new Mesh(
-      new BoxGeometry(0.72, 2.35, 0.5),
-      new MeshStandardMaterial({
-        color: 0x225dff,
-        emissive: 0x0d2d77,
-        emissiveIntensity: 0.5,
-        roughness: 0.55,
-        metalness: 0.35
-      })
-    );
-    body.position.y = -0.05;
-    body.castShadow = true;
-    body.receiveShadow = true;
-    this.root.add(body);
+    this.#humanoid.mountFallback();
+    this.applyLocalAllyColors();
+  }
+
+  applyLocalAllyColors(): void {
+    this.#humanoid.setTeamRole('ally');
+    applyRelativeTeamColors(this.root, 'ally');
+  }
+
+  flashDamage(nowMs?: number): void {
+    this.#humanoid.flashDamage(nowMs);
   }
 
   updateLocomotion(deltaSeconds: number, input: LocomotionAnimInput): void {
-    this.#locomotion?.update(deltaSeconds, input);
-    this.#anchorCharacterToCapsule();
+    this.#humanoid.updateLocomotion(deltaSeconds, input);
   }
 
-  setAimVisible(visible: boolean): void {
-    this.weaponSocket.visible = visible;
+  reviveLocomotion(): void {
+    this.#humanoid.reviveLocomotion();
+  }
+
+  syncThirdPersonWeaponStance(crouching: boolean, firstPersonBlend: number): void {
+    if (firstPersonBlend > 0.5 || this.weaponSocket.parent !== this.root) {
+      return;
+    }
+
+    if (crouching === this.#lastCrouchWeaponStance) {
+      return;
+    }
+
+    this.#lastCrouchWeaponStance = crouching;
+    const drop = crouching ? THIRD_PERSON_CROUCH_WEAPON_DROP_Y : 0;
+    this.weaponSocket.position.set(
+      THIRD_PERSON_WEAPON_SOCKET_POSITION.x,
+      THIRD_PERSON_WEAPON_SOCKET_POSITION.y - drop,
+      THIRD_PERSON_WEAPON_SOCKET_POSITION.z
+    );
+  }
+
+  get locomotionClipId(): string {
+    return this.#humanoid.locomotionClipId;
+  }
+
+  updateCameraPresentation(firstPersonBlend: number): void {
+    const firstPerson = firstPersonBlend > 0.55;
+    if (firstPerson === this.#lastFirstPersonVisible) {
+      return;
+    }
+
+    this.#lastFirstPersonVisible = firstPerson;
+    const character = this.#humanoid.character;
+    if (character !== null) {
+      character.visible = !firstPerson;
+    }
     for (const child of this.root.children) {
-      if (child !== this.weaponSocket && child !== this.muzzleSocket) {
-        child.visible = !visible;
+      if (child === this.weaponSocket || child === this.muzzleSocket || child === character) {
+        continue;
       }
+      child.visible = !firstPerson;
+    }
+  }
+
+  updateAimSpine(pitch: number, thirdPersonBlend: number, isDead: boolean): void {
+    if (isDead) {
+      this.weaponSocket.rotation.x = 0;
+      return;
+    }
+
+    const tpBlend = 1 - Math.min(1, Math.max(0, thirdPersonBlend));
+    this.#aimSpine.apply(pitch, tpBlend, this.weaponSocket);
+    if (tpBlend > 0.01) {
+      this.#humanoid.syncEyesFromHead();
     }
   }
 
   setWeapon(weapon: WeaponDefinition): void {
+    this.#activeWeapon = weapon;
     this.#disposeWeaponMesh();
-
-    const mesh = new Mesh(
-      new BoxGeometry(weapon.width, weapon.height, weapon.length),
-      new MeshStandardMaterial({
-        color: weapon.color,
-        emissive: weapon.color,
-        emissiveIntensity: 0.16,
-        roughness: 0.42,
-        metalness: 0.32
-      })
+    this.#weaponMesh = applyWeaponPlaceholderToSocket(
+      this.weaponSocket,
+      weapon,
+      this.muzzleSocket
     );
-    mesh.name = `${weapon.name.toLowerCase().replaceAll(' ', '-')}-bounds`;
-    mesh.position.set(0, 0, -weapon.length / 2);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    this.#weaponMesh = mesh;
-    this.weaponSocket.add(mesh);
   }
 
-  #configureCharacter(character: Object3D, locomotion: LocomotionAnimController): void {
-    this.#footOffsetY = -(PLAYER_CONFIG.halfHeight + PLAYER_CONFIG.radius);
-    character.position.set(0, this.#footOffsetY, 0);
-    this.#character = character;
-    this.#locomotion = locomotion;
-
-    character.traverse((object) => {
-      if (object instanceof Mesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
-      }
-    });
-
-    this.root.add(character);
+  muzzleOffsetThirdPerson(): Vector3 {
+    return thirdPersonMuzzleSocketPosition(this.#activeWeapon);
   }
 
-  /** Keep skinned mesh at capsule origin — animations must not translate the root. */
-  #anchorCharacterToCapsule(): void {
-    if (this.#character === null) {
-      return;
-    }
-
-    this.#character.position.x = 0;
-    this.#character.position.z = 0;
-    this.#character.position.y = this.#footOffsetY;
-    this.#character.rotation.set(0, 0, 0);
+  muzzleOffsetFirstPerson(): Vector3 {
+    return firstPersonMuzzleSocketPosition(this.#activeWeapon);
   }
 
   #disposeWeaponMesh(): void {
@@ -122,14 +159,7 @@ export class PlayerVisual {
       return;
     }
 
-    this.weaponSocket.remove(this.#weaponMesh);
-    this.#weaponMesh.geometry.dispose();
-    const materials = Array.isArray(this.#weaponMesh.material)
-      ? this.#weaponMesh.material
-      : [this.#weaponMesh.material];
-    for (const material of materials) {
-      material.dispose();
-    }
+    detachSceneObject(this.#weaponMesh, { disposeSubtree: true });
     this.#weaponMesh = null;
   }
 }

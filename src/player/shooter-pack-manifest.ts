@@ -1,6 +1,7 @@
 import {
+  CHARACTER_SELECT_UI_CLIP_IDS,
   clipIdFromShooterPackFile,
-  SHOOTER_PACK_BASE_MODEL
+  SHOOTER_PACK_EXCLUDED_DAE
 } from './shooter-pack-paths';
 
 /** Build-time discovery of `public/Shooter-Pack/animation-*.dae` (excludes base model). */
@@ -20,14 +21,15 @@ export function discoverShooterPackAnimations(): ShooterPackAnimationEntry[] {
 
   for (const [modulePath, url] of Object.entries(animationModules)) {
     const fileName = modulePath.split('/').pop() ?? modulePath;
-    if (fileName === SHOOTER_PACK_BASE_MODEL) {
+    const clipId = clipIdFromShooterPackFile(fileName);
+    if (SHOOTER_PACK_EXCLUDED_DAE.has(fileName) || CHARACTER_SELECT_UI_CLIP_IDS.has(clipId)) {
       continue;
     }
 
     entries.push({
       fileName,
       url: url as string,
-      clipId: clipIdFromShooterPackFile(fileName)
+      clipId
     });
   }
 

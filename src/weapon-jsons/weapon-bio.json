@@ -1,0 +1,28 @@
+{
+  "parts": [
+    {
+      "kind": "box",
+      "size": [0.14, 0.18, 0.62],
+      "position": [0, 0, 0.31],
+      "style": "weapon"
+    },
+    {
+      "kind": "box",
+      "size": [0.14, 0.03, 0.62],
+      "position": [0, 0.105, 0.31],
+      "style": "glow"
+    },
+    {
+      "kind": "box",
+      "size": [0.016, 0.016, 0.016],
+      "position": [0, 0.128, 0.341],
+      "style": "weapon"
+    },
+    {
+      "kind": "box",
+      "size": [0.062, 0.062, 0.034],
+      "position": [0, 0, 0.637],
+      "style": "glow"
+    }
+  ]
+}

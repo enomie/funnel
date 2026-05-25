@@ -5,6 +5,7 @@ UT99-inspired, high-speed WebGPU arena shooter in a 50×300×50 m industrial fun
 - **Spec:** [docs/introduction.md](docs/introduction.md)
 - **Stack:** Three.js WebGPU + Rapier SIMD, Vite + TypeScript
 - **Dev:** `npm install` → `npm run dev` → [http://localhost:3011/](http://localhost:3011/)
+- **Origonal UT99 Funnel Video:** https://www.youtube.com/watch?v=KGDlYjuMloc
 
 ```bash
 npm run lint

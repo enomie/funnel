@@ -1,9 +1,139 @@
 :root {
   color-scheme: dark;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #050607;
-  color: #eef4ff;
+  font-family: Helvetica, Arial, sans-serif;
+  /* Arena floor base + viewer ally blue — `team-color-derive.ts` / `grid-tsl.ts` */
+  --funnel-surface: #141b24;
+  --funnel-surface-rgb: 20, 27, 36;
+  --funnel-surface-muted: #3a424d;
+  --funnel-surface-muted-rgb: 58, 66, 77;
+  --funnel-surface-panel: rgba(var(--funnel-surface-rgb), 0.9);
+  --funnel-surface-panel-solid: #1c2530;
+  --funnel-team-ally: #225dff;
+  --funnel-team-ally-rgb: 34, 93, 255;
+  --funnel-team-ally-muted: #9ec8ff;
+  --funnel-team-ally-soft: #b8d4ff;
+  --funnel-team-ally-glow: rgba(var(--funnel-team-ally-rgb), 0.42);
+  --funnel-team-enemy: #d42b2b;
+  --funnel-team-enemy-rgb: 212, 43, 43;
+  --funnel-text: #eef4ff;
+  --funnel-text-muted: #88a5b9;
+  --funnel-text-dim: #6f8aa6;
+  --funnel-shield-color: #58d6ff;
+  --funnel-hud-panel-border: rgba(var(--funnel-team-ally-rgb), 0.12);
+  --funnel-hud-panel-radius: 0;
+  --funnel-hud-panel-bg: rgba(0, 0, 0, 0.2);
+  --funnel-hud-panel-head-min-height: 20px;
+  --funnel-hud-panel-head-padding: 3px 8px 2px;
+  --funnel-hud-panel-head-title-size: 10px;
+  --funnel-hud-panel-head-letter-spacing: 0.08em;
+  --funnel-hud-panel-head-divider: rgba(255, 255, 255, 0.04);
+  --funnel-hud-panel-metric-min-height: 40px;
+  --funnel-hud-panel-metric-padding: 5px 4px 6px;
+  --funnel-hud-metric-gap: 4px;
+  --funnel-hud-metric-caption-size: 8px;
+  --funnel-team-badge-width: 172px;
+  --funnel-hud-title-size: 10px;
+  --funnel-hud-label-size: 10px;
+  --funnel-hud-title-weight: 400;
+  --funnel-hud-label-weight: 400;
+  --funnel-hud-mono-font:
+    ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  /* Full-screen overlays — blur live WebGPU canvas underneath */
+  --funnel-overlay-blur: 14px;
+  --funnel-overlay-scrim-center: rgba(var(--funnel-team-ally-rgb), 0.1);
+  --funnel-overlay-scrim-edge: rgba(var(--funnel-surface-rgb), 0.52);
+  --funnel-overlay-scrim-danger-center: rgba(255, 74, 61, 0.12);
+  --funnel-btn-radius: 0;
+  --funnel-btn-min-height: 40px;
+  --funnel-btn-padding-x: 20px;
+  --funnel-btn-font-size: 11px;
+  --funnel-btn-letter-spacing: 0.12em;
+  --funnel-btn-border: var(--funnel-team-ally);
+  --funnel-btn-bg: var(--funnel-team-ally);
+  --funnel-btn-color: var(--funnel-text);
+  --funnel-btn-hover-border: var(--funnel-team-ally);
+  --funnel-btn-hover-bg: transparent;
+  --funnel-btn-hover-color: var(--funnel-text);
+  --funnel-btn-active-bg: rgba(var(--funnel-team-ally-rgb), 0.16);
+  --funnel-btn-selected-border: var(--funnel-team-ally);
+  --funnel-btn-selected-bg: var(--funnel-team-ally);
+  --funnel-btn-selected-color: var(--funnel-text);
+  --funnel-btn-transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+  /* Flat arena grid — `grid-tsl.ts` GRID_BASE_COLOR + TEAM_BASE_HEX.ally lines */
+  --funnel-grid-base: #141b24;
+  --funnel-grid-line-minor: rgba(34, 93, 255, 0.28);
+  --funnel-grid-line-major: rgba(34, 93, 255, 0.55);
+  --funnel-grid-minor-step: 20px;
+  --funnel-grid-major-step: 100px;
+  --funnel-brand-font-size: clamp(3.5rem, 10vw, 6rem);
+  background: var(--funnel-surface);
+  color: var(--funnel-text);
+}
+
+.funnel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--funnel-btn-min-height);
+  padding: 0 var(--funnel-btn-padding-x);
+  border: 1px solid var(--funnel-btn-border);
+  border-radius: var(--funnel-btn-radius);
+  background: var(--funnel-btn-bg);
+  color: var(--funnel-btn-color);
+  font: inherit;
+  font-size: var(--funnel-btn-font-size);
+  font-weight: 600;
+  letter-spacing: var(--funnel-btn-letter-spacing);
+  line-height: 1;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: none;
+  transition: var(--funnel-btn-transition);
+}
+
+.funnel-btn:hover:not(:disabled) {
+  border-color: var(--funnel-btn-hover-border);
+  background: var(--funnel-btn-hover-bg);
+  color: var(--funnel-btn-hover-color);
+}
+
+.funnel-btn:active:not(:disabled) {
+  background: var(--funnel-btn-active-bg);
+}
+
+.funnel-btn.is-selected,
+.funnel-btn[aria-pressed='true'] {
+  border-color: var(--funnel-btn-selected-border);
+  background: var(--funnel-btn-selected-bg);
+  color: var(--funnel-btn-selected-color);
+}
+
+.funnel-btn.is-selected:hover:not(:disabled),
+.funnel-btn[aria-pressed='true']:hover:not(:disabled) {
+  border-color: var(--funnel-team-ally);
+  background: transparent;
+  color: var(--funnel-text);
+}
+
+.funnel-btn:focus,
+.funnel-btn:focus-visible {
+  outline: none;
+}
+
+.funnel-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.funnel-btn--block {
+  width: 100%;
 }
 
 * {
@@ -15,18 +145,22 @@ body,
 #app {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   margin: 0;
 }
 
 body {
   overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .funnel-shell {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background: #050607;
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+  background: var(--funnel-surface);
+  contain: layout size style;
 }
 
 .funnel-canvas {
@@ -34,6 +168,10 @@ body {
   width: 100%;
   height: 100%;
   outline: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  contain: strict;
 }
 
 .funnel-hud {
@@ -41,108 +179,781 @@ body {
   inset: 0;
   z-index: 2;
   pointer-events: none;
+  font-family: Helvetica, Arial, sans-serif;
+}
+
+.funnel-damage-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  border: 2px solid rgba(var(--funnel-enemy-rgb, 212, 43, 43), 0);
+  box-shadow:
+    inset 0 0 0 rgba(var(--funnel-enemy-rgb, 212, 43, 43), 0),
+    inset 0 0 0 rgba(var(--funnel-enemy-rgb, 212, 43, 43), 0);
+  transition:
+    opacity 0.07s ease-out,
+    border-color 0.07s ease-out,
+    box-shadow 0.14s ease-out;
+}
+
+.funnel-damage-vignette[data-active='true'] {
+  opacity: 1;
+  border-color: rgba(
+    var(--funnel-enemy-rgb, 212, 43, 43),
+    calc(0.2 + 0.32 * var(--damage-intensity, 0.55))
+  );
+  box-shadow:
+    inset 0 0 28px rgba(
+      var(--funnel-enemy-rgb, 212, 43, 43),
+      calc(0.1 + 0.16 * var(--damage-intensity, 0.55))
+    ),
+    inset 0 0 72px rgba(
+      var(--funnel-enemy-rgb, 212, 43, 43),
+      calc(0.06 + 0.12 * var(--damage-intensity, 0.55))
+    ),
+    inset 0 0 140px rgba(
+      var(--funnel-enemy-rgb, 212, 43, 43),
+      calc(0.03 + 0.08 * var(--damage-intensity, 0.55))
+    );
 }
 
 .funnel-crosshair {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   transform: translate(-50%, -50%);
+  opacity: 0;
+  transition:
+    opacity 0.08s ease-out,
+    width 0.09s ease-out,
+    height 0.09s ease-out;
 }
 
-.funnel-crosshair::before,
-.funnel-crosshair::after {
+.funnel-hud[data-aiming='true'] .funnel-crosshair {
+  opacity: 1;
+}
+
+.funnel-crosshair__line {
   position: absolute;
-  content: "";
-  background: rgba(238, 244, 255, 0.9);
-  box-shadow: 0 0 10px rgba(90, 194, 255, 0.65);
-}
-
-.funnel-crosshair::before {
-  left: 10px;
-  top: 0;
   width: 2px;
-  height: 22px;
+  height: 9px;
+  border-radius: 0;
+  background: rgba(var(--funnel-text-rgb, 238, 244, 255), 0.92);
+  box-shadow: 0 0 8px var(--funnel-team-ally-glow);
+  transform-origin: center center;
+  transition:
+    height 0.07s ease-out,
+    background 0.07s ease-out,
+    box-shadow 0.07s ease-out,
+    left 0.09s ease-out,
+    top 0.09s ease-out,
+    right 0.09s ease-out,
+    bottom 0.09s ease-out;
 }
 
-.funnel-crosshair::after {
+.funnel-crosshair__line--tl {
+  left: 2px;
+  top: 2px;
+  transform: rotate(45deg);
+}
+
+.funnel-crosshair__line--tr {
+  right: 2px;
+  top: 2px;
+  transform: rotate(-45deg);
+}
+
+.funnel-crosshair__line--bl {
+  left: 2px;
+  bottom: 2px;
+  transform: rotate(-45deg);
+}
+
+.funnel-crosshair__line--br {
+  right: 2px;
+  bottom: 2px;
+  transform: rotate(45deg);
+}
+
+.funnel-crosshair[data-hit='true'] .funnel-crosshair__line {
+  height: 12px;
+  background: rgba(255, 64, 64, 0.96);
+  box-shadow: 0 0 11px rgba(255, 48, 48, 0.78);
+}
+
+.funnel-crosshair[data-kill='true'] {
+  width: 38px;
+  height: 38px;
+}
+
+.funnel-crosshair[data-kill='true'] .funnel-crosshair__line {
+  height: 15px;
+  background: rgba(255, 40, 40, 0.98);
+  box-shadow: 0 0 14px rgba(255, 28, 28, 0.88);
+}
+
+.funnel-crosshair[data-kill='true'] .funnel-crosshair__line--tl {
   left: 0;
-  top: 10px;
-  width: 22px;
-  height: 2px;
+  top: 0;
 }
 
-.funnel-panel {
+.funnel-crosshair[data-kill='true'] .funnel-crosshair__line--tr {
+  right: 0;
+  top: 0;
+}
+
+.funnel-crosshair[data-kill='true'] .funnel-crosshair__line--bl {
+  left: 0;
+  bottom: 0;
+}
+
+.funnel-crosshair[data-kill='true'] .funnel-crosshair__line--br {
+  right: 0;
+  bottom: 0;
+}
+
+.funnel-team-scoreboard {
   position: absolute;
-  left: 16px;
   top: 16px;
-  width: min(330px, calc(100vw - 32px));
-  padding: 13px 14px 14px;
-  border: 1px solid rgba(158, 190, 214, 0.24);
-  border-radius: 8px;
-  background: rgba(7, 10, 12, 0.76);
-  box-shadow: 0 14px 45px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(12px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
 }
 
-.funnel-title {
+.funnel-team-badge {
+  display: flex;
+  flex-direction: column;
+  width: var(--funnel-team-badge-width);
+  min-width: var(--funnel-team-badge-width);
+  min-height: 62px;
+  overflow: hidden;
+  border: 1px solid var(--funnel-hud-panel-border);
+  border-radius: var(--funnel-hud-panel-radius);
+  background: var(--funnel-hud-panel-bg);
+}
+
+.funnel-team-badge--own {
+  border-color: rgba(var(--funnel-team-ally-rgb), 0.14);
+}
+
+.funnel-team-badge--enemy {
+  border-color: rgba(212, 43, 43, 0.14);
+}
+
+.funnel-team-badge__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 9px;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0;
+  justify-content: center;
+  min-height: var(--funnel-hud-panel-head-min-height);
+  padding: var(--funnel-hud-panel-head-padding);
+  border-bottom: 1px solid var(--funnel-hud-panel-head-divider);
 }
 
-.funnel-badge {
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: #12465a;
-  color: #9ee6ff;
-  font-size: 10px;
-  font-weight: 800;
+.funnel-team-badge--own .funnel-team-badge__head {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--funnel-team-ally-rgb), 0.22) 0%,
+    rgba(var(--funnel-team-ally-rgb), 0.08) 100%
+  );
+  border-bottom-color: rgba(var(--funnel-team-ally-rgb), 0.12);
+}
+
+.funnel-team-badge--enemy .funnel-team-badge__head {
+  background: linear-gradient(180deg, rgba(212, 43, 43, 0.2) 0%, rgba(212, 43, 43, 0.07) 100%);
+  border-bottom-color: rgba(212, 43, 43, 0.12);
+}
+
+.funnel-team-badge__label {
+  max-width: 100%;
+  font-size: var(--funnel-hud-panel-head-title-size);
+  font-weight: 400;
+  letter-spacing: var(--funnel-hud-panel-head-letter-spacing);
+  line-height: 1;
+  text-align: center;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.funnel-grid {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 5px 12px;
-  margin: 0;
-  color: #d3deea;
-  font-size: 12px;
-  line-height: 1.25;
-}
-
-.funnel-grid dt {
-  margin: 0;
-  color: #88a5b9;
-}
-
-.funnel-grid dd {
-  margin: 0;
-}
-
-.funnel-weapon-readout {
+.funnel-team-badge--own .funnel-team-badge__label {
   color: #ffffff;
+  text-shadow: 0 0 8px rgba(var(--funnel-team-ally-rgb), 0.4);
+}
+
+.funnel-team-badge--enemy .funnel-team-badge__label {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(212, 43, 43, 0.35);
+}
+
+.funnel-team-badge__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 1;
+  align-items: stretch;
+}
+
+.funnel-team-badge__metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--funnel-hud-metric-gap);
+  min-height: var(--funnel-hud-panel-metric-min-height);
+  padding: var(--funnel-hud-panel-metric-padding);
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.funnel-team-badge__metric:last-child {
+  border-right: none;
+}
+
+.funnel-team-badge__members,
+.funnel-team-badge__kills,
+.funnel-team-badge__points {
+  font-family: var(--funnel-hud-mono-font);
+  font-size: 14px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.funnel-team-badge__metric-label,
+.funnel-personal-stats__label,
+.funnel-fps-hud__metric-label {
+  max-width: 100%;
+  font-size: var(--funnel-hud-metric-caption-size);
+  font-weight: var(--funnel-hud-label-weight);
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.funnel-team-badge__metric-label,
+.funnel-fps-hud__metric-label {
+  color: var(--funnel-text-dim);
+}
+
+.funnel-team-badge--own[data-winner='true'] {
+  border-color: rgba(var(--funnel-team-ally-rgb), 0.42);
+  box-shadow: 0 0 12px rgba(var(--funnel-team-ally-rgb), 0.18);
+}
+
+.funnel-team-badge--own[data-winner='true'] .funnel-team-badge__head {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--funnel-team-ally-rgb), 0.34) 0%,
+    rgba(var(--funnel-team-ally-rgb), 0.12) 100%
+  );
+}
+
+.funnel-team-badge--enemy[data-winner='true'] {
+  border-color: rgba(255, 130, 130, 0.42);
+  box-shadow: 0 0 12px rgba(255, 90, 90, 0.18);
+}
+
+.funnel-team-badge--enemy[data-winner='true'] .funnel-team-badge__head {
+  background: linear-gradient(180deg, rgba(212, 43, 43, 0.32) 0%, rgba(212, 43, 43, 0.12) 100%);
+}
+
+.funnel-personal-stats {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  width: 136px;
+  min-height: 62px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--funnel-team-ally-rgb), 0.14);
+  border-radius: var(--funnel-hud-panel-radius);
+  background: var(--funnel-hud-panel-bg);
+  pointer-events: none;
+  font-family: Helvetica, Arial, sans-serif;
+}
+
+.funnel-personal-stats__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--funnel-hud-panel-head-min-height);
+  padding: var(--funnel-hud-panel-head-padding);
+  border-bottom: 1px solid rgba(var(--funnel-team-ally-rgb), 0.1);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--funnel-team-ally-rgb), 0.18) 0%,
+    rgba(var(--funnel-team-ally-rgb), 0.06) 100%
+  );
+}
+
+.funnel-personal-stats__title {
+  font-size: var(--funnel-hud-panel-head-title-size);
+  font-weight: 400;
+  letter-spacing: var(--funnel-hud-panel-head-letter-spacing);
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(var(--funnel-team-ally-rgb), 0.35);
+}
+
+.funnel-personal-stats__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 1;
+  align-items: stretch;
+}
+
+.funnel-personal-stats__metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--funnel-hud-metric-gap);
+  min-height: var(--funnel-hud-panel-metric-min-height);
+  padding: var(--funnel-hud-panel-metric-padding);
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.funnel-personal-stats__metric:last-child {
+  border-right: none;
+}
+
+.funnel-personal-stats__value {
+  font-family: var(--funnel-hud-mono-font);
+  font-size: 14px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.funnel-personal-stats__metric--kills .funnel-personal-stats__label {
+  color: var(--funnel-team-ally-muted);
+}
+
+.funnel-personal-stats__metric--deaths .funnel-personal-stats__label {
+  color: #ff9a9a;
+}
+
+.funnel-personal-stats__metric--ratio .funnel-personal-stats__label {
+  color: var(--funnel-text-dim);
+}
+
+.funnel-weapon-bar {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100vw - 40px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.funnel-weapon-bar__slots {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: 100%;
+}
+
+.funnel-weapon-bar__slot {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 48px;
+  height: 48px;
+  box-sizing: border-box;
+  border: 1px solid var(--funnel-hud-panel-border);
+  border-radius: var(--funnel-hud-panel-radius);
+  background: var(--funnel-hud-panel-bg);
+  opacity: 0.34;
+  transition:
+    opacity 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.funnel-weapon-bar__slot[data-active='true'] {
+  opacity: 1;
+  border-color: var(--funnel-weapon-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--funnel-weapon-color) 42%, transparent);
+}
+
+.funnel-weapon-bar__key {
+  font-size: 14px;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--funnel-text-dim);
+}
+
+.funnel-weapon-bar__slot[data-active='true'] .funnel-weapon-bar__key {
+  color: var(--funnel-weapon-color);
+}
+
+.funnel-weapon-bar__name {
+  max-width: 100%;
+  padding: 0 2px;
+  font-size: var(--funnel-hud-label-size);
+  font-weight: var(--funnel-hud-label-weight);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.funnel-weapon-bar__slot[data-active='true'] .funnel-weapon-bar__name {
+  text-shadow: 0 0 8px var(--funnel-weapon-color);
+}
+
+.funnel-hud-panel {
+  --funnel-hud-panel-block-height: 66px;
+  --funnel-hud-panel-stat-width: 220px;
+  --funnel-stat-label-width: 40px;
+  --funnel-stat-row-gap: 6px;
+  --funnel-stat-row-height: 11px;
+  --funnel-stat-track-height: 6px;
+  --funnel-stat-track-radius: 0;
+  --funnel-stat-track-bg: rgba(var(--funnel-surface-muted-rgb), 0.95);
+  --funnel-ammo-cell-gap: 2px;
+  --funnel-ammo-cell-radius: 0;
+  box-sizing: border-box;
+  position: absolute;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  width: var(--funnel-hud-panel-stat-width);
+  min-height: var(--funnel-hud-panel-block-height);
+  overflow: hidden;
+  border: 1px solid var(--funnel-hud-panel-border);
+  border-radius: var(--funnel-hud-panel-radius);
+  background: var(--funnel-hud-panel-bg);
+  pointer-events: none;
+  font-family: Helvetica, Arial, sans-serif;
+}
+
+.funnel-hud-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--funnel-hud-panel-head-min-height);
+  padding: var(--funnel-hud-panel-head-padding);
+  border-bottom: 1px solid var(--funnel-hud-panel-head-divider);
+}
+
+.funnel-hud-panel__title {
+  max-width: 100%;
+  font-size: var(--funnel-hud-panel-head-title-size);
+  font-weight: 400;
+  letter-spacing: var(--funnel-hud-panel-head-letter-spacing);
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.funnel-hud-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--funnel-stat-row-gap);
+  padding: 6px 8px 7px;
+}
+
+.funnel-health {
+  left: 20px;
+  border-color: rgba(88, 255, 176, 0.14);
+}
+
+.funnel-health__head {
+  background: linear-gradient(180deg, rgba(88, 255, 176, 0.18) 0%, rgba(88, 255, 176, 0.06) 100%);
+  border-bottom-color: rgba(88, 255, 176, 0.1);
+}
+
+.funnel-health .funnel-hud-panel__title {
+  text-shadow: 0 0 8px rgba(88, 255, 176, 0.35);
+}
+
+.funnel-ammo {
+  right: 20px;
+  --funnel-ammo-accent-rgb: var(--funnel-team-ally-rgb);
+  border-color: rgba(var(--funnel-ammo-accent-rgb), 0.14);
+}
+
+.funnel-ammo__head {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--funnel-ammo-accent-rgb), 0.18) 0%,
+    rgba(var(--funnel-ammo-accent-rgb), 0.06) 100%
+  );
+  border-bottom-color: rgba(var(--funnel-ammo-accent-rgb), 0.1);
+}
+
+.funnel-ammo .funnel-hud-panel__title {
+  text-shadow: 0 0 8px rgba(var(--funnel-ammo-accent-rgb), 0.35);
+}
+
+.funnel-stat-row {
+  display: grid;
+  grid-template-columns: var(--funnel-stat-label-width) 1fr;
+  align-items: center;
+  column-gap: 8px;
+  height: var(--funnel-stat-row-height);
+}
+
+.funnel-stat-row__label {
+  font-size: var(--funnel-hud-label-size);
+  font-weight: var(--funnel-hud-label-weight);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--funnel-text-dim);
+  text-align: left;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.funnel-stat-row__label--health {
+  color: #58ffb0;
+}
+
+.funnel-stat-row__label--shield {
+  color: var(--funnel-shield-color);
+}
+
+.funnel-stat-row__label--numeric {
+  text-transform: uppercase;
+  font-family: var(--funnel-hud-mono-font);
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+.funnel-ammo__count {
+  text-align: left;
+}
+
+.funnel-stat-row__track {
+  height: var(--funnel-stat-track-height);
+  min-width: 0;
+  border-radius: var(--funnel-stat-track-radius);
+  overflow: hidden;
+  background: var(--funnel-stat-track-bg);
+}
+
+.funnel-stat-row__fill {
+  height: 100%;
+  width: 0%;
+  border-radius: var(--funnel-stat-track-radius);
+  transition: width 80ms linear;
+}
+
+.funnel-health__fill {
+  background: linear-gradient(90deg, #3ecf8e, #58ffb0);
+}
+
+.funnel-shield__fill {
+  background: var(--funnel-shield-color);
+}
+
+.funnel-health[data-regen='true'] .funnel-health__fill {
+  box-shadow: 0 0 8px rgba(88, 255, 176, 0.45);
+}
+
+.funnel-health[data-low='true'] .funnel-health__fill {
+  background: linear-gradient(90deg, #ffb347, #ff5f45);
+}
+
+.funnel-health[data-dead='true'] .funnel-health__fill,
+.funnel-health[data-dead='true'] .funnel-shield__fill {
+  background: var(--funnel-surface-muted);
+}
+
+.funnel-ammo__mag {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: var(--funnel-ammo-cell-gap);
+  width: 100%;
+  height: 100%;
+}
+
+.funnel-ammo__cell {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  border-radius: var(--funnel-ammo-cell-radius);
+  box-shadow: none;
+  background-color: rgba(0, 0, 0, 0.22);
+}
+
+.funnel-ammo__cell[data-state='filled'],
+.funnel-ammo__cell[data-state='reserved'],
+.funnel-ammo__cell[data-state='chambering'] {
+  box-shadow: none;
+}
+
+.funnel-ammo__reload-fill {
+  background: linear-gradient(90deg, var(--funnel-team-ally) 0%, var(--funnel-team-ally-muted) 100%);
+}
+
+.funnel-hud[data-aiming='true'] .funnel-hud-panel {
+  opacity: 0.92;
+}
+
+@media (max-width: 1200px) {
+  .funnel-weapon-bar {
+    max-width: calc(100vw - 24px);
+    bottom: calc(52px + var(--funnel-hud-panel-block-height) + 8px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .funnel-weapon-bar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .funnel-weapon-bar {
+    bottom: calc(52px + var(--funnel-hud-panel-block-height) + 8px);
+  }
+
+  .funnel-weapon-bar__slots {
+    gap: 4px;
+  }
+
+  .funnel-weapon-bar__slot {
+    width: 42px;
+    height: 42px;
+  }
+
+  .funnel-weapon-bar__key {
+    font-size: 13px;
+  }
+
+  .funnel-weapon-bar__name {
+    font-size: 7px;
+  }
+
+  .funnel-hud-panel {
+    --funnel-hud-panel-stat-width: min(220px, calc(50vw - 26px));
+    bottom: 52px;
+  }
+
+  .funnel-health {
+    left: 12px;
+  }
+
+  .funnel-ammo {
+    right: 12px;
+  }
+}
+
+.funnel-fps-hud {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  width: 136px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--funnel-hud-panel-radius);
+  background: var(--funnel-hud-panel-bg);
+  pointer-events: none;
+  font-family: Helvetica, Arial, sans-serif;
+}
+
+.funnel-fps-hud__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--funnel-hud-panel-head-min-height);
+  padding: var(--funnel-hud-panel-head-padding);
+  border-bottom: 1px solid var(--funnel-hud-panel-head-divider);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%);
+}
+
+.funnel-fps-hud__title {
+  font-size: var(--funnel-hud-panel-head-title-size);
+  font-weight: 400;
+  letter-spacing: var(--funnel-hud-panel-head-letter-spacing);
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.16);
+}
+
+.funnel-fps-hud__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.funnel-fps-hud__metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--funnel-hud-metric-gap);
+  min-height: var(--funnel-hud-panel-metric-min-height);
+  padding: 6px 8px 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.funnel-fps-hud__value {
+  font-family: var(--funnel-hud-mono-font);
+  font-size: 14px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.funnel-fps-hud[data-tier='high'] .funnel-fps-hud__value {
+  color: var(--funnel-team-ally-muted);
+}
+
+.funnel-fps-hud[data-tier='low'] .funnel-fps-hud__value {
+  color: #ff9a9a;
+}
+
+.funnel-fps-hud__graph {
+  display: block;
+  width: 100%;
+  height: 28px;
 }
 
 .funnel-status {
   position: absolute;
   right: 16px;
-  top: 16px;
+  top: 84px;
   max-width: min(440px, calc(100vw - 32px));
   padding: 10px 12px;
-  border: 1px solid rgba(245, 197, 105, 0.38);
-  border-radius: 8px;
-  background: rgba(22, 17, 8, 0.82);
-  color: #ffdda4;
+  border: 1px solid var(--funnel-hud-panel-border);
+  border-radius: var(--funnel-hud-panel-radius);
+  background: var(--funnel-hud-panel-bg);
+  color: var(--funnel-team-ally-soft);
   font-size: 12px;
   line-height: 1.35;
   opacity: 0;
@@ -158,15 +969,636 @@ body {
 }
 
 @media (max-width: 720px) {
-  .funnel-panel {
+  .funnel-status {
     left: 10px;
-    top: 10px;
-    width: min(300px, calc(100vw - 20px));
-    padding: 11px 12px 12px;
+    right: 10px;
+    top: auto;
+    bottom: 12px;
   }
+}
 
-  .funnel-grid {
-    font-size: 11px;
+.funnel-prematch-host {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background-color: var(--funnel-grid-base);
+  background-image:
+    linear-gradient(var(--funnel-grid-line-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--funnel-grid-line-major) 1px, transparent 1px),
+    linear-gradient(var(--funnel-grid-line-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--funnel-grid-line-minor) 1px, transparent 1px);
+  background-size:
+    var(--funnel-grid-major-step) var(--funnel-grid-major-step),
+    var(--funnel-grid-major-step) var(--funnel-grid-major-step),
+    var(--funnel-grid-minor-step) var(--funnel-grid-minor-step),
+    var(--funnel-grid-minor-step) var(--funnel-grid-minor-step);
+  background-position: center center;
+}
+
+.funnel-prematch-host[hidden] {
+  display: none;
+}
+
+.funnel-prematch-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px 24px 52px;
+}
+
+.funnel-prematch-screen__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(440px, 100%);
+  padding: 18px 16px 16px;
+  border: 1px solid rgba(var(--funnel-team-ally-rgb), 1);
+  border-radius: 0;
+  background: rgba(var(--funnel-surface-rgb), 0.88);
+  text-align: center;
+}
+
+.funnel-prematch-screen__card--loader {
+  width: min(420px, 100%);
+  padding: 20px 18px;
+}
+
+.funnel-prematch-screen__footer {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+}
+
+.funnel-prematch-screen__platform-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.2em 0.45em;
+  margin: 0;
+  color: var(--funnel-text-dim);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: center;
+  line-height: 1;
+  opacity: 0.88;
+  pointer-events: none;
+}
+
+.funnel-prematch-screen__platform-note-part,
+.funnel-prematch-screen__platform-chip {
+  display: inline-flex;
+  align-items: center;
+}
+
+.funnel-prematch-screen__platform-chip {
+  gap: 0.3em;
+}
+
+.funnel-prematch-screen__platform-icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.92;
+}
+
+html.funnel-platform-target .funnel-prematch-screen__platform-note {
+  color: var(--funnel-team-ally-muted);
+}
+
+.funnel-prematch-screen__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(24px, 4vh, 40px);
+  width: min(420px, 100%);
+  text-align: center;
+}
+
+.funnel-prematch-screen__brand-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 22px 14px 20px;
+  border: 1px solid rgba(var(--funnel-team-ally-rgb), 0.35);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+.funnel-prematch-screen__kicker {
+  margin: 0;
+  color: var(--funnel-text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.funnel-prematch-screen__brand {
+  margin: 0;
+  color: var(--funnel-team-ally);
+  font-size: var(--funnel-brand-font-size);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 0.95;
+  text-shadow: 0 0 56px var(--funnel-team-ally-glow);
+}
+
+.funnel-prematch-screen__brand--loader {
+  width: 100%;
+}
+
+.funnel-prematch-screen__tagline {
+  margin: 0;
+  color: var(--funnel-team-ally-soft);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.funnel-prematch-screen__controls {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  width: 100%;
+  margin: 2px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(var(--funnel-surface-muted-rgb), 0.65);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.18);
+  color: #d3deea;
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.funnel-prematch-screen__controls dt {
+  margin: 0;
+  color: var(--funnel-text-dim);
+  font-weight: 700;
+}
+
+.funnel-prematch-screen__controls dd {
+  margin: 0;
+}
+
+.funnel-prematch-screen__tips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  text-align: left;
+}
+
+.funnel-prematch-screen__tip {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--funnel-surface-muted-rgb), 0.55);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.funnel-prematch-screen__tip-title {
+  margin: 0 0 2px;
+  color: var(--funnel-team-ally-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.funnel-prematch-screen__tip-desc {
+  margin: 0;
+  color: #c5d4e4;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.funnel-prematch-screen__tip--orange {
+  border-color: rgba(255, 132, 48, 0.58);
+  background: rgba(255, 120, 32, 0.1);
+}
+
+.funnel-prematch-screen__tip--orange .funnel-prematch-screen__tip-title {
+  color: #ffb04a;
+}
+
+.funnel-prematch-screen__tip--orange .funnel-prematch-screen__tip-desc {
+  color: #ffd2a6;
+}
+
+.funnel-prematch-screen__health-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--funnel-team-enemy-rgb), 0.55);
+  background: rgba(var(--funnel-team-enemy-rgb), 0.08);
+  color: #f0a8a8;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.funnel-prematch-screen__health-warning-title {
+  display: block;
+  margin: 0 0 2px;
+  color: var(--funnel-team-enemy);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.funnel-prematch-screen__start {
+  margin-top: 4px;
+  width: 100%;
+}
+
+.funnel-prematch-screen__progress-label {
+  margin: 0;
+  color: var(--funnel-team-ally-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.funnel-prematch-screen__progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 0;
+  background: rgba(var(--funnel-surface-muted-rgb), 0.95);
+  overflow: hidden;
+}
+
+.funnel-prematch-screen__progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--funnel-team-ally) 0%, var(--funnel-team-ally-muted) 100%);
+  transition: width 120ms ease-out;
+}
+
+.funnel-shell[data-match-phase='ended'] {
+  cursor: default;
+}
+
+.funnel-shell[data-match-phase='ended'] .funnel-canvas {
+  cursor: default;
+}
+
+.funnel-shell[data-match-phase='character-select'] .funnel-hud,
+.funnel-shell[data-match-phase='character-select'] .funnel-status,
+.funnel-shell[data-match-phase='countdown'] .funnel-hud,
+.funnel-shell[data-match-phase='countdown'] .funnel-status,
+.funnel-shell[data-match-phase='ended'] .funnel-hud,
+.funnel-shell[data-match-phase='ended'] .funnel-status {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.funnel-prematch-screen__card--loader-minimal .funnel-prematch-screen__kicker {
+  display: none;
+}
+
+.funnel-prematch-host[data-match-phase='game-loading'] .funnel-prematch-screen__card--loader {
+  width: min(360px, 100%);
+  padding: 22px 20px;
+  gap: 12px;
+}
+
+.funnel-countdown-overlay:not([hidden]),
+.funnel-death-overlay[data-visible='true'],
+.funnel-match-result-overlay[data-visible='true'] {
+  -webkit-backdrop-filter: blur(var(--funnel-overlay-blur));
+  backdrop-filter: blur(var(--funnel-overlay-blur));
+}
+
+.funnel-countdown-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 50% at 50% 50%,
+    var(--funnel-overlay-scrim-center),
+    var(--funnel-overlay-scrim-edge)
+  );
+  pointer-events: none;
+}
+
+.funnel-countdown-overlay__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.funnel-countdown-overlay__kicker {
+  margin: 0;
+  color: var(--funnel-text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.funnel-countdown-overlay__value {
+  color: var(--funnel-text);
+  font-size: clamp(4rem, 18vw, 7rem);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 48px var(--funnel-team-ally-glow);
+}
+
+.funnel-countdown-overlay__tagline {
+  margin: 0;
+  color: var(--funnel-team-ally-soft);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.funnel-character-select-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 24px 36px;
+  pointer-events: none;
+}
+
+.funnel-character-select-overlay__title {
+  margin: 0;
+  color: var(--funnel-text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.funnel-character-select-overlay__roster {
+  display: flex;
+  justify-content: center;
+  gap: clamp(3.5rem, 22vw, 7rem);
+  width: min(520px, 100%);
+}
+
+.funnel-character-select-overlay__name {
+  margin: 0;
+  color: var(--funnel-text-muted);
+  font-size: clamp(1rem, 3.2vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  transition:
+    color 140ms ease,
+    text-shadow 140ms ease;
+}
+
+.funnel-character-select-overlay__name[data-hovered='true'] {
+  color: var(--funnel-text);
+  text-shadow: 0 0 32px var(--funnel-team-ally-glow);
+}
+
+.funnel-death-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: none;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.funnel-death-overlay[data-visible='true'] {
+  display: grid;
+  background: radial-gradient(
+    ellipse 70% 50% at 50% 50%,
+    var(--funnel-overlay-scrim-danger-center),
+    var(--funnel-overlay-scrim-edge)
+  );
+}
+
+.funnel-death-overlay__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.funnel-death-overlay__title {
+  margin: 0;
+  color: #ff4a3d;
+  font-size: clamp(2.4rem, 12vw, 4.5rem);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-shadow: 0 0 40px rgba(255, 74, 61, 0.55);
+}
+
+.funnel-death-overlay__kicker {
+  margin: 0;
+  color: var(--funnel-text-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.funnel-death-overlay__value {
+  color: var(--funnel-text);
+  font-size: clamp(4rem, 18vw, 7rem);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 48px var(--funnel-team-ally-glow);
+}
+
+.funnel-match-result-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.funnel-match-result-overlay[data-visible='true'] {
+  display: grid;
+  pointer-events: auto;
+  cursor: default;
+  background: radial-gradient(
+    ellipse 70% 50% at 50% 50%,
+    var(--funnel-overlay-scrim-center),
+    var(--funnel-overlay-scrim-edge)
+  );
+}
+
+.funnel-match-result-overlay[data-visible='true'][data-outcome='lost'] {
+  background: radial-gradient(
+    ellipse 70% 50% at 50% 50%,
+    var(--funnel-overlay-scrim-danger-center),
+    var(--funnel-overlay-scrim-edge)
+  );
+}
+
+.funnel-match-result-overlay__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: min(440px, calc(100vw - 48px));
+  text-align: center;
+}
+
+.funnel-match-result-overlay__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.funnel-match-result-overlay__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.funnel-match-result-overlay__section-label {
+  margin: 0;
+  color: var(--funnel-text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.funnel-match-result-overlay__personal {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.funnel-match-result-overlay__metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.funnel-match-result-overlay__metric-value {
+  color: var(--funnel-text);
+  font-family: var(--funnel-hud-mono-font);
+  font-size: clamp(1.35rem, 5vw, 1.75rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.funnel-match-result-overlay__metric-label {
+  color: var(--funnel-text-muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.funnel-match-result-overlay__teams {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.funnel-match-result-overlay__team {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 2px;
+}
+
+.funnel-match-result-overlay__team-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.funnel-match-result-overlay__team--own .funnel-match-result-overlay__team-label {
+  color: var(--funnel-team-ally);
+}
+
+.funnel-match-result-overlay__team--enemy .funnel-match-result-overlay__team-label {
+  color: var(--funnel-team-enemy);
+}
+
+.funnel-match-result-overlay__team-metrics {
+  color: var(--funnel-text-muted);
+  font-family: var(--funnel-hud-mono-font);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.funnel-match-result-overlay[data-outcome='lost'] .funnel-match-result-overlay__team--own .funnel-match-result-overlay__team-label {
+  color: var(--funnel-text);
+}
+
+.funnel-match-result-overlay[data-outcome='lost'] .funnel-match-result-overlay__team--enemy .funnel-match-result-overlay__team-label {
+  color: #ff6a5c;
+}
+
+.funnel-match-result-overlay__title {
+  margin: 0;
+  font-size: clamp(2rem, 10vw, 3.6rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.funnel-match-result-overlay[data-outcome='won'] .funnel-match-result-overlay__title {
+  color: var(--funnel-team-ally);
+}
+
+.funnel-match-result-overlay[data-outcome='lost'] .funnel-match-result-overlay__title {
+  color: #ff4a3d;
+}
+
+.funnel-match-result-overlay__action {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .funnel-personal-stats {
+    top: 10px;
+    left: 10px;
   }
 
   .funnel-status {

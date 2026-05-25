@@ -7,7 +7,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.json', './_growing_trees/tsconfig.json'],
+        project: ['./tsconfig.json'],
         tsconfigRootDir: import.meta.dirname
       }
     }
@@ -54,7 +54,10 @@ export default tseslint.config(
     }
   },
   {
-    files: ['src/game/game-materials/wood/wood-node-material.ts'],
+    files: [
+      'src/game/game-materials/wood/wood-node-material.ts',
+      'src/render/materials/**/*.ts'
+    ],
     rules: {
       '@typescript-eslint/ban-ts-comment': 'off',
       // TSL / three.js nodematerial: heavy any from upstream typings; keep local shader readable.
@@ -97,22 +100,25 @@ export default tseslint.config(
     }
   },
   {
+    files: ['src/render/dispose-three.ts'],
+    rules: {
+      // Central Three.js traverse dispose — Mesh generics from `instanceof` are loose upstream.
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off'
+    }
+  },
+  {
     ignores: [
       'dist/**',
       'node_modules/**',
       '_deleted/**',
       '_from_github/**',
       '.backups/**',
-      '_growing_trees/.backups/**',
-      '_growing_trees/_deleted/**',
-      '_growing_trees/dist/**',
-      '_growing_trees/reference/**',
-      '_growing_trees/vite.config.ts',
-      '_growing_trees_erste-versionen/**',
+      'docs/_examples/**',
       'eslint.config.js',
       'vite.config.ts',
       'scripts/**',
-      '_growing_trees/scripts/**',
       '_Scripts/**/*.mjs',
       '_Learnings/**',
       'src/character-new/**',

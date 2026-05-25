@@ -5,55 +5,72 @@ import {
   type AnimationMixer
 } from 'three/webgpu';
 import type { AnimationClipRegistry } from './animation-clip-registry';
+import { resolveLocomotionBlendInto, type LocomotionBlendResult, type LocomotionBlendRole } from './locomotion-blend';
+import {
+  advanceLocomotionPhase,
+  locomotionGaitReferenceClipId,
+  locomotionSyncSpeedMps
+} from './locomotion-stride-sync';
+import { CROUCH_LOCOMOTION_CLIP_ID } from './player-stance';
+import type { JumpStyle } from './player-jump';
+import { VERTICAL_JUMP_SUBCLIP_IDS } from './vertical-jump-subclips';
 
-const CROSSFADE_LOCOMOTION = 0.12;
-const CROSSFADE_TRANSITION = 0.08;
+const CROSSFADE_LOCOMOTION = 0.15;
+const CROSSFADE_CROUCH = 0.1;
 const CROSSFADE_FAST = 0.05;
 const FIRE_OVERLAY_FADE_OUT = 0.06;
 const FIRE_OVERLAY_WEIGHT_IDLE = 1;
 const FIRE_OVERLAY_WEIGHT_MOVING = 0.72;
-const TIMESCALE_MIN = 0.55;
-const TIMESCALE_MAX = 1.65;
 
-/** Tuned in-game: m/s the clip visually matches at timeScale 1. */
-const CLIP_REFERENCE_SPEED_MPS: Partial<Record<string, number>> = {
-  walking: 1.35,
-  'rifle-run': 5.2,
-  'walking-backwards': 1.2,
-  'run-backwards': 4.5,
-  strafe: 1.3,
-  'strafe-2': 1.3
+const JUMP_CLIP_TIMESCALE: Record<JumpStyle, number> = {
+  idle: 0.88,
+  walk: 1.05,
+  run: 1.28,
+  backward: 1
 };
 
+const CROSSFADE_LAND = 0.16;
+
+const LAND_CLIP_TIMESCALE: Record<JumpStyle, number> = {
+  idle: 1,
+  walk: 1.12,
+  run: 1.22,
+  backward: 1.08
+};
+
+const LAND_BLEND_OUT_IDLE_FULL = 0.9;
+const LAND_BLEND_OUT_MOVING = 0.46;
+
 const ONE_SHOT_CLIPS = new Set([
-  'start-walking',
-  'stop-walking',
-  'start-walking-backwards',
-  'walk-backwards-stop',
   'jump-forward',
   'jump-backward',
+  'jump-up-takeoff',
+  'jump-down-land',
   'firing-rifle',
   'walking-to-dying'
 ]);
 
-/** Strafe clips swapped: A = strafe-2, D = strafe (matches in-game strafe direction). */
 const CLIP = {
   idle: 'rifle-aiming-idle',
-  forwardWalk: 'walking',
-  forwardRun: 'rifle-run',
-  backwardWalk: 'walking-backwards',
-  backwardRun: 'run-backwards',
-  strafeLeft: 'strafe-2',
-  strafeRight: 'strafe',
   jumpForward: 'jump-forward',
   jumpBackward: 'jump-backward',
   fire: 'firing-rifle',
   death: 'walking-to-dying',
-  forwardStart: 'start-walking',
-  forwardStop: 'stop-walking',
-  backwardStart: 'start-walking-backwards',
-  backwardStop: 'walk-backwards-stop'
+  crouchIdle: CROUCH_LOCOMOTION_CLIP_ID
 } as const;
+
+const HARD_SWITCH_LOCOMOTION_CLIPS: Set<string> = new Set([
+  CLIP.jumpForward,
+  CLIP.jumpBackward,
+  CLIP.death,
+  VERTICAL_JUMP_SUBCLIP_IDS.takeoff
+]);
+
+type BlendLayerSlot = {
+  action: AnimationAction;
+  clipId: string;
+  clipDuration: number;
+};
 
 export interface LocomotionAnimInput {
   movement: {
@@ -69,66 +86,74 @@ export interface LocomotionAnimInput {
   sliding: boolean;
   fireStarted: boolean;
   isDead: boolean;
-  /** Horizontal capsule speed (m/s) for walk/run timeScale sync. */
-  planarSpeed: number;
+  planarSpeedBody: number;
+  planarSpeedTarget: number;
+  jumpStyle: JumpStyle;
+  landedFromAir: boolean;
 }
 
-type LocomotionIntent =
-  | 'idle'
-  | 'forwardWalk'
-  | 'forwardRun'
-  | 'backwardWalk'
-  | 'backwardRun'
-  | 'strafeLeft'
-  | 'strafeRight'
-  | 'jumpForward'
-  | 'jumpBackward'
-  | 'fire'
-  | 'death';
+type LocomotionAnimInputParams = Omit<LocomotionAnimInput, 'crouch' | 'sliding'> &
+  Partial<Pick<LocomotionAnimInput, 'crouch' | 'sliding'>>;
 
-type TransitionKind = 'none' | 'forwardStart' | 'forwardStop' | 'backwardStart' | 'backwardStop';
+/** Fills `out` in place — no allocation on hot path. */
+export function buildLocomotionAnimInputInto(
+  out: LocomotionAnimInput,
+  params: LocomotionAnimInputParams
+): LocomotionAnimInput {
+  out.movement = params.movement;
+  out.sprint = params.sprint;
+  out.grounded = params.grounded;
+  out.airborne = params.airborne;
+  out.crouch = params.crouch ?? false;
+  out.sliding = params.sliding ?? false;
+  out.fireStarted = params.fireStarted;
+  out.isDead = params.isDead;
+  out.planarSpeedBody = params.planarSpeedBody;
+  out.planarSpeedTarget = params.planarSpeedTarget;
+  out.jumpStyle = params.jumpStyle;
+  out.landedFromAir = params.landedFromAir;
+  return out;
+}
+
+/** Shared player + bot locomotion payload — `crouch` / `sliding` default to false. */
+export function buildLocomotionAnimInput(params: LocomotionAnimInputParams): LocomotionAnimInput {
+  return buildLocomotionAnimInputInto(
+    {
+      movement: params.movement,
+      sprint: params.sprint,
+      grounded: params.grounded,
+      airborne: params.airborne,
+      crouch: false,
+      sliding: false,
+      fireStarted: params.fireStarted,
+      isDead: params.isDead,
+      planarSpeedBody: params.planarSpeedBody,
+      planarSpeedTarget: params.planarSpeedTarget,
+      jumpStyle: params.jumpStyle,
+      landedFromAir: params.landedFromAir
+    },
+    params
+  );
+}
 
 export class LocomotionAnimController {
   readonly #registry: AnimationClipRegistry;
   readonly #mixer: AnimationMixer;
+  /** Single-clip path: idle, airborne, land, crouch, death. */
   #locomotion: AnimationAction | null = null;
   #locomotionClipId: string = CLIP.idle;
+  readonly #blendLayers = new Map<LocomotionBlendRole, BlendLayerSlot>();
+  #dominantBlendClipId: string = CLIP.idle;
+  readonly #blendScratch: LocomotionBlendResult = { idle: true, layers: [], dominantClipId: CLIP.idle };
+  /** Shared 0–1 footfall phase for all blend-space layers (Unreal-style sync). */
+  #locomotionPhase = 0;
   #overlay: AnimationAction | null = null;
-  #lastIntent: LocomotionIntent = 'idle';
-  #transition: TransitionKind = 'none';
   #jumpPlayedThisAirborne = false;
+  #deathPoseSettled = false;
 
   readonly #handleFinished = (event: { action: AnimationAction }): void => {
     if (event.action === this.#overlay) {
       this.#overlay = null;
-      return;
-    }
-
-    if (event.action !== this.#locomotion) {
-      return;
-    }
-
-    if (this.#transition === 'forwardStart') {
-      this.#transition = 'none';
-      this.#playLocomotionClip(CLIP.forwardWalk, { fade: CROSSFADE_TRANSITION });
-      return;
-    }
-
-    if (this.#transition === 'forwardStop') {
-      this.#transition = 'none';
-      this.#playLocomotionClip(CLIP.idle, { fade: CROSSFADE_LOCOMOTION });
-      return;
-    }
-
-    if (this.#transition === 'backwardStart') {
-      this.#transition = 'none';
-      this.#playLocomotionClip(CLIP.backwardWalk, { fade: CROSSFADE_TRANSITION });
-      return;
-    }
-
-    if (this.#transition === 'backwardStop') {
-      this.#transition = 'none';
-      this.#playLocomotionClip(CLIP.idle, { fade: CROSSFADE_LOCOMOTION });
     }
   };
 
@@ -140,6 +165,12 @@ export class LocomotionAnimController {
   }
 
   update(deltaSeconds: number, input: LocomotionAnimInput): void {
+    this.#pauseBlendLayerClocks();
+
+    if (input.isDead && this.#deathPoseSettled) {
+      return;
+    }
+
     this.#mixer.update(deltaSeconds);
 
     if (!input.airborne) {
@@ -148,98 +179,271 @@ export class LocomotionAnimController {
 
     if (input.isDead) {
       this.#fadeOutOverlay();
-      this.#transition = 'none';
       if (this.#locomotionClipId !== CLIP.death) {
+        this.#deathPoseSettled = false;
+        this.#stopBlendLayers();
         this.#playLocomotionClip(
           this.#registry.hasClip(CLIP.death) ? CLIP.death : CLIP.idle,
-          { once: true, fade: CROSSFADE_FAST }
+          { once: true, immediate: true }
         );
+      } else if (this.#locomotion !== null) {
+        this.#locomotion.timeScale = 1;
+        if (!this.#locomotion.isRunning()) {
+          this.#deathPoseSettled = true;
+        }
       }
       return;
     }
 
+    this.#deathPoseSettled = false;
+
     if (input.airborne) {
-      this.#transition = 'none';
       this.#updateAirborne(input);
-      this.#syncLocomotionTimeScale(input);
+      this.#syncExclusiveTimeScale(input);
       return;
     }
 
     if (input.fireStarted) {
-      this.#playFireOverlay(input.planarSpeed > 0.15);
+      this.#playFireOverlay(this.#syncSpeed(input) > 0.15);
     }
 
     if (input.crouch || input.sliding) {
-      this.#transition = 'none';
-      this.#playIntent('idle');
+      this.#clearBlendLayers();
+      this.#playCrouchStance();
+      this.#syncExclusiveTimeScale(input);
       return;
     }
 
-    if (this.#transition !== 'none') {
-      const intent = this.#resolveIntent(input);
-      if (this.#shouldInterruptTransition(intent)) {
-        this.#transition = 'none';
-        this.#playIntent(intent);
-      }
-      return;
-    }
-
-    this.#updateGround(input);
-    this.#syncLocomotionTimeScale(input);
+    this.#updateGround(deltaSeconds, input);
   }
 
   get currentClipId(): string {
+    if (this.#blendLayers.size > 0) {
+      return this.#dominantBlendClipId;
+    }
+
     return this.#locomotionClipId;
   }
 
-  #shouldInterruptTransition(intent: LocomotionIntent): boolean {
-    if (this.#transition === 'forwardStart' || this.#transition === 'forwardStop') {
-      return intent === 'forwardRun' || intent === 'strafeLeft' || intent === 'strafeRight';
-    }
+  /** Death clip finished — mixer frozen; skip mesh/eye sync on visual pass. */
+  get deathPoseSettled(): boolean {
+    return this.#deathPoseSettled;
+  }
 
-    if (this.#transition === 'backwardStart' || this.#transition === 'backwardStop') {
-      return intent === 'backwardRun' || intent === 'strafeLeft' || intent === 'strafeRight';
-    }
-
-    return false;
+  /** After bot respawn — leave death pose and return to idle locomotion. */
+  reviveToIdle(): void {
+    this.#deathPoseSettled = false;
+    this.#fadeOutOverlay();
+    this.#clearBlendLayers();
+    this.#jumpPlayedThisAirborne = false;
+    this.#playLocomotionClip(CLIP.idle, { immediate: true });
   }
 
   #updateAirborne(input: LocomotionAnimInput): void {
-    const intent = this.#resolveIntent(input);
-    const jumpClipId = intent === 'jumpBackward' ? CLIP.jumpBackward : CLIP.jumpForward;
+    this.#clearBlendLayers();
+    const takeoffClipId = this.#takeoffClipId(input);
 
     if (!this.#jumpPlayedThisAirborne) {
-      this.#lastIntent = intent;
       this.#jumpPlayedThisAirborne = true;
-      this.#playLocomotionClip(jumpClipId, { once: true, fade: CROSSFADE_FAST });
+      this.#playLocomotionClip(takeoffClipId, { once: true, immediate: true });
+      this.#applyJumpClipTimeScale(input.jumpStyle);
       return;
     }
 
-    const jumpStillPlaying =
-      this.#locomotionClipId === jumpClipId && this.#locomotion !== null && this.#locomotion.isRunning();
+    const takeoffStillPlaying =
+      this.#locomotionClipId === takeoffClipId &&
+      this.#locomotion !== null &&
+      this.#locomotion.isRunning();
 
-    if (jumpStillPlaying) {
+    if (takeoffStillPlaying) {
       return;
     }
 
-    const fallClipId = this.#clipForIntent(intent === 'idle' ? 'idle' : intent);
-    if (this.#locomotionClipId === fallClipId && this.#locomotion?.isRunning()) {
+    if (this.#locomotionClipId === CLIP.idle && this.#locomotion?.isRunning()) {
       return;
     }
 
-    this.#lastIntent = intent;
-    this.#playLocomotionClip(fallClipId, { fade: CROSSFADE_LOCOMOTION });
+    this.#playLocomotionClip(CLIP.idle, { fade: CROSSFADE_LOCOMOTION });
   }
 
-  #updateGround(input: LocomotionAnimInput): void {
-    const intent = this.#resolveIntent(input);
-    this.#playIntent(intent);
+  #takeoffClipId(input: LocomotionAnimInput): string {
+    if (input.movement.back && !input.movement.forward && this.#registry.hasClip(CLIP.jumpBackward)) {
+      return CLIP.jumpBackward;
+    }
+
+    if (input.movement.forward && this.#registry.hasClip(CLIP.jumpForward)) {
+      return CLIP.jumpForward;
+    }
+
+    if (this.#registry.hasClip(VERTICAL_JUMP_SUBCLIP_IDS.takeoff)) {
+      return VERTICAL_JUMP_SUBCLIP_IDS.takeoff;
+    }
+
+    return this.#registry.hasClip(CLIP.jumpForward) ? CLIP.jumpForward : CLIP.idle;
   }
 
-  #playIntent(intent: LocomotionIntent): void {
-    const clipId = this.#clipForIntent(intent);
+  #updateGround(deltaSeconds: number, input: LocomotionAnimInput): void {
+    if (this.#registry.hasClip(VERTICAL_JUMP_SUBCLIP_IDS.land)) {
+      if (input.landedFromAir) {
+        this.#clearBlendLayers();
+        this.#locomotionPhase = 0;
+        this.#playLocomotionClip(VERTICAL_JUMP_SUBCLIP_IDS.land, {
+          once: true,
+          fade: CROSSFADE_LAND
+        });
+        return;
+      }
+
+      if (this.#locomotionClipId === VERTICAL_JUMP_SUBCLIP_IDS.land) {
+        if (this.#locomotion?.isRunning() && !this.#shouldBlendOutOfLand(input)) {
+          return;
+        }
+
+        if (this.#locomotion !== null && this.#locomotion.getEffectiveWeight() > 0.01) {
+          this.#fadeOutExclusiveLocomotion();
+        }
+      }
+    }
+
+    const blend = resolveLocomotionBlendInto(this.#blendScratch, {
+      movement: input.movement,
+      sprint: input.sprint
+    });
+
+    if (blend.idle) {
+      this.#clearBlendLayers();
+      this.#locomotionPhase = 0;
+      this.#playLocomotionClip(CLIP.idle, { fade: CROSSFADE_LOCOMOTION });
+      return;
+    }
+
+    this.#dominantBlendClipId = blend.dominantClipId;
+
+    for (const role of ['forward', 'strafe'] as const) {
+      let layer: (typeof blend.layers)[number] | undefined;
+      for (let index = 0; index < blend.layers.length; index += 1) {
+        if (blend.layers[index].role === role) {
+          layer = blend.layers[index];
+          break;
+        }
+      }
+      if (layer === undefined) {
+        this.#fadeOutBlendLayer(role);
+        continue;
+      }
+
+      this.#setBlendLayer(role, layer.clipId, layer.weight);
+    }
+
+    const syncSpeed = this.#syncSpeed(input);
+    this.#locomotionPhase = advanceLocomotionPhase(
+      this.#locomotionPhase,
+      syncSpeed,
+      locomotionGaitReferenceClipId(input.sprint),
+      deltaSeconds
+    );
+    this.#applyLocomotionPhase();
+  }
+
+  #setBlendLayer(role: LocomotionBlendRole, clipId: string, weight: number): void {
+    const action = this.#registry.getAction(clipId);
+    if (action === undefined) {
+      return;
+    }
+
+    const existing = this.#blendLayers.get(role);
+    if (existing !== undefined && existing.clipId === clipId) {
+      existing.action.enabled = true;
+      existing.action.setEffectiveWeight(weight);
+      return;
+    }
+
+    const isFirstBlendLayer = this.#blendLayers.size === 0;
+    const handoffAction =
+      isFirstBlendLayer &&
+      this.#locomotion !== null &&
+      this.#locomotion.getEffectiveWeight() > 0.01
+        ? this.#locomotion
+        : null;
+
+    if (existing !== undefined) {
+      existing.action.fadeOut(CROSSFADE_LOCOMOTION);
+      this.#blendLayers.delete(role);
+    }
+
+    action.setLoop(LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.enabled = true;
+    action.timeScale = 0;
+    action.setEffectiveWeight(weight);
+    action.play();
+
+    if (handoffAction !== null) {
+      action.crossFadeFrom(handoffAction, CROSSFADE_LOCOMOTION, true);
+      this.#locomotion = null;
+      this.#locomotionClipId = CLIP.idle;
+    }
+
+    this.#blendLayers.set(role, {
+      action,
+      clipId,
+      clipDuration: this.#registry.getClip(clipId)?.duration ?? 1
+    });
+  }
+
+  #fadeOutBlendLayer(role: LocomotionBlendRole): void {
+    const slot = this.#blendLayers.get(role);
+    if (slot === undefined) {
+      return;
+    }
+
+    slot.action.fadeOut(CROSSFADE_LOCOMOTION);
+    this.#blendLayers.delete(role);
+  }
+
+  #clearBlendLayers(): void {
+    for (const role of ['forward', 'strafe'] as const) {
+      this.#fadeOutBlendLayer(role);
+    }
+  }
+
+  #stopBlendLayers(): void {
+    for (const slot of this.#blendLayers.values()) {
+      slot.action.stop();
+      slot.action.enabled = false;
+    }
+    this.#blendLayers.clear();
+  }
+
+  #pauseBlendLayerClocks(): void {
+    for (const slot of this.#blendLayers.values()) {
+      slot.action.timeScale = 0;
+    }
+  }
+
+  #applyLocomotionPhase(): void {
+    for (const slot of this.#blendLayers.values()) {
+      if (slot.clipDuration <= 0) {
+        continue;
+      }
+
+      slot.action.time = this.#locomotionPhase * slot.clipDuration;
+    }
+  }
+
+  #fadeOutExclusiveLocomotion(): void {
+    if (this.#locomotion === null) {
+      return;
+    }
+
+    this.#locomotion.fadeOut(CROSSFADE_LOCOMOTION);
+    this.#locomotion = null;
+    this.#locomotionClipId = CLIP.idle;
+  }
+
+  #playCrouchStance(): void {
+    const clipId = this.#registry.hasClip(CLIP.crouchIdle) ? CLIP.crouchIdle : CLIP.idle;
     if (
-      this.#lastIntent === intent &&
       this.#locomotionClipId === clipId &&
       this.#locomotion !== null &&
       this.#locomotion.isRunning()
@@ -247,70 +451,9 @@ export class LocomotionAnimController {
       return;
     }
 
-    this.#lastIntent = intent;
-    this.#playLocomotionClip(clipId, { fade: CROSSFADE_LOCOMOTION });
-  }
-
-  #resolveIntent(input: LocomotionAnimInput): LocomotionIntent {
-    if (input.isDead) {
-      return 'death';
-    }
-
-    if (input.airborne) {
-      if (input.movement.forward) {
-        return 'jumpForward';
-      }
-
-      if (input.movement.back) {
-        return 'jumpBackward';
-      }
-
-      return 'jumpForward';
-    }
-
-    if (input.movement.forward) {
-      return input.sprint ? 'forwardRun' : 'forwardWalk';
-    }
-
-    if (input.movement.back) {
-      return input.sprint ? 'backwardRun' : 'backwardWalk';
-    }
-
-    if (input.movement.left && !input.movement.right) {
-      return 'strafeLeft';
-    }
-
-    if (input.movement.right && !input.movement.left) {
-      return 'strafeRight';
-    }
-
-    return 'idle';
-  }
-
-  #clipForIntent(intent: LocomotionIntent): string {
-    switch (intent) {
-      case 'idle':
-        return CLIP.idle;
-      case 'forwardWalk':
-        return CLIP.forwardWalk;
-      case 'forwardRun':
-        return CLIP.forwardRun;
-      case 'backwardWalk':
-        return CLIP.backwardWalk;
-      case 'backwardRun':
-        return CLIP.backwardRun;
-      case 'strafeLeft':
-        return CLIP.strafeLeft;
-      case 'strafeRight':
-        return CLIP.strafeRight;
-      case 'jumpForward':
-        return CLIP.jumpForward;
-      case 'jumpBackward':
-        return CLIP.jumpBackward;
-      case 'fire':
-        return CLIP.fire;
-      case 'death':
-        return CLIP.death;
+    this.#playLocomotionClip(clipId, { fade: CROSSFADE_CROUCH });
+    if (this.#locomotion !== null) {
+      this.#locomotion.timeScale = 1;
     }
   }
 
@@ -349,6 +492,7 @@ export class LocomotionAnimController {
     clipId: string,
     options: { fade?: number; once?: boolean; immediate?: boolean } = {}
   ): void {
+    this.#clearBlendLayers();
     const action = this.#registry.getAction(clipId);
     if (action === undefined) {
       return;
@@ -362,15 +506,22 @@ export class LocomotionAnimController {
       return;
     }
 
+    const hardSwitch =
+      options.immediate === true || HARD_SWITCH_LOCOMOTION_CLIPS.has(clipId);
+    if (hardSwitch) {
+      this.#stopLocomotionAction();
+    }
+
     const once = options.once ?? ONE_SHOT_CLIPS.has(clipId);
     action.reset();
     action.setLoop(once ? LoopOnce : LoopRepeat, once ? 1 : Infinity);
     action.clampWhenFinished = once;
     action.enabled = true;
     action.setEffectiveWeight(1);
+    action.timeScale = 1;
     action.play();
 
-    if (this.#locomotion !== null && !options.immediate) {
+    if (this.#locomotion !== null && !hardSwitch) {
       this.#locomotion.crossFadeTo(action, options.fade ?? CROSSFADE_LOCOMOTION, true);
     }
 
@@ -378,19 +529,76 @@ export class LocomotionAnimController {
     this.#locomotionClipId = clipId;
   }
 
-  #syncLocomotionTimeScale(input: LocomotionAnimInput): void {
+  #stopLocomotionAction(): void {
     if (this.#locomotion === null) {
       return;
     }
 
-    const reference = CLIP_REFERENCE_SPEED_MPS[this.#locomotionClipId];
-    if (reference === undefined || reference <= 0) {
-      this.#locomotion.timeScale = 1;
+    this.#locomotion.stop();
+    this.#locomotion.setEffectiveWeight(0);
+    this.#locomotion.enabled = false;
+  }
+
+  #syncSpeed(input: LocomotionAnimInput): number {
+    return locomotionSyncSpeedMps(input.planarSpeedBody, input.planarSpeedTarget);
+  }
+
+  #syncExclusiveTimeScale(input: LocomotionAnimInput): void {
+    if (this.#locomotion === null) {
       return;
     }
 
-    const speed = Math.max(input.planarSpeed, reference * TIMESCALE_MIN);
-    const scale = speed / reference;
-    this.#locomotion.timeScale = Math.min(TIMESCALE_MAX, Math.max(TIMESCALE_MIN, scale));
+    if (
+      this.#locomotionClipId === CLIP.jumpForward ||
+      this.#locomotionClipId === CLIP.jumpBackward ||
+      this.#locomotionClipId === VERTICAL_JUMP_SUBCLIP_IDS.takeoff
+    ) {
+      this.#applyJumpClipTimeScale(input.jumpStyle);
+      return;
+    }
+
+    if (this.#locomotionClipId === VERTICAL_JUMP_SUBCLIP_IDS.land) {
+      this.#locomotion.timeScale = LAND_CLIP_TIMESCALE[input.jumpStyle];
+      return;
+    }
+
+    this.#locomotion.timeScale = 1;
+  }
+
+  #applyJumpClipTimeScale(style: JumpStyle): void {
+    if (this.#locomotion === null) {
+      return;
+    }
+
+    this.#locomotion.timeScale = JUMP_CLIP_TIMESCALE[style];
+  }
+
+  #shouldBlendOutOfLand(input: LocomotionAnimInput): boolean {
+    if (this.#locomotion === null || this.#locomotionClipId !== VERTICAL_JUMP_SUBCLIP_IDS.land) {
+      return true;
+    }
+
+    const clip = this.#registry.getClip(VERTICAL_JUMP_SUBCLIP_IDS.land);
+    if (clip === undefined || clip.duration <= 0) {
+      return true;
+    }
+
+    const progress = this.#locomotion.time / clip.duration;
+    if (progress >= 0.98) {
+      return true;
+    }
+
+    const moving =
+      input.movement.forward ||
+      input.movement.back ||
+      input.movement.left ||
+      input.movement.right;
+    const movingJump = input.jumpStyle === 'run' || input.jumpStyle === 'walk';
+
+    if (movingJump || moving) {
+      return progress >= LAND_BLEND_OUT_MOVING;
+    }
+
+    return progress >= LAND_BLEND_OUT_IDLE_FULL;
   }
 }

@@ -22,6 +22,14 @@ export default defineConfig({
     __BUNDLED_DEV__: 'false',
     __APP_VERSION__: JSON.stringify('v.0.0.1')
   },
+  build: {
+    rollupOptions: {
+      input: {
+        index: path.join(root, 'index.html'),
+        game: path.join(root, 'game.html')
+      }
+    }
+  },
   resolve: {
     dedupe: ['@dimforge/rapier3d-simd-compat'],
     /** Only the bare `three` specifier — do not match `three/webgpu` or `three/addons/...`. */
@@ -33,6 +41,12 @@ export default defineConfig({
   },
   server: {
     port: 3011,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp'
+    }
+  },
+  preview: {
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp'

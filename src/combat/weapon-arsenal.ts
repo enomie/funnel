@@ -1,80 +1,235 @@
-import RAPIER from '@dimforge/rapier3d-simd-compat';
-import type { Collider, World } from '@dimforge/rapier3d-simd-compat';
+import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import {
-  BufferGeometry,
-  Line,
-  LineBasicMaterial,
-  Mesh,
-  MeshBasicMaterial,
   Object3D,
-  PointLight,
   Scene,
-  SphereGeometry,
   Vector3
 } from 'three/webgpu';
-import type { BuildingSystem } from '../arena/building-system';
-import type { CameraVectors } from '../player/player-camera';
-import { alignProjectileVisual, createProjectileVisual } from './projectile-visuals';
-import { WEAPON_DEFINITIONS, type WeaponDefinition } from './weapon-definitions';
+import {
+  configureViewmodelAttachedProjectilePreview,
+  createProjectileVisual,
+  releaseViewmodelAttachedProjectilePreview,
+  resetProjectileTransform,
+  syncMuzzleAttachedPreviewPosition
+} from './projectile-visuals';
+import {
+  applyImpact,
+  type ApplyImpactDeps,
+  type ApplyImpactRequest,
+  type CombatImpactSink
+} from './apply-impact';
+import { BioChargeState } from './bio-charge';
+import { IMPACT_GAIN_NORMAL } from '../game-audio/audio-config';
+import type { WeaponAudio } from '../game-audio/audio-weapon/audio-weapon';
+import type { ChargeHoldMechanicsState } from '../game-audio/audio-weapon/audio-weapon-charge-hold';
+import type { SphereInstancingService } from '../render/sphere-instancing';
+import type { SegmentLineInstancingService } from '../render/segment-line-instancing';
+import { HitscanWeapon, type ShockComboFireContext } from './hitscan-weapon';
+import { type ShockOrbRayHit } from './shock-combo';
+import type { FactionTeam } from './teams';
+import {
+  fireDeliveryFor,
+  fireInputOpen,
+  fireProfileForMode,
+  fireTriggerFor,
+  impactProfileForMode,
+  secondaryFireEnabled,
+  weaponHasBioChargeSecondary,
+  weaponHasRocketMagazine,
+  WEAPON_DEFINITIONS,
+  type FireProfile,
+  type ImpactProfile,
+  type WeaponDefinition,
+  type WeaponFireMode
+} from './weapon-definitions';
+import {
+  bioChargeAmmoCost,
+  WeaponAmmoController,
+  type AmmoHudSnapshot
+} from './ammo-controller';
+import {
+  resolveRocketBarrelSpawn,
+  resolveRocketVolleyDirection,
+  ROCKET_VOLLEY_SHOT_INTERVAL_MS,
+  RocketLauncherMagazine
+} from './rocket-launcher';
+import {
+  applyLobBiasInto,
+  eachProjectileDirection,
+  type WorldProjectileSim
+} from './world-projectile-sim';
+import {
+  projectileIsGuidedRedeemer,
+  type GuidedRedeemerCameraState,
+  RedeemerGuidedFlight
+} from './redeemer-guided';
+import { rollSpawnWeapon, spawnWeaponSlotIndex } from './spawn-weapon-roll';
+import { resolveWeaponEngageRangeM } from './weapon-aim';
+import {
+  registerWorldEffectsSource,
+  unregisterWorldEffectsSource,
+  type WorldEffectsSource
+} from './world-effects-registry';
 
-const RIPPER_RICOCHET_LIMIT = 3;
-const BOUNCE_SURFACE_NUDGE = 0.035;
-const MIN_STEP_DISTANCE = 0.001;
-const MAX_COLLISION_STEPS_PER_FRAME = RIPPER_RICOCHET_LIMIT + 1;
-const PROJECTILE_LIGHT_POOL_SIZE = 8;
-const PROJECTILE_LIGHT_INTENSITY = 2.35;
-const PROJECTILE_LIGHT_RANGE = 7.2;
-const PROJECTILE_LIGHT_DECAY = 1.45;
-const TRAIL_SPAWN_INTERVAL_MS = 26;
-const TRAIL_OPACITY = 0.94;
-const TRAIL_REMOVE_AFTER_MS = 90;
-const IMPACT_REMOVE_AFTER_MS = 210;
-const TRAIL_MATERIAL_CACHE = new Map<number, LineBasicMaterial>();
-const IMPACT_MATERIAL_CACHE = new Map<number, MeshBasicMaterial>();
-const IMPACT_GEOMETRY_CACHE = new Map<number, SphereGeometry>();
+const SHOCK_COMBO_IMPACT_GAIN = IMPACT_GAIN_NORMAL * 1.75;
 
-interface ActiveProjectile {
-  weapon: WeaponDefinition;
-  object: Object3D;
-  position: Vector3;
-  direction: Vector3;
-  traveled: number;
-  spin: Vector3;
-  ricochetsRemaining: number;
-  lastTrailAt: number;
+export interface WeaponFireGates {
+  held: boolean;
+  pressed: boolean;
 }
 
-interface ProjectileHit {
-  collider: Collider;
-  point: Vector3;
-  normal: Vector3;
-  distance: number;
+export interface WeaponArsenalBudget {
+  readonly maxActiveProjectiles: number;
 }
 
-export class WeaponArsenal {
-  readonly #scene: Scene;
-  readonly #world: World;
-  readonly #ignoredCollider: Collider;
-  readonly #buildingSystem: BuildingSystem;
-  readonly #audio = new WeaponAudio();
-  readonly #projectiles: ActiveProjectile[] = [];
-  readonly #projectileLights: PointLight[] = [];
-  readonly #litProjectiles: ActiveProjectile[] = [];
-  readonly #litProjectilePriorities: number[] = [];
-  readonly #temporaryObjects: Array<{ object: Object3D; removeAt: number; dispose: () => void }> = [];
+const _lobDirectionScratch = new Vector3();
+
+export const WEAPON_ARSENAL_PLAYER_BUDGET: WeaponArsenalBudget = {
+  maxActiveProjectiles: 96
+};
+
+export const WEAPON_ARSENAL_BOT_BUDGET: WeaponArsenalBudget = {
+  maxActiveProjectiles: 8
+};
+
+export class WeaponArsenal implements WorldEffectsSource {
+  readonly #audio: WeaponAudio;
+  readonly #projectileSim: WorldProjectileSim;
+  readonly #hitscan: HitscanWeapon;
   #selectedSlot = 0;
-  #lastFireAt = 0;
+  #lastPrimaryFireAt = 0;
+  #lastSecondaryFireAt = 0;
+  #burstShotsRemaining = 0;
+  #burstNextShotAt = 0;
+  readonly #burstDirection = new Vector3();
+  readonly #burstMuzzle = new Vector3();
+  #fireStarted = false;
+  #rocketVolleyRemaining = 0;
+  #rocketVolleyTotal = 0;
+  #rocketVolleyShotIndex = 0;
+  #rocketVolleyNextAt = 0;
+  readonly #rocketVolleyDirection = new Vector3();
+  readonly #rocketVolleyMuzzle = new Vector3();
+  #rocketVolleyFire: FireProfile | null = null;
+  #rocketVolleyImpact: ImpactProfile | null = null;
+  readonly #ammo = new WeaponAmmoController();
+  readonly #rocketMagazine = new RocketLauncherMagazine();
+  readonly #redeemerGuided = new RedeemerGuidedFlight();
+  readonly #bioCharge = new BioChargeState();
+  #bioChargePreview: Object3D | null = null;
+  readonly #barrelSpawnScratch = new Vector3();
+  readonly #volleyDirectionScratch = new Vector3();
+  readonly #volleySpawnScratch = new Vector3();
+  readonly #mechanicsAudioOrigin = new Vector3();
+  readonly #chargeHoldMechanicsScratch: {
+    rocketMarking: boolean;
+    rocketMarkedCount: number;
+    bioHolding: boolean;
+    bioChargeFraction: number;
+  } = {
+    rocketMarking: false,
+    rocketMarkedCount: 0,
+    bioHolding: false,
+    bioChargeFraction: 0
+  };
+  readonly #guidedCameraScratch: GuidedRedeemerCameraState = {
+    position: new Vector3(),
+    lookAt: new Vector3(),
+    direction: new Vector3()
+  };
+  readonly #impactDeps: ApplyImpactDeps;
+  readonly #sourceFaction: () => FactionTeam;
+  readonly #sourceActorId: string;
+  readonly #bioChargePreviewParent: Object3D;
+  readonly #impactSink: CombatImpactSink;
+  readonly #impactScratch: ApplyImpactRequest = {
+    sourceFaction: 'alpha',
+    sourceActorId: '',
+    impact: { directDamage: 0, impactRadius: 0, impactExpandMs: 0, ricochetMax: 0, explodeOnContact: false },
+    point: new Vector3()
+  };
+  readonly #shockComboContext: ShockComboFireContext = {
+    orbs: [],
+    onComboHit: (hit) => {
+      this.#resolveShockCombo(hit);
+    }
+  };
 
-  constructor(scene: Scene, world: World, ignoredCollider: Collider, buildingSystem: BuildingSystem) {
-    this.#scene = scene;
-    this.#world = world;
-    this.#ignoredCollider = ignoredCollider;
-    this.#buildingSystem = buildingSystem;
-    this.#createProjectileLightPool();
+  constructor(
+    scene: Scene,
+    world: World,
+    ignoredRigidBody: RigidBody,
+    weaponAudio: WeaponAudio,
+    impactDeps: ApplyImpactDeps,
+    sourceFaction: () => FactionTeam,
+    sourceActorId: string,
+    bioChargePreviewParent: Object3D,
+    projectileSim: WorldProjectileSim,
+    budget: WeaponArsenalBudget = WEAPON_ARSENAL_PLAYER_BUDGET,
+    sphereInstancing: SphereInstancingService | null = null,
+    segmentLines: SegmentLineInstancingService | null = null
+  ) {
+    this.#audio = weaponAudio;
+    this.#projectileSim = projectileSim;
+    this.#impactDeps = impactDeps;
+    this.#sourceFaction = sourceFaction;
+    this.#sourceActorId = sourceActorId;
+    this.#bioChargePreviewParent = bioChargePreviewParent;
+    this.#impactSink = {
+      apply: (request) => {
+        const scratch = this.#impactScratch;
+        scratch.sourceFaction = this.#sourceFaction();
+        scratch.sourceActorId = this.#sourceActorId;
+        scratch.impact = request.impact;
+        scratch.point = request.point;
+        scratch.hitCollider = request.hitCollider;
+        applyImpact(this.#impactDeps, scratch);
+      }
+    };
+    this.#hitscan = new HitscanWeapon(
+      scene,
+      world,
+      ignoredRigidBody,
+      weaponAudio,
+      this.#impactSink,
+      sphereInstancing,
+      segmentLines
+    );
+    this.#ammo.selectWeapon(this.selectedWeapon);
+    this.#projectileSim.registerBridge({
+      ownerId: sourceActorId,
+      ignoredBody: ignoredRigidBody,
+      maxActive: budget.maxActiveProjectiles,
+      sourceFaction,
+      impactSink: this.#impactSink,
+      playImpact: (weapon, point, gain, impact, options) => {
+        this.#audio.playImpact(weapon, point, gain, impact, options);
+      },
+      playRedeemerBlastSpread: (position, gain) =>
+        this.#audio.playRedeemerBlastSpread(position, gain),
+      stopRedeemerBlastSpread: (slot) => {
+        this.#audio.stopRedeemerBlastSpread(slot);
+      },
+      resolveShockCombo: (hit) => {
+        this.#resolveShockCombo(hit);
+      }
+    });
+    registerWorldEffectsSource(this);
+  }
+
+  prepareWorldTickContext(aim?: { readonly yaw: number; readonly pitch: number }): void {
+    this.#projectileSim.setOwnerAim(this.#sourceActorId, aim);
+  }
+
+  getAmmoHudSnapshot(): AmmoHudSnapshot {
+    return this.#ammo.getHudSnapshot(this.selectedWeapon);
   }
 
   get selectedWeapon(): WeaponDefinition {
     return WEAPON_DEFINITIONS[this.#selectedSlot] ?? WEAPON_DEFINITIONS[0];
+  }
+
+  get selectedSlotIndex(): number {
+    return this.#selectedSlot;
   }
 
   get selectedWeaponLabel(): string {
@@ -89,415 +244,857 @@ export class WeaponArsenal {
     }
 
     this.#selectedSlot = nextSlot;
+    this.#clearPistolBurst();
+    this.#hitscan.releaseBeamStream();
+    this.#audio.stopReloadMechanics();
+    this.#ammo.selectWeapon(this.selectedWeapon);
+    this.#syncRocketMagazineForSelectedWeapon();
+    this.#redeemerGuided.end();
+    this.#clearBioCharge();
     return true;
   }
 
-  update(nowMs: number, deltaSeconds: number): void {
-    this.#updateProjectiles(deltaSeconds);
-    this.#removeExpiredTemporaryObjects(nowMs);
+  equipSpawnWeapon(): WeaponDefinition {
+    return this.equipWeapon(rollSpawnWeapon());
   }
 
-  tryPrimaryFire(nowMs: number, vectors: CameraVectors, muzzlePosition: Vector3): boolean {
+  equipWeapon(weapon: WeaponDefinition): WeaponDefinition {
+    this.#selectedSlot = spawnWeaponSlotIndex(weapon);
+    this.#clearPistolBurst();
+    this.#hitscan.releaseBeamStream();
+    this.#audio.stopReloadMechanics();
+    this.#ammo.selectWeapon(this.selectedWeapon);
+    this.#syncRocketMagazineForSelectedWeapon();
+    this.#redeemerGuided.end();
+    this.#clearBioCharge();
+    return this.selectedWeapon;
+  }
+
+  get fireRangeM(): number {
+    return resolveWeaponEngageRangeM(this.selectedWeapon.primary);
+  }
+
+  canFirePrimary(nowMs: number): boolean {
+    return this.#ammo.canFire(this.selectedWeapon, 'primary', nowMs);
+  }
+
+  trackMechanicsAudioOrigin(position: Vector3): void {
+    this.#mechanicsAudioOrigin.copy(position);
+  }
+
+  /** Reload / RMB-hold SFX — skip when idle so bot rosters avoid per-frame audio sync. */
+  needsMechanicsAudioTick(nowMs: number): boolean {
+    if (this.#bioCharge.isHolding || this.#rocketMagazine.isMarking) {
+      return true;
+    }
+
+    if (this.#ammo.isReloading(nowMs)) {
+      return true;
+    }
+
+    const reloadState = this.#ammo.getReloadMechanicsState();
+    if (
+      reloadState.kind !== 'none' &&
+      nowMs < reloadState.startedAtMs + reloadState.durationMs
+    ) {
+      return true;
+    }
+
+    return this.#audio.hasActiveMechanicsVoice();
+  }
+
+  tickMechanicsAudio(nowMs: number): void {
+    this.#audio.syncReloadMechanics(
+      this.selectedWeapon,
+      this.#mechanicsAudioOrigin,
+      this.#ammo.getReloadMechanicsState(),
+      nowMs
+    );
+    this.#audio.syncChargeHoldMechanics(
+      this.#mechanicsAudioOrigin,
+      this.#fillChargeHoldMechanics(nowMs)
+    );
+  }
+
+  #fillChargeHoldMechanics(nowMs: number): ChargeHoldMechanicsState {
+    const scratch = this.#chargeHoldMechanicsScratch;
+    scratch.rocketMarking = this.#rocketMagazine.isMarking;
+    scratch.rocketMarkedCount = this.#rocketMagazine.markedCount;
+    scratch.bioHolding = this.#bioCharge.isHolding;
+    scratch.bioChargeFraction = this.peekBioChargeFraction(nowMs);
+    return scratch;
+  }
+
+  isReloading(nowMs: number): boolean {
+    return this.#ammo.isReloading(nowMs);
+  }
+
+  needsWorldTick(_nowMs: number): boolean {
+    return (
+      this.#burstShotsRemaining > 0 ||
+      this.#rocketVolleyRemaining > 0 ||
+      this.#bioCharge.isHolding ||
+      this.#rocketMagazine.isMarking ||
+      this.#redeemerGuided.isActive ||
+      this.#ammo.isBeamActive() ||
+      this.#ammo.hasReloadPending() ||
+      this.#hitscan.needsWorldTick()
+    );
+  }
+
+  consumeFireStarted(): boolean {
+    const started = this.#fireStarted;
+    this.#fireStarted = false;
+    return started;
+  }
+
+  releaseBeamStream(): void {
+    this.#ammo.releaseBeam(performance.now());
+    this.#hitscan.releaseBeamStream();
+  }
+
+  suspendCombat(): void {
+    this.releaseBeamStream();
+    this.#audio.stopReloadMechanics();
+    this.#clearBioCharge();
+    this.#rocketMagazine.cancelMarkHold();
+    this.#clearPistolBurst();
+    this.#clearRocketVolley();
+    this.#redeemerGuided.end();
+    this.#projectileSim.releaseOwner(this.#sourceActorId);
+  }
+
+  releaseAllWorldEffects(): void {
+    this.suspendCombat();
+    this.#hitscan.releaseAllEffects();
+    this.#projectileSim.unregisterBridge(this.#sourceActorId);
+    unregisterWorldEffectsSource(this);
+  }
+
+  isBeamStreamSecondarySelected(): boolean {
+    return fireDeliveryFor(this.selectedWeapon.secondary) === 'beamTick';
+  }
+
+  tickBeamStream(nowMs: number, muzzlePosition: Vector3, direction: Vector3): void {
     const weapon = this.selectedWeapon;
-    if (nowMs < this.#lastFireAt + weapon.fireIntervalMs) {
+    const fire = weapon.secondary;
+    if (fireDeliveryFor(fire) !== 'beamTick') {
+      return;
+    }
+
+    if (!this.#ammo.isBeamActive() && !this.#ammo.canFire(weapon, 'secondary', nowMs)) {
+      return;
+    }
+
+    if (!this.#ammo.isBeamActive()) {
+      this.#ammo.beginBeam(nowMs);
+    }
+
+    this.#hitscan.tickBeamStream(weapon, fire, weapon.secondaryImpact, muzzlePosition, direction);
+  }
+
+  isRedeemerGuidedActive(): boolean {
+    return this.#redeemerGuided.isActive;
+  }
+
+  resolveGuidedRedeemerCamera(): GuidedRedeemerCameraState | null {
+    return this.#redeemerGuided.resolveCamera(this.#guidedCameraScratch);
+  }
+
+  isRocketLauncherSelected(): boolean {
+    return weaponHasRocketMagazine(this.selectedWeapon);
+  }
+
+  isBioLobberSelected(): boolean {
+    return weaponHasBioChargeSecondary(this.selectedWeapon);
+  }
+
+  isBioChargeHolding(): boolean {
+    return this.#bioCharge.isHolding;
+  }
+
+  isRocketMarking(): boolean {
+    return this.#rocketMagazine.isMarking;
+  }
+
+  isRocketVolleyPending(): boolean {
+    return this.#rocketVolleyRemaining > 0;
+  }
+
+  get rocketMarkedCount(): number {
+    return this.#rocketMagazine.markedCount;
+  }
+
+  roundsAvailable(): number {
+    return this.#ammo.getRoundsAvailable();
+  }
+
+  peekBioChargeFraction(nowMs: number): number {
+    if (!this.isBioLobberSelected() || !this.#bioCharge.isHolding) {
+      return 0;
+    }
+
+    const weapon = this.selectedWeapon;
+    return this.#bioCharge.snapshot(nowMs, weapon.secondary, weapon.secondaryImpact).fraction;
+  }
+
+  beginBioChargeHold(nowMs: number, firstPerson: boolean): void {
+    if (!this.isBioLobberSelected()) {
+      return;
+    }
+
+    const weapon = this.selectedWeapon;
+    const fire = weapon.secondary;
+    if (nowMs < this.#lastSecondaryFireAt + fire.fireIntervalMs) {
+      return;
+    }
+
+    if (!this.#ammo.canFire(weapon, 'secondary', nowMs)) {
+      return;
+    }
+
+    this.#bioCharge.beginHold(nowMs);
+    const ammoMax = weapon.ammo?.ammoMax ?? 10;
+    this.#ammo.setBioChargePreviewCost(bioChargeAmmoCost(0, ammoMax, this.#ammo.current));
+    this.#ensureBioChargePreview(weapon);
+    const charge = this.#bioCharge.snapshot(nowMs, weapon.secondary, weapon.secondaryImpact);
+    this.#syncBioChargePreview(charge.projectileScale, firstPerson);
+  }
+
+  tickBioCharge(nowMs: number, firstPerson: boolean): void {
+    if (!this.#bioCharge.isHolding || !this.isBioLobberSelected()) {
+      return;
+    }
+
+    const weapon = this.selectedWeapon;
+    const charge = this.#bioCharge.snapshot(nowMs, weapon.secondary, weapon.secondaryImpact);
+    const ammoMax = weapon.ammo?.ammoMax ?? 10;
+    this.#ammo.setBioChargePreviewCost(
+      bioChargeAmmoCost(charge.fraction, ammoMax, this.#ammo.current)
+    );
+    this.#syncBioChargePreview(charge.projectileScale, firstPerson);
+  }
+
+  releaseBioCharge(
+    nowMs: number,
+    direction: Vector3,
+    muzzlePosition: Vector3
+  ): boolean {
+    if (!this.isBioLobberSelected()) {
+      this.#clearBioCharge();
       return false;
     }
 
-    this.#lastFireAt = nowMs;
-    this.#audio.playShot(weapon);
-
-    const directions = createProjectileDirections(
-      vectors.direction,
-      weapon.projectileCount,
-      weapon.spreadRadians
-    );
-    for (const direction of directions) {
-      this.#spawnProjectile(weapon, direction, muzzlePosition);
+    if (!this.#bioCharge.isHolding) {
+      return false;
     }
 
+    const weapon = this.selectedWeapon;
+    if (!this.#ammo.canFire(weapon, 'secondary', nowMs)) {
+      this.#clearBioCharge();
+      return false;
+    }
+
+    const baseFire = weapon.secondary;
+    const baseImpact = weapon.secondaryImpact;
+    if (nowMs < this.#lastSecondaryFireAt + baseFire.fireIntervalMs) {
+      this.#clearBioCharge();
+      return false;
+    }
+
+    const charge = this.#bioCharge.snapshot(nowMs, baseFire, baseImpact);
+    const ammoMax = weapon.ammo?.ammoMax ?? 10;
+    const ammoCost = bioChargeAmmoCost(charge.fraction, ammoMax, this.#ammo.current);
+    if (!this.#ammo.canConsume(ammoCost, nowMs)) {
+      this.#clearBioCharge();
+      return false;
+    }
+
+    this.#clearBioCharge();
+    this.#lastSecondaryFireAt = nowMs;
+    this.#fireChargedBioBlob(weapon, baseFire, baseImpact, charge, direction, muzzlePosition);
+    this.#ammo.commitFire(weapon, 'secondary', nowMs, ammoCost);
     return true;
   }
 
-  #spawnProjectile(weapon: WeaponDefinition, direction: Vector3, muzzlePosition: Vector3): void {
-    const position = muzzlePosition.clone().addScaledVector(direction, 1.35);
-    const object = createProjectileVisual(weapon.visualKind, direction, weapon.color);
-    object.position.copy(position);
-    this.#scene.add(object);
-    this.#projectiles.push({
-      weapon,
-      object,
-      position,
+  beginRocketMarkHold(nowMs: number): void {
+    if (!this.isRocketLauncherSelected()) {
+      return;
+    }
+
+    this.#rocketMagazine.beginMarkHold(nowMs);
+  }
+
+  tickRocketMarking(nowMs: number): void {
+    if (!this.isRocketLauncherSelected()) {
+      return;
+    }
+
+    this.#rocketMagazine.tickMarkWhileHeld(nowMs, this.#ammo.getRoundsAvailable());
+  }
+
+  releaseRocketVolley(
+    nowMs: number,
+    direction: Vector3,
+    muzzlePosition: Vector3
+  ): boolean {
+    if (!this.isRocketLauncherSelected()) {
+      return false;
+    }
+
+    const weapon = this.selectedWeapon;
+    const fire = weapon.secondary;
+    const ammoAvailable = this.#ammo.getRoundsAvailable();
+    const count = this.#rocketMagazine.peekVolleyCount(ammoAvailable);
+    if (count <= 0) {
+      this.#rocketMagazine.cancelMarkHold();
+      return false;
+    }
+
+    if (nowMs < this.#lastSecondaryFireAt + fire.fireIntervalMs) {
+      this.#rocketMagazine.cancelMarkHold();
+      return false;
+    }
+
+    const marked = this.#rocketMagazine.commitVolley();
+    const fired = Math.min(marked, ammoAvailable);
+    if (fired <= 0) {
+      return false;
+    }
+
+    this.#lastSecondaryFireAt = nowMs;
+    this.#ammo.commitFire(weapon, 'secondary', nowMs, fired);
+    this.#rocketVolleyRemaining = fired;
+    this.#rocketVolleyTotal = fired;
+    this.#rocketVolleyShotIndex = 0;
+    this.#rocketVolleyNextAt = nowMs;
+    this.#rocketVolleyFire = fire;
+    this.#rocketVolleyImpact = weapon.secondaryImpact;
+    this.#rocketVolleyDirection.copy(direction);
+    this.#rocketVolleyMuzzle.copy(muzzlePosition);
+    this.#tickRocketVolley(nowMs);
+    return true;
+  }
+
+  hasSecondaryBurstPending(): boolean {
+    return this.#burstShotsRemaining > 0;
+  }
+
+  tickWorld(nowMs: number, _deltaSeconds: number): void {
+    this.#hitscan.update(nowMs);
+    if (this.#ammo.tick(nowMs)) {
+      this.releaseBeamStream();
+    }
+    if (this.isRocketLauncherSelected()) {
+      this.#ammo.setReservedCount(this.#rocketMagazine.markedCount);
+    } else {
+      this.#ammo.setReservedCount(0);
+    }
+    this.#updateGuidedRedeemer(nowMs);
+    if (this.#rocketVolleyRemaining > 0) {
+      this.#tickRocketVolley(nowMs);
+    }
+    if (this.#burstShotsRemaining > 0) {
+      this.#tickPistolBurst(nowMs, this.#burstDirection, this.#burstMuzzle);
+    }
+  }
+
+  tryFire(
+    mode: WeaponFireMode,
+    nowMs: number,
+    muzzlePosition: Vector3,
+    direction: Vector3,
+    gates: WeaponFireGates
+  ): boolean {
+    const weapon = this.selectedWeapon;
+    this.#noteMechanicsAudioOrigin(muzzlePosition);
+
+    if (this.#redeemerGuided.isActive || this.#bioCharge.isHolding) {
+      return false;
+    }
+
+    if (!this.#ammo.canFire(weapon, mode, nowMs)) {
+      this.#tryDryFireClick(weapon, mode, nowMs, muzzlePosition, gates);
+      return false;
+    }
+
+    if (mode === 'primary' && weaponHasRocketMagazine(weapon)) {
+      return this.#tryFireRocketPrimary(nowMs, direction, muzzlePosition, gates);
+    }
+
+    if (mode === 'secondary') {
+      if (weaponHasRocketMagazine(weapon) || weaponHasBioChargeSecondary(weapon)) {
+        return false;
+      }
+
+      this.#tickPistolBurst(nowMs, direction, muzzlePosition);
+      if (!this.#shouldAttemptSecondaryFire(weapon, gates)) {
+        return this.#burstShotsRemaining > 0;
+      }
+      if (weapon.secondaryBurstShots !== undefined) {
+        return this.#tryStartPistolBurst(nowMs, direction, muzzlePosition);
+      }
+    } else if (!this.#fireInputOpen(fireProfileForMode(weapon, 'primary'), gates)) {
+      return false;
+    }
+
+    const fire = fireProfileForMode(weapon, mode);
+    const impact = impactProfileForMode(weapon, mode);
+    const lastFireAt = mode === 'primary' ? this.#lastPrimaryFireAt : this.#lastSecondaryFireAt;
+    if (nowMs < lastFireAt + fire.fireIntervalMs) {
+      return false;
+    }
+
+    if (fire.delivery === 'beamTick' && this.#ammo.isBeamActive()) {
+      return true;
+    }
+
+    if (mode === 'primary') {
+      this.#lastPrimaryFireAt = nowMs;
+    } else {
+      this.#lastSecondaryFireAt = nowMs;
+    }
+
+    this.#emitFireVolley(weapon, fire, impact, direction, muzzlePosition, mode);
+    this.#commitAmmoAfterFire(weapon, fire, mode, nowMs);
+    this.#fireStarted = true;
+    return true;
+  }
+
+  #shouldAttemptSecondaryFire(weapon: WeaponDefinition, gates: WeaponFireGates): boolean {
+    if (this.#burstShotsRemaining > 0) {
+      return true;
+    }
+
+    if (weapon.secondaryBurstShots !== undefined) {
+      return gates.pressed;
+    }
+
+    if (!secondaryFireEnabled(weapon)) {
+      return false;
+    }
+
+    return this.#fireInputOpen(weapon.secondary, gates);
+  }
+
+  #fireInputOpen(fire: FireProfile, gates: WeaponFireGates): boolean {
+    return fireInputOpen(fire, gates);
+  }
+
+  #noteMechanicsAudioOrigin(position: Vector3): void {
+    this.#mechanicsAudioOrigin.copy(position);
+  }
+
+  #tryDryFireClick(
+    weapon: WeaponDefinition,
+    mode: WeaponFireMode,
+    nowMs: number,
+    muzzlePosition: Vector3,
+    gates: WeaponFireGates
+  ): void {
+    if (weapon.ammo === undefined || !gates.pressed) {
+      return;
+    }
+
+    if (mode === 'secondary' && (weaponHasRocketMagazine(weapon) || weaponHasBioChargeSecondary(weapon))) {
+      return;
+    }
+
+    const fire = fireProfileForMode(weapon, mode);
+    if (!this.#fireInputOpen(fire, gates) && fireTriggerFor(fire) !== 'auto') {
+      return;
+    }
+
+    const cost = this.#ammo.fireCost(weapon, mode);
+    const empty = this.#ammo.current < cost;
+    const reloading = this.#ammo.isReloading(nowMs);
+    if (!empty && !reloading) {
+      return;
+    }
+
+    this.#audio.playEmptyClick(weapon, muzzlePosition, nowMs);
+  }
+
+  #tryStartPistolBurst(nowMs: number, direction: Vector3, muzzlePosition: Vector3): boolean {
+    const weapon = this.selectedWeapon;
+    const fire = weapon.secondary;
+    if (nowMs < this.#lastSecondaryFireAt + fire.fireIntervalMs) {
+      return false;
+    }
+
+    const maxBurst = weapon.secondaryBurstShots ?? 3;
+    const burstShots = Math.min(maxBurst, this.#ammo.current);
+    if (burstShots <= 0 || !this.#ammo.canConsume(1, nowMs)) {
+      return false;
+    }
+
+    this.#lastSecondaryFireAt = nowMs;
+    this.#ammo.commitFire(weapon, 'secondary', nowMs, burstShots);
+    this.#burstShotsRemaining = burstShots;
+    this.#burstNextShotAt = nowMs;
+    this.#burstDirection.copy(direction);
+    this.#burstMuzzle.copy(muzzlePosition);
+    this.#tickPistolBurst(nowMs, direction, muzzlePosition);
+    this.#fireStarted = true;
+    return true;
+  }
+
+  #tickPistolBurst(nowMs: number, direction: Vector3, _muzzlePosition: Vector3): void {
+    if (this.#burstShotsRemaining <= 0 || this.selectedWeapon.secondaryBurstShots === undefined) {
+      return;
+    }
+
+    const weapon = this.selectedWeapon;
+    const fire = weapon.secondary;
+    const impact = weapon.secondaryImpact;
+    const burstDirection = this.#burstShotsRemaining > 0 ? this.#burstDirection : direction;
+    const shotInterval = weapon.secondaryBurstShotIntervalMs ?? 52;
+
+    while (
+      this.#burstShotsRemaining > 0 &&
+      nowMs >= this.#burstNextShotAt &&
+      this.selectedWeapon.slotLabel === weapon.slotLabel
+    ) {
+      this.#emitFireVolley(weapon, fire, impact, burstDirection, this.#burstMuzzle, 'secondary');
+      this.#burstShotsRemaining -= 1;
+      this.#burstNextShotAt = nowMs + shotInterval;
+    }
+
+    if (this.#burstShotsRemaining <= 0) {
+      this.#clearPistolBurst();
+    }
+  }
+
+  #clearPistolBurst(): void {
+    this.#burstShotsRemaining = 0;
+  }
+
+  #syncRocketMagazineForSelectedWeapon(): void {
+    const weapon = this.selectedWeapon;
+    if (weapon.barrelCount !== undefined) {
+      this.#rocketMagazine.reset(weapon.barrelCount);
+      return;
+    }
+
+    this.#rocketMagazine.clear();
+  }
+
+  #commitAmmoAfterFire(
+    weapon: WeaponDefinition,
+    fire: FireProfile,
+    mode: WeaponFireMode,
+    nowMs: number
+  ): void {
+    if (fire.delivery === 'beamTick') {
+      if (!this.#ammo.isBeamActive()) {
+        this.#ammo.beginBeam(nowMs);
+      }
+      return;
+    }
+
+    this.#ammo.commitFire(weapon, mode, nowMs, this.#ammo.fireCost(weapon, mode));
+  }
+
+  #updateGuidedRedeemer(nowMs: number): void {
+    if (!this.#redeemerGuided.isActive) {
+      return;
+    }
+
+    const id = this.#redeemerGuided.projectileId;
+    if (!this.#projectileSim.hasProjectile(id)) {
+      this.#redeemerGuided.end();
+      return;
+    }
+
+    if (this.#redeemerGuided.isExpired(nowMs)) {
+      this.#projectileSim.detonateById(id);
+      this.#redeemerGuided.end();
+    }
+  }
+
+  #tryFireRocketPrimary(
+    nowMs: number,
+    direction: Vector3,
+    muzzlePosition: Vector3,
+    gates: WeaponFireGates
+  ): boolean {
+    const weapon = this.selectedWeapon;
+    const ammoAvailable = this.#ammo.getRoundsAvailable();
+    if (!this.#fireInputOpen(weapon.primary, gates) || !this.#rocketMagazine.canFirePrimary(ammoAvailable)) {
+      return false;
+    }
+
+    const fire = weapon.primary;
+    if (nowMs < this.#lastPrimaryFireAt + fire.fireIntervalMs) {
+      return false;
+    }
+
+    const barrelIndex = this.#rocketMagazine.consumePrimaryRound();
+    if (barrelIndex < 0) {
+      return false;
+    }
+
+    this.#lastPrimaryFireAt = nowMs;
+    this.#ammo.commitFire(weapon, 'primary', nowMs, 1);
+    const barrelCount = weapon.barrelCount ?? 6;
+    const spawnPosition = resolveRocketBarrelSpawn(
+      muzzlePosition,
       direction,
-      traveled: 0,
-      spin: spinForWeapon(weapon.visualKind),
-      ricochetsRemaining: weapon.visualKind === 'ripper' ? RIPPER_RICOCHET_LIMIT : 0,
-      lastTrailAt: 0
-    });
-  }
-
-  #updateProjectiles(deltaSeconds: number): void {
-    for (let index = this.#projectiles.length - 1; index >= 0; index -= 1) {
-      const projectile = this.#projectiles[index];
-      const previousPosition = projectile.position.clone();
-      let remainingDistance = projectile.weapon.speed * deltaSeconds;
-      let shouldRemove = false;
-      let collisionSteps = 0;
-
-      while (remainingDistance > MIN_STEP_DISTANCE && collisionSteps < MAX_COLLISION_STEPS_PER_FRAME) {
-        const hit = this.#castProjectileStep(projectile, remainingDistance);
-
-        if (hit === null) {
-          projectile.position.addScaledVector(projectile.direction, remainingDistance);
-          projectile.traveled += remainingDistance;
-          this.#spawnTrail(projectile, previousPosition, projectile.position);
-          remainingDistance = 0;
-          continue;
-        }
-
-        this.#spawnTrail(projectile, previousPosition, hit.point, true);
-        projectile.traveled += hit.distance;
-        remainingDistance -= Math.max(hit.distance, MIN_STEP_DISTANCE);
-
-        if (this.#tryRicochet(projectile, hit)) {
-          previousPosition.copy(projectile.position);
-          collisionSteps += 1;
-          continue;
-        }
-
-        this.#handleProjectileHit(projectile, hit);
-        shouldRemove = true;
-        break;
-      }
-
-      if (shouldRemove || projectile.traveled >= projectile.weapon.maxDistance) {
-        this.#removeProjectile(index);
-        continue;
-      }
-
-      projectile.object.position.copy(projectile.position);
-      projectile.object.rotation.x += projectile.spin.x * deltaSeconds;
-      projectile.object.rotation.y += projectile.spin.y * deltaSeconds;
-      projectile.object.rotation.z += projectile.spin.z * deltaSeconds;
-    }
-
-    this.#updateProjectileLights();
-  }
-
-  #castProjectileStep(projectile: ActiveProjectile, distance: number): ProjectileHit | null {
-    if (distance <= 0) {
-      return null;
-    }
-
-    const ray = new RAPIER.Ray(projectile.position, projectile.direction);
-    const hit = this.#world.castRayAndGetNormal(
-      ray,
-      distance,
-      true,
-      undefined,
-      undefined,
-      this.#ignoredCollider
+      barrelIndex,
+      barrelCount,
+      this.#barrelSpawnScratch
     );
-    if (hit === null) {
-      return null;
-    }
-
-    const hitPoint = toVector3(ray.pointAt(hit.timeOfImpact));
-    const normal = toVector3(hit.normal).normalize();
-    return {
-      collider: hit.collider,
-      point: hitPoint,
-      normal,
-      distance: hit.timeOfImpact
-    };
-  }
-
-  #tryRicochet(projectile: ActiveProjectile, hit: ProjectileHit): boolean {
-    if (projectile.weapon.visualKind !== 'ripper' || projectile.ricochetsRemaining <= 0) {
-      return false;
-    }
-
-    const damagedBuild = this.#buildingSystem.damage(hit.collider, projectile.weapon.damage);
-    if (damagedBuild) {
-      this.#audio.playImpact(projectile.weapon, 0.24);
-      this.#spawnImpact(projectile.weapon, hit.point);
-      return false;
-    }
-
-    projectile.ricochetsRemaining -= 1;
-    projectile.direction.copy(reflectDirection(projectile.direction, hit.normal));
-    projectile.position.copy(hit.point).addScaledVector(hit.normal, BOUNCE_SURFACE_NUDGE);
-    alignProjectileVisual(projectile.object, projectile.direction);
-    this.#audio.playImpact(projectile.weapon, 0.08);
-    this.#spawnImpact(projectile.weapon, hit.point);
+    this.#emitRocketShot(weapon, fire, weapon.primaryImpact, direction, spawnPosition, muzzlePosition);
+    this.#fireStarted = true;
     return true;
   }
 
-  #handleProjectileHit(projectile: ActiveProjectile, hit: ProjectileHit): void {
-    const damagedBuild = this.#buildingSystem.damage(hit.collider, projectile.weapon.damage);
-    this.#audio.playImpact(projectile.weapon, damagedBuild ? 0.24 : 0.1);
-    this.#spawnImpact(projectile.weapon, hit.point);
+  #emitRocketShot(
+    weapon: WeaponDefinition,
+    fire: FireProfile,
+    impact: ImpactProfile,
+    direction: Vector3,
+    spawnPosition: Vector3,
+    audioPosition: Vector3
+  ): void {
+    this.#audio.playFire(weapon, audioPosition, fire, impact);
+    this.#spawnProjectile(weapon, fire, impact, direction, spawnPosition);
   }
 
-  #spawnImpact(weapon: WeaponDefinition, position: Vector3): void {
-    const mesh = new Mesh(impactGeometryForRadius(weapon.impactRadius), impactMaterialForColor(weapon.color));
-    mesh.position.copy(position);
-    this.#scene.add(mesh);
-    this.#temporaryObjects.push({
-      object: mesh,
-      removeAt: performance.now() + IMPACT_REMOVE_AFTER_MS,
-      dispose: noop
+  #emitRocketVolleyShot(
+    weapon: WeaponDefinition,
+    fire: FireProfile,
+    impact: ImpactProfile,
+    direction: Vector3,
+    muzzlePosition: Vector3,
+    shotIndex: number,
+    totalCount: number,
+    barrelIndex: number
+  ): void {
+    const barrelCount = weapon.barrelCount ?? 6;
+    const spawnPosition = resolveRocketBarrelSpawn(
+      muzzlePosition,
+      direction,
+      barrelIndex,
+      barrelCount,
+      this.#volleySpawnScratch
+    );
+    const shotDirection = resolveRocketVolleyDirection(
+      direction,
+      shotIndex,
+      totalCount,
+      fire.spreadRadians,
+      this.#volleyDirectionScratch
+    );
+    this.#audio.playFire(weapon, spawnPosition, fire, impact);
+    this.#spawnProjectile(weapon, fire, impact, shotDirection, spawnPosition);
+  }
+
+  #tickRocketVolley(nowMs: number): void {
+    if (this.#rocketVolleyRemaining <= 0 || !this.isRocketLauncherSelected()) {
+      this.#clearRocketVolley();
+      return;
+    }
+
+    const weapon = this.selectedWeapon;
+    const fire = this.#rocketVolleyFire;
+    const impact = this.#rocketVolleyImpact;
+    if (fire === null || impact === null) {
+      this.#clearRocketVolley();
+      return;
+    }
+
+    const barrelCount = weapon.barrelCount ?? 6;
+    while (
+      this.#rocketVolleyRemaining > 0 &&
+      nowMs >= this.#rocketVolleyNextAt
+    ) {
+      this.#emitRocketVolleyShot(
+        weapon,
+        fire,
+        impact,
+        this.#rocketVolleyDirection,
+        this.#rocketVolleyMuzzle,
+        this.#rocketVolleyShotIndex,
+        this.#rocketVolleyTotal,
+        this.#rocketVolleyShotIndex % barrelCount
+      );
+      this.#rocketVolleyShotIndex += 1;
+      this.#rocketVolleyRemaining -= 1;
+      this.#rocketVolleyNextAt = nowMs + ROCKET_VOLLEY_SHOT_INTERVAL_MS;
+    }
+
+    if (this.#rocketVolleyRemaining <= 0) {
+      this.#clearRocketVolley();
+    }
+  }
+
+  #clearRocketVolley(): void {
+    this.#rocketVolleyRemaining = 0;
+    this.#rocketVolleyTotal = 0;
+    this.#rocketVolleyShotIndex = 0;
+    this.#rocketVolleyNextAt = 0;
+    this.#rocketVolleyFire = null;
+    this.#rocketVolleyImpact = null;
+  }
+
+  #fireChargedBioBlob(
+    weapon: WeaponDefinition,
+    baseFire: FireProfile,
+    baseImpact: ImpactProfile,
+    charge: {
+      projectileScale: number;
+      damage: number;
+      impactRadius: number;
+      impactExpandMs: number;
+      stickDelayMs: number;
+    },
+    direction: Vector3,
+    muzzlePosition: Vector3
+  ): void {
+    const fire: FireProfile = {
+      ...baseFire,
+      projectileScale: charge.projectileScale,
+      damage: charge.damage
+    };
+    const impact: ImpactProfile = {
+      ...baseImpact,
+      directDamage: charge.damage,
+      impactRadius: charge.impactRadius,
+      impactExpandMs: charge.impactExpandMs,
+      stickDelayMs: charge.stickDelayMs
+    };
+
+    this.#audio.playFire(weapon, muzzlePosition, fire, impact);
+
+    const lobBias = fire.lobUpBias;
+    const shotDirection =
+      lobBias !== undefined && lobBias > 0
+        ? applyLobBiasInto(direction, lobBias, _lobDirectionScratch)
+        : direction;
+    this.#spawnProjectile(weapon, fire, impact, shotDirection, muzzlePosition);
+  }
+
+  #ensureBioChargePreview(weapon: WeaponDefinition): void {
+    if (this.#bioChargePreview !== null) {
+      return;
+    }
+
+    this.#bioChargePreview = createProjectileVisual(weapon.visualKind, weapon.color);
+    configureViewmodelAttachedProjectilePreview(this.#bioChargePreview);
+    this.#bioChargePreviewParent.add(this.#bioChargePreview);
+  }
+
+  #syncBioChargePreview(visualScale: number, firstPerson: boolean): void {
+    if (this.#bioChargePreview === null) {
+      return;
+    }
+
+    const weapon = this.selectedWeapon;
+    resetProjectileTransform(this.#bioChargePreview);
+    this.#bioChargePreview.scale.setScalar(visualScale);
+    syncMuzzleAttachedPreviewPosition(
+      this.#bioChargePreview,
+      weapon.visualKind,
+      visualScale,
+      firstPerson
+    );
+  }
+
+  #clearBioCharge(): void {
+    this.#bioCharge.cancelHold();
+    this.#ammo.clearBioChargePreview();
+    if (this.#bioChargePreview !== null) {
+      releaseViewmodelAttachedProjectilePreview(this.#bioChargePreview);
+      this.#bioChargePreview = null;
+    }
+  }
+
+  #refreshShockComboContext(): ShockComboFireContext {
+    this.#shockComboContext.orbs = this.#projectileSim.listShockOrbs(this.#sourceActorId);
+    return this.#shockComboContext;
+  }
+
+  #resolveShockCombo(hit: ShockOrbRayHit): void {
+    const orb = this.#projectileSim.removeById(hit.projectileId);
+    if (orb === null) {
+      return;
+    }
+
+    const weapon = orb.weapon;
+    const comboImpact = weapon.comboImpact;
+    if (comboImpact === undefined) {
+      return;
+    }
+
+    this.#audio.playImpact(weapon, hit.point, SHOCK_COMBO_IMPACT_GAIN, comboImpact);
+    this.#projectileSim.spawnImpactBurst(weapon, comboImpact, hit.point, 'hit');
+    this.#impactSink.apply({
+      impact: comboImpact,
+      point: hit.point
     });
   }
 
-  #spawnTrail(projectile: ActiveProjectile, start: Vector3, end: Vector3, force = false): void {
-    if (start.distanceToSquared(end) <= 0.0001) {
+  #emitFireVolley(
+    weapon: WeaponDefinition,
+    fire: FireProfile,
+    impact: ImpactProfile,
+    direction: Vector3,
+    muzzlePosition: Vector3,
+    _mode: WeaponFireMode
+  ): void {
+    const delivery = fireDeliveryFor(fire);
+    if (delivery === 'beamTick') {
+      this.#audio.playFire(weapon, muzzlePosition, fire, impact);
       return;
     }
 
-    const nowMs = performance.now();
-    if (!force && nowMs < projectile.lastTrailAt + TRAIL_SPAWN_INTERVAL_MS) {
+    if (delivery === 'hitscan') {
+      const shockCombo =
+        weapon.comboImpact !== undefined ? this.#refreshShockComboContext() : undefined;
+      this.#hitscan.fireVolley(weapon, fire, impact, direction, muzzlePosition, shockCombo);
       return;
     }
-    projectile.lastTrailAt = nowMs;
 
-    const geometry = new BufferGeometry().setFromPoints([start, end]);
-    const line = new Line(geometry, trailMaterialForColor(projectile.weapon.color));
-    this.#scene.add(line);
-    this.#temporaryObjects.push({
-      object: line,
-      removeAt: performance.now() + TRAIL_REMOVE_AFTER_MS,
-      dispose: () => {
-        geometry.dispose();
+    this.#audio.playFire(weapon, muzzlePosition, fire, impact);
+
+    eachProjectileDirection(
+      direction,
+      fire.projectileCount,
+      fire.spreadRadians,
+      (shotDirection) => {
+        const lobBias = fire.lobUpBias;
+        const resolvedDirection =
+          lobBias !== undefined && lobBias > 0
+            ? applyLobBiasInto(shotDirection, lobBias, _lobDirectionScratch)
+            : shotDirection;
+        this.#spawnProjectile(weapon, fire, impact, resolvedDirection, muzzlePosition);
       }
-    });
+    );
   }
 
-  #removeProjectile(index: number): void {
-    const [projectile] = this.#projectiles.splice(index, 1);
-    this.#scene.remove(projectile.object);
-  }
-
-  #removeExpiredTemporaryObjects(nowMs: number): void {
-    for (let index = this.#temporaryObjects.length - 1; index >= 0; index -= 1) {
-      const item = this.#temporaryObjects[index];
-      if (item.removeAt > nowMs) {
-        continue;
-      }
-
-      this.#scene.remove(item.object);
-      item.dispose();
-      this.#temporaryObjects.splice(index, 1);
-    }
-  }
-
-  #createProjectileLightPool(): void {
-    for (let index = 0; index < PROJECTILE_LIGHT_POOL_SIZE; index += 1) {
-      const light = new PointLight(0xffffff, 0, PROJECTILE_LIGHT_RANGE, PROJECTILE_LIGHT_DECAY);
-      light.name = `projectile-light-${String(index)}`;
-      this.#projectileLights.push(light);
-      this.#scene.add(light);
-    }
-  }
-
-  #updateProjectileLights(): void {
-    for (const light of this.#projectileLights) {
-      light.intensity = 0;
-    }
-
-    this.#litProjectiles.length = 0;
-    this.#litProjectilePriorities.length = 0;
-    for (const projectile of this.#projectiles) {
-      this.#queueProjectileLightCandidate(projectile, projectileLightPriority(projectile.weapon));
-    }
-
-    for (let index = 0; index < this.#litProjectiles.length; index += 1) {
-      const projectile = this.#litProjectiles[index];
-      const light = this.#projectileLights[index];
-      light.color.setHex(projectile.weapon.color);
-      light.position.copy(projectile.position);
-      light.intensity = PROJECTILE_LIGHT_INTENSITY * this.#litProjectilePriorities[index];
-    }
-  }
-
-  #queueProjectileLightCandidate(projectile: ActiveProjectile, priority: number): void {
-    if (priority <= 0) {
+  #spawnProjectile(
+    weapon: WeaponDefinition,
+    fire: FireProfile,
+    impact: ImpactProfile,
+    direction: Vector3,
+    muzzlePosition: Vector3
+  ): void {
+    const id = this.#projectileSim.spawn(
+      this.#sourceActorId,
+      weapon,
+      fire,
+      impact,
+      direction,
+      muzzlePosition
+    );
+    if (id < 0) {
       return;
     }
 
-    let insertAt = this.#litProjectilePriorities.length;
-    while (insertAt > 0 && this.#litProjectilePriorities[insertAt - 1] < priority) {
-      insertAt -= 1;
-    }
-
-    if (insertAt >= this.#projectileLights.length) {
-      return;
-    }
-
-    this.#litProjectiles.splice(insertAt, 0, projectile);
-    this.#litProjectilePriorities.splice(insertAt, 0, priority);
-    if (this.#litProjectiles.length > this.#projectileLights.length) {
-      this.#litProjectiles.length = this.#projectileLights.length;
-      this.#litProjectilePriorities.length = this.#projectileLights.length;
+    const tags = fire.projectileTags ?? [];
+    if (projectileIsGuidedRedeemer(tags)) {
+      this.#redeemerGuided.begin(this.#projectileSim, id, performance.now());
     }
   }
-}
-
-function createProjectileDirections(direction: Vector3, count: number, spreadRadians: number): Vector3[] {
-  if (count <= 1 || spreadRadians <= 0) {
-    return [direction.clone().normalize()];
-  }
-
-  const forward = direction.clone().normalize();
-  const right = new Vector3().crossVectors(forward, new Vector3(0, 1, 0)).normalize();
-  if (right.lengthSq() <= 0.001) {
-    right.set(1, 0, 0);
-  }
-  const up = new Vector3().crossVectors(right, forward).normalize();
-  const directions: Vector3[] = [];
-
-  for (let index = 0; index < count; index += 1) {
-    const angle = (Math.PI * 2 * index) / count;
-    const ring = index === 0 ? 0 : spreadRadians;
-    const offset = right
-      .clone()
-      .multiplyScalar(Math.cos(angle) * ring)
-      .addScaledVector(up, Math.sin(angle) * ring);
-    directions.push(forward.clone().add(offset).normalize());
-  }
-
-  return directions;
-}
-
-function trailMaterialForColor(color: number): LineBasicMaterial {
-  const existing = TRAIL_MATERIAL_CACHE.get(color);
-  if (existing !== undefined) {
-    return existing;
-  }
-
-  const material = new LineBasicMaterial({
-    color,
-    transparent: true,
-    opacity: TRAIL_OPACITY
-  });
-  TRAIL_MATERIAL_CACHE.set(color, material);
-  return material;
-}
-
-function impactMaterialForColor(color: number): MeshBasicMaterial {
-  const existing = IMPACT_MATERIAL_CACHE.get(color);
-  if (existing !== undefined) {
-    return existing;
-  }
-
-  const material = new MeshBasicMaterial({ color });
-  IMPACT_MATERIAL_CACHE.set(color, material);
-  return material;
-}
-
-function impactGeometryForRadius(radius: number): SphereGeometry {
-  const existing = IMPACT_GEOMETRY_CACHE.get(radius);
-  if (existing !== undefined) {
-    return existing;
-  }
-
-  const geometry = new SphereGeometry(radius, 12, 8);
-  IMPACT_GEOMETRY_CACHE.set(radius, geometry);
-  return geometry;
-}
-
-function spinForWeapon(kind: WeaponDefinition['visualKind']): Vector3 {
-  if (kind === 'ripper') {
-    return new Vector3(0, 0, 34);
-  }
-
-  if (kind === 'flak') {
-    return new Vector3(14, 6, 9);
-  }
-
-  if (kind === 'bio') {
-    return new Vector3(3, 5, 2);
-  }
-
-  if (kind === 'redeemer') {
-    return new Vector3(1.5, 2.5, 1);
-  }
-
-  return new Vector3(0, 6, 0);
-}
-
-function projectileLightPriority(weapon: WeaponDefinition): number {
-  switch (weapon.visualKind) {
-    case 'gatling':
-      return 0.2;
-    case 'flak':
-      return 0.28;
-    case 'pistol':
-      return 0.45;
-    case 'sniper':
-      return 0.5;
-    case 'ripper':
-      return 0.78;
-    case 'pulse':
-      return 0.9;
-    case 'shock':
-      return 1.15;
-    case 'rocket':
-      return 1.05;
-    case 'bio':
-      return 1;
-    case 'redeemer':
-      return 1.3;
-  }
-}
-
-function reflectDirection(direction: Vector3, surfaceNormal: Vector3): Vector3 {
-  const normal = surfaceNormal.clone().normalize();
-  if (direction.dot(normal) > 0) {
-    normal.multiplyScalar(-1);
-  }
-
-  return direction.clone().sub(normal.multiplyScalar(2 * direction.dot(normal))).normalize();
-}
-
-function toVector3(vector: { x: number; y: number; z: number }): Vector3 {
-  return new Vector3(vector.x, vector.y, vector.z);
-}
-
-function noop(): void {}
-
-class WeaponAudio {
-  #context: AudioContext | null = null;
-
-  playShot(weapon: WeaponDefinition): void {
-    this.#playTone(shotFrequency(weapon), 0.035, 0.075, 'sawtooth');
-    this.#playTone(shotFrequency(weapon) * 2.7, 0.018, 0.03, 'square');
-  }
-
-  playImpact(weapon: WeaponDefinition, volume: number): void {
-    this.#playTone(Math.max(80, shotFrequency(weapon) * 0.5), 0.045, volume, 'triangle');
-  }
-
-  #playTone(frequency: number, duration: number, volume: number, type: OscillatorType): void {
-    const context = this.#context ?? new AudioContext();
-    this.#context = context;
-
-    if (context.state === 'suspended') {
-      void context.resume();
-    }
-
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = type;
-    oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(volume, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + duration);
-  }
-}
-
-function shotFrequency(weapon: WeaponDefinition): number {
-  return 90 + WEAPON_DEFINITIONS.indexOf(weapon) * 48;
 }

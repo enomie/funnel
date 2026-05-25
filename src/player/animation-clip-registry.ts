@@ -10,6 +10,8 @@ import {
 const ONE_SHOT_CLIP_IDS = new Set([
   'jump-forward',
   'jump-backward',
+  'jump-up-takeoff',
+  'jump-down-land',
   'start-walking',
   'stop-walking',
   'start-walking-backwards',
@@ -28,6 +30,10 @@ export class AnimationClipRegistry {
   }
 
   readonly #mixer: AnimationMixer;
+
+  get mixer(): AnimationMixer {
+    return this.#mixer;
+  }
 
   registerClip(clipId: string, sourceClip: AnimationClip, index = 0): void {
     const storageId = index === 0 ? clipId : `${clipId}__${String(index)}`;
@@ -61,6 +67,27 @@ export class AnimationClipRegistry {
 
   hasClip(clipId: string): boolean {
     return this.#clips.has(clipId);
+  }
+
+  getClip(clipId: string): AnimationClip | undefined {
+    return this.#clips.get(clipId);
+  }
+
+  /** Independent mixer per cloned character (bots, hire previews). */
+  fork(mixer: AnimationMixer): AnimationClipRegistry {
+    const forked = new AnimationClipRegistry(mixer);
+    for (const clipId of this.getAllClipIds()) {
+      const clip = this.#clips.get(clipId);
+      if (clip === undefined) {
+        continue;
+      }
+
+      const baseId = clipId.includes('__') ? clipId.split('__')[0] : clipId;
+      const index = clipId.includes('__') ? Number(clipId.split('__')[1]) : 0;
+      forked.registerClip(baseId, clip, index);
+    }
+
+    return forked;
   }
 }
 
