@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-baked-phrase.ts
+
 export interface BakedPhrase {
   buffer: AudioBuffer;
   durationS: number;
@@ -12,7 +14,7 @@ export function getBakedPhraseCache(): BakedPhraseCache {
   return sharedCache;
 }
 
-/** Offline-rendered one-shots — fire, impact, grunts, dry-fire. */
+
 export class BakedPhraseCache {
   readonly #cache = new Map<string, BakedPhrase>();
   readonly #cap: number;
@@ -89,7 +91,7 @@ export function playBakedPhrase(
   return { source, gainNode };
 }
 
-/** Silent tail so a voice lease survives until a live-scheduled phrase ends. */
+
 export function scheduleVoiceTail(
   context: AudioContext,
   destination: AudioNode,

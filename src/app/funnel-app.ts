@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/app/funnel-app.ts
+
 import { PerspectiveCamera, Vector3, type Scene, type WebGPURenderer } from 'three/webgpu';
 import {
   createWeaponAudio,
@@ -13,11 +15,15 @@ import { PickupField } from '../arena/pickup-field';
 import { RedeemerPickup } from '../arena/redeemer-pickup';
 import { JumpPadField } from '../arena/jump-pad-field';
 import { createFunnelArena } from '../arena/funnel-arena';
-import { TeamSpawnMascots } from '../arena/team-spawn-mascots';
+import { TeamSpawnMascots, preloadTeamSpawnMascotModels } from '../arena/team-spawn-mascots';
 import { BotRoster } from '../bots/bot-roster';
+import type { BotActor } from '../bots/bot-actor';
 import { beginNavRayBudgetFrame } from '../bots/bot-nav-ray-budget';
 import { beginBotRespawnBudgetFrame } from '../bots/bot-respawn-budget';
 import { ActorRegistry } from '../combat/actor-registry';
+import { DownedActorIndex } from '../combat/downed-actor-index';
+import { ReviveHireChannel, readSpectatorReviveHireHud } from '../combat/revive-hire-channel';
+import type { ReviveHireChannelComplete, ReviveHireChannelDeps } from '../combat/revive-hire-channel';
 import { createCombatActor, LOCAL_PLAYER_ACTOR_ID } from '../combat/combat-actor';
 import { PersonalMatchStats } from '../combat/personal-match-stats';
 import { TeamKillScore } from '../combat/team-kill-score';
@@ -56,7 +62,7 @@ import { createRapierRuntime } from '../physics/rapier-world';
 import { CapsuleColliderDebugLayer } from '../physics/capsule-collider-debug';
 import { PlayerCamera } from '../player/player-camera';
 import { PlayerController } from '../player/player-controller';
-import { playerAutoRespawnCountdownSeconds } from '../player/player-auto-respawn';
+import { playerAutoRespawnCountdownSeconds, playerAutoRespawnDue } from '../player/player-auto-respawn';
 import type { HumanoidRigId } from '../player/humanoid-rig';
 import { loadShooterPackCharacter } from '../player/shooter-pack-loader';
 import { PlayerVisual } from '../player/player-visual';
@@ -75,9 +81,11 @@ import { AmmoHud } from '../ui/ammo-hud';
 import { CrosshairHud } from '../ui/crosshair-hud';
 import { DamageVignetteHud } from '../ui/damage-vignette-hud';
 import { DeathRespawnHud } from '../ui/death-respawn-hud';
+import { ReviveHireHud } from '../ui/revive-hire-hud';
 import { HealthHud } from '../ui/health-hud';
 import { PersonalStatsHud } from '../ui/personal-stats-hud';
 import { MATCH_COUNTDOWN_SECONDS, MatchFlowScreen } from '../ui/match-flow-screen';
+import { loadAllCharacterSelectPreviews } from '../ui/character-select-loader';
 import { runCharacterSelect } from '../ui/character-select-scene';
 import { MatchResultScreen } from '../ui/match-result-screen';
 import { buildMatchResultSummary } from '../ui/match-result-summary';
@@ -103,7 +111,7 @@ const _inputSnapshot: InputSnapshot = {
   pitch: -0.05,
   weaponSlotSelect: null,
   killPressed: false,
-  respawnPressed: false,
+  reviveChannelHeld: false,
   teamFlipPressed: false
 };
 
@@ -137,25 +145,40 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   });
 
   matchFlow.beginFromHomeNavigation();
+  matchFlow.beginBootLoading();
   resumeGameAudio();
 
+  matchFlow.setLoadingProgress(5, 'Starting WebGPU…');
   const renderer = await createRenderer(dom.canvas);
 
-  const selectedRig = await runCharacterSelect({
-    canvas: dom.canvas,
-    renderer,
-    matchFlow
+  const rigLabels: Record<HumanoidRigId, string> = {
+    'y-bot': 'Y-Bot',
+    'x-bot': 'X-Bot'
+  };
+  const previews = await loadAllCharacterSelectPreviews((loaded, total, rigId) => {
+    const percent = 15 + Math.round((loaded / total) * 50);
+    matchFlow.setLoadingProgress(percent, `Loading ${rigLabels[rigId]}…`);
   });
+
+  matchFlow.setLoadingProgress(85, 'Preparing selection…');
+  const selectedRig = await runCharacterSelect(
+    {
+      canvas: dom.canvas,
+      renderer,
+      matchFlow
+    },
+    previews
+  );
 
   matchFlow.setLoadingProgress(10, 'Starting physics…');
   const { scene, camera, lighting } = createRenderScene();
   const capsuleDebug = new CapsuleColliderDebugLayer(scene);
   const { world, eventQueue } = await createRapierRuntime();
 
-  matchFlow.setLoadingProgress(42, 'Preparing audio…');
+  matchFlow.setLoadingProgress(25, 'Preparing audio…');
   await warmGameAudio();
 
-  matchFlow.setLoadingProgress(48, 'Building arena…');
+  matchFlow.setLoadingProgress(40, 'Building arena…');
   const arena = createFunnelArena(scene, world);
   const jumpPadField = new JumpPadField({ scene });
 
@@ -195,7 +218,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   });
   const teamSpawnMascots = new TeamSpawnMascots(scene, playerTeam);
 
-  matchFlow.setLoadingProgress(52, 'Loading character…');
+  matchFlow.setLoadingProgress(55, 'Loading gameplay animations…');
   const alternateRig: HumanoidRigId = selectedRig === 'y-bot' ? 'x-bot' : 'y-bot';
   try {
     const [playerPack, alternatePack] = await Promise.all([
@@ -204,17 +227,20 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     ]);
     visual.mountShooterPack(playerPack);
     shadowLod.register(visual.root, { alwaysFull: true });
+    matchFlow.setLoadingProgress(72, 'Preparing mascots…');
+    await preloadTeamSpawnMascotModels();
+    matchFlow.setLoadingProgress(75, 'Spawning bots…');
     botRoster.spawn({
       [selectedRig]: playerPack,
       [alternateRig]: alternatePack
     });
-    teamSpawnMascots.spawn({
-      [selectedRig]: playerPack,
-      [alternateRig]: alternatePack
-    });
+    teamSpawnMascots.spawn();
   } catch (error) {
     visual.useFallbackMesh();
     shadowLod.register(visual.root, { alwaysFull: true });
+    matchFlow.setLoadingProgress(72, 'Preparing mascots…');
+    await preloadTeamSpawnMascotModels();
+    matchFlow.setLoadingProgress(75, 'Spawning bots…');
     botRoster.spawn();
     teamSpawnMascots.spawn();
     toast.show(
@@ -223,7 +249,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     );
   }
 
-  matchFlow.setLoadingProgress(78, 'Wiring combat…');
+  matchFlow.setLoadingProgress(90, 'Wiring combat…');
   const teamHud = new TeamHud({
     ownBadge: dom.teamOwnBadge,
     ownLabel: dom.teamOwnLabel,
@@ -241,7 +267,6 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   let lastTeamHudKey = '';
   const teamRosterCounter = new TeamRosterCounter();
   let lastLocalPlayerDead = false;
-  teamRosterCounter.rebuild(actorRegistry);
 
   const refreshTeamHud = (): void => {
     const roster = teamRosterCounter.counts;
@@ -305,27 +330,10 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     deaths: dom.personalStatsDeaths,
     kdRatio: dom.personalStatsKdRatio
   });
-  gameEvents.on('actor-died', (event) => {
-    if (event.sourceActorId === LOCAL_PLAYER_ACTOR_ID && event.actorId !== LOCAL_PLAYER_ACTOR_ID) {
-      crosshairHud.flashKill();
-      playKillConfirm();
-    }
-    teamRosterCounter.onDeath(event.actorId, event.faction);
-    personalMatchStats.recordActorDied(event);
-    personalStatsHud.update(personalMatchStats);
-    teamKillScore.recordKill(event.sourceFaction, event.faction);
-    teamMatchPoints.recordCrossFactionKill(event.sourceFaction, event.faction);
-    refreshTeamHud();
-    const winner = teamMatchPoints.winner;
-    if (winner !== null) {
-      endMatch(winner);
-    }
-  });
-  gameEvents.on('actor-respawned', (event) => {
-    teamRosterCounter.onRevive(event.actorId, event.faction);
-    refreshTeamHud();
-  });
   const deathRespawnHud = new DeathRespawnHud({ shell: dom.shell });
+  const reviveHireHud = new ReviveHireHud({ shell: dom.shell });
+  const downedActorIndex = new DownedActorIndex();
+  const reviveHireChannel = new ReviveHireChannel();
   const matchResultScreen = new MatchResultScreen({ shell: dom.shell });
   const player = new PlayerController(world, visual);
   const localPlayerActor = createCombatActor({
@@ -337,6 +345,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     colliders: [player.collider]
   });
   actorRegistry.register(localPlayerActor);
+  teamRosterCounter.rebuild(actorRegistry);
   playerTeam.onChange((event) => {
     localPlayerActor.setFaction(playerTeam.faction);
     if (!player.health.isDead) {
@@ -360,6 +369,111 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     bus: gameEvents,
     world
   }, () => playerTeam.faction, LOCAL_PLAYER_ACTOR_ID, visual.muzzleSocket, projectileSim, WEAPON_ARSENAL_PLAYER_BUDGET, sphereInstancing, segmentLineInstancing);
+
+  const registerDownedFromBot = (bot: BotActor): void => {
+    downedActorIndex.add({
+      actorId: bot.combatActor.id,
+      actor: bot.combatActor,
+      deathSnapshot: bot.controller.deathSnapshot
+    });
+  };
+
+  const registerDownedActor = (actorId: string): void => {
+    if (actorId === LOCAL_PLAYER_ACTOR_ID) {
+      downedActorIndex.add({
+        actorId,
+        actor: localPlayerActor,
+        deathSnapshot: player.deathSnapshot
+      });
+      return;
+    }
+
+    const bot = botRoster.resolveBot(actorId);
+    if (bot !== null) {
+      registerDownedFromBot(bot);
+    }
+  };
+
+  const completeReviveHire = (result: ReviveHireChannelComplete): void => {
+    const { mode, targetActorId, targetActor } = result;
+    if (targetActorId === LOCAL_PLAYER_ACTOR_ID) {
+      player.reviveInPlace();
+      gameEvents.emit('actor-revived', {
+        actorId: targetActorId,
+        faction: playerTeam.faction,
+        reviverId: LOCAL_PLAYER_ACTOR_ID
+      });
+      deathRespawnHud.update(false, 0);
+      return;
+    }
+
+    const bot = botRoster.resolveBot(targetActorId);
+    if (bot === null) {
+      return;
+    }
+
+    if (mode === 'hire') {
+      const previousFaction = targetActor.getFaction();
+      const newFaction = playerTeam.faction;
+      bot.hireInPlace(newFaction, playerTeam);
+      gameEvents.emit('actor-hired', {
+        actorId: targetActorId,
+        previousFaction,
+        newFaction,
+        hirerId: LOCAL_PLAYER_ACTOR_ID
+      });
+      return;
+    }
+
+    bot.reviveInPlace();
+    gameEvents.emit('actor-revived', {
+      actorId: targetActorId,
+      faction: bot.combatActor.getFaction(),
+      reviverId: LOCAL_PLAYER_ACTOR_ID
+    });
+  };
+
+  const reviveHireChannelDeps: ReviveHireChannelDeps = {
+    channelerId: LOCAL_PLAYER_ACTOR_ID,
+    getChannelerFaction: () => playerTeam.faction,
+    downedIndex: downedActorIndex,
+    channelerBody: player.body,
+    isChannelerEligible: () => matchLive && !player.health.isDead && !weapon.isRedeemerGuidedActive(),
+    onComplete: completeReviveHire
+  };
+
+  gameEvents.on('actor-died', (event) => {
+    if (event.sourceActorId === LOCAL_PLAYER_ACTOR_ID && event.actorId !== LOCAL_PLAYER_ACTOR_ID) {
+      crosshairHud.flashKill();
+      playKillConfirm();
+    }
+    teamRosterCounter.onDeath(event.actorId, event.faction);
+    personalMatchStats.recordActorDied(event);
+    personalStatsHud.update(personalMatchStats);
+    teamKillScore.recordKill(event.sourceFaction, event.faction);
+    teamMatchPoints.recordCrossFactionKill(event.sourceFaction, event.faction);
+    refreshTeamHud();
+    registerDownedActor(event.actorId);
+    const winner = teamMatchPoints.winner;
+    if (winner !== null) {
+      endMatch(winner);
+    }
+  });
+  gameEvents.on('actor-respawned', (event) => {
+    downedActorIndex.remove(event.actorId);
+    teamRosterCounter.onRevive(event.actorId, event.faction);
+    refreshTeamHud();
+  });
+  gameEvents.on('actor-revived', (event) => {
+    downedActorIndex.remove(event.actorId);
+    teamRosterCounter.onRevive(event.actorId, event.faction);
+    refreshTeamHud();
+  });
+  gameEvents.on('actor-hired', (event) => {
+    downedActorIndex.remove(event.actorId);
+    teamRosterCounter.onHired(event.actorId, event.previousFaction, event.newFaction);
+    refreshTeamHud();
+  });
   const pickupField = new PickupField({
     scene,
     world,
@@ -400,7 +514,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     player: playerSnapshot
   };
 
-  matchFlow.setLoadingProgress(92, 'Finalizing…');
+  matchFlow.setLoadingProgress(95, 'Finalizing…');
   const resizeObserver = new ResizeObserver(() => {
     resizeRenderer(renderer, dom.canvas, camera);
   });
@@ -424,6 +538,8 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     player.setMovementLocked(true);
     lighting.updateFightFocus(null);
     refreshTeamHud();
+    reviveHireChannel.abortAll(performance.now());
+    reviveHireHud.update(false, null, 0);
     deathRespawnHud.update(false, 0);
     matchFlow.setMatchPhase('ended');
     matchResultScreen.show(
@@ -445,7 +561,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   input.connect();
   enterArenaDisplayMode(dom.canvas);
 
-  // Canvas still holds the last character-select frame until we paint the arena.
+  
   primeArenaFrame(renderer, scene, camera);
 
   const frameClock = new GameFrameClock(getRuntimeProfile().physicsMaxSubSteps);
@@ -536,13 +652,50 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
       visual.setWeapon(weapon.equipSpawnWeapon());
     });
     botRoster.update(deltaSeconds, frameNowMs, botContextBase);
+    const reviveChannelHeld = input.reviveChannelHeldNow();
+    if (matchLive && (reviveChannelHeld || reviveHireChannel.isChanneling)) {
+      botRoster.syncDownedActors(registerDownedFromBot);
+    }
+    if (matchLive) {
+      const deathSnapshotForChannel = player.deathSnapshot;
+      const spectatorSnapshot =
+        frame.isDead &&
+        (deathSnapshotForChannel.applied || deathSnapshotForChannel.diedAtMs > 0)
+          ? deathSnapshotForChannel
+          : null;
+      let reviveHireHudView = readSpectatorReviveHireHud(spectatorSnapshot);
+      if (
+        reviveHireChannel.mayTick(
+          matchLive,
+          downedActorIndex.count,
+          reviveChannelHeld,
+          spectatorSnapshot
+        )
+      ) {
+        reviveHireHudView = reviveHireChannel.tick(
+          reviveHireChannelDeps,
+          reviveChannelHeld,
+          frameNowMs,
+          deltaSeconds,
+          spectatorSnapshot
+        );
+      }
+      reviveHireHud.update(
+        reviveHireHudView.visible,
+        reviveHireHudView.mode,
+        reviveHireHudView.progress
+      );
+      botRoster.tryAutoRespawn(frameNowMs);
+    }
     profileMark('funnel-bots-end');
     profileMeasure('funnel-bots', 'funnel-bots-start', 'funnel-bots-end');
     if (frame.isDead !== lastLocalPlayerDead) {
       if (frame.isDead) {
         teamRosterCounter.onDeath(LOCAL_PLAYER_ACTOR_ID, playerTeam.faction);
+        registerDownedActor(LOCAL_PLAYER_ACTOR_ID);
       } else {
         teamRosterCounter.onRevive(LOCAL_PLAYER_ACTOR_ID, playerTeam.faction);
+        downedActorIndex.remove(LOCAL_PLAYER_ACTOR_ID);
       }
       lastLocalPlayerDead = frame.isDead;
     }
@@ -596,12 +749,9 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
       );
 
       const deathSnapshot = player.deathSnapshot;
-      if (frame.isDead && deathSnapshot.applied && deathSnapshot.diedAtMs > 0) {
-        const countdownSeconds = playerAutoRespawnCountdownSeconds(
-          frameNowMs,
-          deathSnapshot.diedAtMs
-        );
-        if (countdownSeconds > 0) {
+      if (frame.isDead && deathSnapshot.diedAtMs > 0) {
+        const countdownSeconds = playerAutoRespawnCountdownSeconds(frameNowMs, deathSnapshot);
+        if (!playerAutoRespawnDue(frameNowMs, deathSnapshot)) {
           deathRespawnHud.update(true, countdownSeconds);
         } else {
           player.respawnAtFaction(playerTeam.faction);
@@ -628,7 +778,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
       segmentLineInstancing.tick(frameNowMs);
     }
 
-    if (matchLive && !frame.isDead) {
+    if (matchLive && !frame.isDead && !reviveHireChannel.isChanneling) {
       if (snapshot.weaponSlotSelect !== null && weapon.selectSlot(snapshot.weaponSlotSelect)) {
         visual.setWeapon(weapon.selectedWeapon);
         toast.show(`Selected ${weapon.selectedWeaponLabel}.`, 900);

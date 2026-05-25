@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/ammo-controller.ts
+
 import type { AmmoProfile, WeaponDefinition, WeaponFireMode } from './weapon-definitions';
 
 const SNIPER_MAGAZINE_RELOAD_MS = 3500;
@@ -10,7 +12,7 @@ export interface AmmoHudSnapshot {
   ammoMax: number;
   ammoCurrent: number;
   weaponColor: number;
-  /** 0 when idle; 0–1 during full magazine reload only. */
+  
   reloadProgress: number;
   cellStates: readonly AmmoCellState[];
 }
@@ -182,7 +184,7 @@ export class WeaponAmmoController {
     return this.#reloadEndsAtMs > nowMs;
   }
 
-  /** `true` while a reload timer is active — includes the completion frame (`tick` must still run). */
+  
   hasReloadPending(): boolean {
     return this.#reloadEndsAtMs > 0;
   }
@@ -282,7 +284,7 @@ export class WeaponAmmoController {
     return this.#current >= cost;
   }
 
-  /** Call after a committed shot (or burst start / volley). */
+  
   commitFire(weapon: WeaponDefinition, _mode: WeaponFireMode, nowMs: number, units = 1): void {
     const profile = weapon.ammo;
     if (profile === undefined) {
@@ -422,7 +424,7 @@ export class WeaponAmmoController {
   }
 }
 
-/** Pulse RMB: beam duration draws from the same pool as LMB (full hold ≈ ammoMax units). */
+
 export function pulseBeamAmmoCost(heldMs: number, profile: AmmoProfile): number {
   const maxHold = profile.beamMaxHoldMs ?? 3000;
   if (maxHold <= 0) {
@@ -432,7 +434,7 @@ export function pulseBeamAmmoCost(heldMs: number, profile: AmmoProfile): number 
   return Math.max(1, Math.ceil((heldMs / maxHold) * profile.ammoMax));
 }
 
-/** Bio RMB: charge fraction maps to 1…ammoMax units (10 small shots = one full lob). */
+
 export function bioChargeAmmoCost(
   fraction: number,
   ammoMax: number,

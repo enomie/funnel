@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-roster.ts
+
 import type { Collider, RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import type { Scene } from 'three/webgpu';
 import type { WeaponAudio } from '../game-audio/audio-weapon/audio-weapon';
@@ -141,7 +143,7 @@ export class BotRoster {
     }
   }
 
-  /** Fresh random loadout for every bot when the match goes live. */
+  
   rollSpawnWeapons(): void {
     for (const bot of this.#bots) {
       bot.rollSpawnWeapon();
@@ -187,7 +189,7 @@ export class BotRoster {
     }
   }
 
-  /** Brain + nav — once per render frame before the physics sub-step loop. */
+  
   preparePhysicsFrame(
     deltaSeconds: number,
     nowMs: number,
@@ -205,7 +207,7 @@ export class BotRoster {
     }
   }
 
-  /** Once per render frame after `world.step` — ground probes only (targets sync before physics). */
+  
   afterPhysics(): void {
     for (const bot of this.#bots) {
       if (!bot.controller.health.isDead) {
@@ -223,7 +225,7 @@ export class BotRoster {
     jumpPadField.tickBots(scratch, nowMs);
   }
 
-  /** Match countdown — fall animation + footstep landings while `matchLive` is false. */
+  
   tickCountdownDrop(deltaSeconds: number, nowMs: number): void {
     for (const bot of this.#bots) {
       bot.tickCountdownDrop(deltaSeconds, nowMs);
@@ -248,6 +250,32 @@ export class BotRoster {
   syncCapsuleDebug(): void {
     for (const bot of this.#bots) {
       this.#capsuleDebug.sync(bot.combatActor.id, bot.controller.collider);
+    }
+  }
+
+  resolveBot(actorId: string): BotActor | null {
+    for (const bot of this.#bots) {
+      if (bot.combatActor.id === actorId) {
+        return bot;
+      }
+    }
+
+    return null;
+  }
+
+  syncDownedActors(register: (bot: BotActor) => void): void {
+    for (const bot of this.#bots) {
+      if (!bot.controller.health.isDead) {
+        continue;
+      }
+
+      register(bot);
+    }
+  }
+
+  tryAutoRespawn(nowMs: number): void {
+    for (const bot of this.#bots) {
+      bot.tryAutoRespawn(nowMs);
     }
   }
 

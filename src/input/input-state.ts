@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/input/input-state.ts
+
 import { PLAYER_CONFIG } from '../config/game-config';
 import { requestArenaPointerLock } from './pointer-lock';
 
@@ -11,7 +13,7 @@ export interface InputSnapshot {
     right: boolean;
   };
   jumpPressed: boolean;
-  /** `KeyC` held (stance, not edge). */
+  
   crouchHeld: boolean;
   sprintHeld: boolean;
   primaryHeld: boolean;
@@ -20,21 +22,21 @@ export interface InputSnapshot {
   secondaryHeld: boolean;
   secondaryPressed: boolean;
   secondaryReleased: boolean;
-  /** `true` = first person (default); `V` toggles third person. */
+  
   firstPersonView: boolean;
   yaw: number;
   pitch: number;
-  /** Set only on digit-key press (`1`–`0`); not re-applied every frame. */
+  
   weaponSlotSelect: number | null;
-  /** Dev/test: trigger death animation (`K`). */
+  
   killPressed: boolean;
-  /** Reserved for Revive/Hire channel (`R` hold) — not instant respawn. */
-  respawnPressed: boolean;
-  /** Dev: flip faction (`T`) — hire mechanic prep. */
+
+  reviveChannelHeld: boolean;
+
   teamFlipPressed: boolean;
 }
 
-/** Strip gameplay actions during pre-match countdown; keep look (yaw/pitch/view mode). */
+
 export function applyPreMatchLookOnly(out: InputSnapshot): InputSnapshot {
   out.movement.forward = false;
   out.movement.back = false;
@@ -51,12 +53,12 @@ export function applyPreMatchLookOnly(out: InputSnapshot): InputSnapshot {
   out.secondaryReleased = false;
   out.weaponSlotSelect = null;
   out.killPressed = false;
-  out.respawnPressed = false;
+  out.reviveChannelHeld = false;
   out.teamFlipPressed = false;
   return out;
 }
 
-/** No movement or actions — pre-match countdown / locked phases. */
+
 export const IDLE_INPUT_SNAPSHOT: InputSnapshot = {
   movement: { forward: false, back: false, left: false, right: false },
   jumpPressed: false,
@@ -73,7 +75,7 @@ export const IDLE_INPUT_SNAPSHOT: InputSnapshot = {
   pitch: -0.05,
   weaponSlotSelect: null,
   killPressed: false,
-  respawnPressed: false,
+  reviveChannelHeld: false,
   teamFlipPressed: false
 };
 
@@ -89,7 +91,6 @@ export class InputState {
   #secondaryReleased = false;
   #jumpPressed = false;
   #killPressed = false;
-  #respawnPressed = false;
   #teamFlipPressed = false;
   #yaw = Math.PI;
   #pitch = -0.05;
@@ -122,6 +123,10 @@ export class InputState {
     this.#canvas.removeEventListener('contextmenu', this.#preventContextMenu);
   }
 
+  reviveChannelHeldNow(): boolean {
+    return this.#keys.has('KeyR');
+  }
+
   snapshot(out: InputSnapshot = this.#snapshotScratch): InputSnapshot {
     const forward = this.#keys.has('KeyW') ? 1 : 0;
     const back = this.#keys.has('KeyS') ? 1 : 0;
@@ -130,7 +135,6 @@ export class InputState {
     const jumpPressed = this.#jumpPressed;
     const crouchHeld = this.#keys.has('KeyC');
     const killPressed = this.#killPressed;
-    const respawnPressed = this.#respawnPressed;
     const teamFlipPressed = this.#teamFlipPressed;
     const primaryPressed = this.#primaryPressed;
     const primaryReleased = this.#primaryReleased;
@@ -139,7 +143,6 @@ export class InputState {
 
     this.#jumpPressed = false;
     this.#killPressed = false;
-    this.#respawnPressed = false;
     this.#teamFlipPressed = false;
     this.#primaryPressed = false;
     this.#primaryReleased = false;
@@ -166,7 +169,7 @@ export class InputState {
     out.pitch = this.#pitch;
     out.weaponSlotSelect = weaponSlotSelect;
     out.killPressed = killPressed;
-    out.respawnPressed = respawnPressed;
+    out.reviveChannelHeld = this.#keys.has('KeyR');
     out.teamFlipPressed = teamFlipPressed;
     return out;
   }
@@ -187,7 +190,7 @@ export class InputState {
     pitch: -0.05,
     weaponSlotSelect: null,
     killPressed: false,
-    respawnPressed: false,
+    reviveChannelHeld: false,
     teamFlipPressed: false
   };
 
@@ -224,8 +227,9 @@ export class InputState {
       this.#killPressed = true;
     }
 
-    if (event.code === 'KeyR' && !event.repeat) {
-      this.#respawnPressed = true;
+    if (event.code === 'KeyR') {
+      event.preventDefault();
+      this.#keys.add('KeyR');
     }
 
     if (event.code === 'KeyT' && !event.repeat) {

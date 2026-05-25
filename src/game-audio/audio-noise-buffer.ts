@@ -1,4 +1,6 @@
-/** Procedural noise clips — one cache entry per shape. */
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-noise-buffer.ts
+
+
 
 import { BAKED_NOISE_PEAK } from './audio-config';
 

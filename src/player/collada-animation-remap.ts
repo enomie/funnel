@@ -1,9 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/collada-animation-remap.ts
+
 import { Bone, type AnimationClip, type Object3D } from 'three/webgpu';
 
-/**
- * Mixamo ZIP Collada files animate nodes by Collada id; Three.js keys tracks with
- * object UUIDs. Remap track names to bone names so clips work on the base rig.
- */
+
 export function remapAnimationClipToBoneNames(clip: AnimationClip, sourceScene: Object3D): AnimationClip {
   const uuidToBoneName = new Map<string, string>();
   sourceScene.traverse((object) => {

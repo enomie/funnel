@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/sphere-vfx-tuning.ts
+
 export const IMPACT_BURST_DURATION_MS = 200;
 export const ROCKET_IMPACT_BURST_DURATION_MS = 440;
 export const IMPACT_BURST_START_SCALE = 0.12;

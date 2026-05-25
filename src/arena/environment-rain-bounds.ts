@@ -1,11 +1,13 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/environment-rain-bounds.ts
+
 import { FUNNEL_DIMENSIONS, funnelZoneExtentZ } from '../config/game-config';
 import { dynamicPropVerticalExtent, type DynamicPropSpec } from './environment-dynamic-shapes';
 
-/** 10 m inset from side walls (interior ±25). */
+
 export const RAIN_DROP_X_MIN = -15;
 export const RAIN_DROP_X_MAX = 15;
 
-/** 10 m inset from neutral zone north/south borders — rain only in neutral (docs/environment-dynamic.md). */
+
 const NEUTRAL_ZONE_RAIN_INSET_M = 10;
 
 const neutralZoneZ = funnelZoneExtentZ(1);
@@ -13,11 +15,11 @@ const neutralZoneZ = funnelZoneExtentZ(1);
 export const RAIN_DROP_Z_MIN = neutralZoneZ.minZ + NEUTRAL_ZONE_RAIN_INSET_M;
 export const RAIN_DROP_Z_MAX = neutralZoneZ.maxZ - NEUTRAL_ZONE_RAIN_INSET_M;
 
-/** Spawn band above interior ceiling (y = 50) — production match rain. */
+
 export const RAIN_SPAWN_Y_MIN = 52;
 export const RAIN_SPAWN_Y_MAX = 58;
 
-/** Countdown-visible band — in frustum from spawn pockets while rain logic is tuned. */
+
 export const RAIN_COUNTDOWN_SPAWN_Y_MIN = 10;
 export const RAIN_COUNTDOWN_SPAWN_Y_MAX = 14;
 
@@ -31,7 +33,7 @@ export function clampRainDropZ(z: number): number {
   return Math.max(RAIN_DROP_Z_MIN, Math.min(RAIN_DROP_Z_MAX, z));
 }
 
-/** Mid-band rain spawn height for production spawner. */
+
 export function rainSpawnY(): number {
   return (RAIN_SPAWN_Y_MIN + RAIN_SPAWN_Y_MAX) * 0.5;
 }
@@ -48,17 +50,17 @@ export function randomRainSpawnY(): number {
   return RAIN_SPAWN_Y_MIN + Math.random() * (RAIN_SPAWN_Y_MAX - RAIN_SPAWN_Y_MIN);
 }
 
-/** Uniform random X/Z inside neutral-zone rain footprint. */
+
 export function randomRainDropPosition(): readonly [number, number] {
   return [randomRainDropX(), randomRainDropZ()];
 }
 
-/** Uniform random center — production rain (above ceiling). */
+
 export function randomRainSpawnCenter(): readonly [number, number, number] {
   return [randomRainDropX(), randomRainSpawnY(), randomRainDropZ()];
 }
 
-/** Shape-aware spawn center in the countdown-visible band. */
+
 export function randomCountdownRainSpawnCenter(
   shape: DynamicPropSpec
 ): readonly [number, number, number] {
@@ -66,7 +68,7 @@ export function randomCountdownRainSpawnCenter(
   return randomPickupSpawnCenter(halfHeight);
 }
 
-/** Pickups + countdown rain — visible band above the arena floor. */
+
 export function randomPickupSpawnCenter(halfExtentY: number): readonly [number, number, number] {
   const yMin = RAIN_COUNTDOWN_SPAWN_Y_MIN + halfExtentY;
   const yMax = RAIN_COUNTDOWN_SPAWN_Y_MAX + halfExtentY;

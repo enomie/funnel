@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/redeemer-pickup.ts
+
 import { Group } from 'three/webgpu';
 import type { Scene } from 'three/webgpu';
 import type { CombatActor } from '../combat/combat-actor';
@@ -13,7 +15,7 @@ const REDEEMER_PICKUP_SPIN_RAD_S = 2.1;
 const REDEEMER_PICKUP_BOB_AMPLITUDE_M = 0.14;
 const REDEEMER_PICKUP_BOB_RAD_S = 2.6;
 const REDEEMER_PICKUP_DISPLAY_SCALE = 1.18;
-/** Lay bore horizontal so Y spin reads like a classic weapon pad. */
+
 const REDEEMER_PICKUP_MESH_TILT_RAD = Math.PI * 0.5;
 
 export interface RedeemerPickupDeps {
@@ -22,7 +24,7 @@ export interface RedeemerPickupDeps {
   readonly onCollected: (collector: CombatActor, origin: AudioPoint) => void;
 }
 
-/** Spinning Redeemer mesh on center podium — 60 s respawn, equips on touch. */
+
 export class RedeemerPickup {
   readonly #registry: ActorRegistry;
   readonly #onCollected: RedeemerPickupDeps['onCollected'];
@@ -54,7 +56,7 @@ export class RedeemerPickup {
     deps.scene.add(this.#root);
   }
 
-  /** Spawn on podium when the match goes live. Idempotent. */
+  
   begin(): void {
     if (this.#active) {
       return;

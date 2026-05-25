@@ -1,13 +1,6 @@
-/**
- * Death — player and bots share one path.
- *
- * Three layers (same as locomotion — see funnel-locomotion-animations.mdc):
- * 1. Rapier capsule — crouch size (1 m); bottom pinned to floor captured at death
- * 2. `visual.root` — body translation; yaw frozen at death
- * 3. Skinned mesh — per-frame foot anchor with crouch capsule offset (`walking-to-dying`)
- *
- * Locomotion: `walking-to-dying` once when `isDead`.
- */
+// Path: /Users/johann/MyBrew/funnel-real/src/player/actor-death.ts
+
+
 import type { Collider, RigidBody } from '@dimforge/rapier3d-simd-compat';
 import type { Object3D } from 'three/webgpu';
 import {
@@ -30,21 +23,73 @@ export const HUMANOID_JUMP_FOOT_CLIP_IDS = new Set<string>([
   VERTICAL_JUMP_SUBCLIP_IDS.land
 ]);
 
+export type ReviveHireChannelMode = 'revive' | 'hire';
+
 export interface ActorDeathSnapshot {
   applied: boolean;
   diedAtMs: number;
   frozenYaw: number;
   groundY: number | null;
+  respawnPauseAccumMs: number;
+  respawnPauseStartedMs: number;
+  channelerId: string | null;
+  channelMode: ReviveHireChannelMode | null;
+  channelProgress: number;
 }
 
 export function createActorDeathSnapshot(): ActorDeathSnapshot {
-  return { applied: false, diedAtMs: 0, frozenYaw: 0, groundY: null };
+  return {
+    applied: false,
+    diedAtMs: 0,
+    frozenYaw: 0,
+    groundY: null,
+    respawnPauseAccumMs: 0,
+    respawnPauseStartedMs: 0,
+    channelerId: null,
+    channelMode: null,
+    channelProgress: 0
+  };
 }
 
 export function clearActorDeathSnapshot(snapshot: ActorDeathSnapshot): void {
   snapshot.applied = false;
   snapshot.diedAtMs = 0;
   snapshot.groundY = null;
+  snapshot.respawnPauseAccumMs = 0;
+  snapshot.respawnPauseStartedMs = 0;
+  snapshot.channelerId = null;
+  snapshot.channelMode = null;
+  snapshot.channelProgress = 0;
+}
+
+export function effectiveRespawnElapsedMs(nowMs: number, snapshot: ActorDeathSnapshot): number {
+  let pauseMs = snapshot.respawnPauseAccumMs;
+  if (snapshot.respawnPauseStartedMs > 0) {
+    pauseMs += nowMs - snapshot.respawnPauseStartedMs;
+  }
+
+  return nowMs - snapshot.diedAtMs - pauseMs;
+}
+
+export function startRespawnPause(snapshot: ActorDeathSnapshot, nowMs: number): void {
+  if (snapshot.respawnPauseStartedMs <= 0) {
+    snapshot.respawnPauseStartedMs = nowMs;
+  }
+}
+
+export function endRespawnPause(snapshot: ActorDeathSnapshot, nowMs: number): void {
+  if (snapshot.respawnPauseStartedMs <= 0) {
+    return;
+  }
+
+  snapshot.respawnPauseAccumMs += nowMs - snapshot.respawnPauseStartedMs;
+  snapshot.respawnPauseStartedMs = 0;
+}
+
+export function clearReviveHireChannelState(snapshot: ActorDeathSnapshot): void {
+  snapshot.channelerId = null;
+  snapshot.channelMode = null;
+  snapshot.channelProgress = 0;
 }
 
 export function syncActorDeathState(
@@ -97,7 +142,7 @@ export function createFootAnchorState(): FootAnchorState {
   return { lastClipId: '', liveFeetActive: false };
 }
 
-/** After locomotion mixer tick — player and bots. */
+
 export function syncHumanoidVisualMesh(
   character: Object3D,
   anchors: StanceMeshAnchors,

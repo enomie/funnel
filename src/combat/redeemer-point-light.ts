@@ -1,12 +1,14 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/redeemer-point-light.ts
+
 import type { CombatPointLightPool } from '../render/combat-point-light-pool';
 
-/** In-flight — warm luminous orb. */
+
 export const REDEEMER_FLIGHT_LIGHT_COLOR = 0xfffef0;
 
-/** Redeemer impact flash — blinding white. */
+
 export const REDEEMER_FLASH_LIGHT_COLOR = 0xffffff;
 
-/** Rocket impact flash — hot white-orange (smaller cousin of the nuke). */
+
 export const ROCKET_FLASH_LIGHT_COLOR = 0xfff4e0;
 
 const REDEEMER_FLIGHT_INTENSITY = 128;
@@ -38,7 +40,7 @@ export interface ExplosivePointLightFlash {
   expandMs: number;
 }
 
-/** @deprecated Use ExplosivePointLightFlash */
+
 export type RedeemerPointLightFlash = ExplosivePointLightFlash;
 
 export function tryAcquireRedeemerFlightLight(pool: CombatPointLightPool): number {
@@ -137,7 +139,7 @@ export function tickExplosiveImpactFlashes(
   }
 }
 
-/** @deprecated Use tickExplosiveImpactFlashes */
+
 export function tickRedeemerImpactFlashes(
   pool: CombatPointLightPool,
   flashes: ExplosivePointLightFlash[],

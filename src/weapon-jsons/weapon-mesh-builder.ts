@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/weapon-jsons/weapon-mesh-builder.ts
+
 import {
   BoxGeometry,
   BufferGeometry,

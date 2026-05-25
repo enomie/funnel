@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/team-visual-colors.ts
+
 import {
   Mesh,
   MeshStandardMaterial,
@@ -14,7 +16,7 @@ const MANNEQUIN_SURFACE = {
 } as const;
 
 const SEGMENT_EMISSIVE_INTENSITY = 0.18;
-/** Gelenke: in Teamfarbe leuchten, nicht auf Weiß ausfransen. */
+
 const JOINT_EMISSIVE_INTENSITY = 0.42;
 
 function isJointMesh(mesh: { name: string; material: Material | Material[] }): boolean {
@@ -124,7 +126,7 @@ export function isPooledTeamMaterial(material: Material): boolean {
   return POOLED_TEAM_MATERIALS.has(material as MeshStandardMaterial);
 }
 
-/** Ally = blue, enemy = red (viewer-relative). Replaces Collada materials so tint always applies. */
+
 export function applyRelativeTeamColors(root: Object3D, role: RelativeTeamRole): void {
   ensureTeamMaterialPool();
 
@@ -166,7 +168,7 @@ function isWeaponPlaceholderMesh(object: Object3D): boolean {
   return object.name.endsWith('-bounds');
 }
 
-/** Swap joint + eye meshes between idle and hit-flash pooled materials. */
+
 export function setJointHitFlash(character: Object3D, role: RelativeTeamRole, active: boolean): void {
   const material = getTeamMaterial(role, true, active);
   character.traverse((object) => {

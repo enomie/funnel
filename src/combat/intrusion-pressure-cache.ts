@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/intrusion-pressure-cache.ts
+
 import type { ActorRegistry } from './actor-registry';
 import {
   fillIntrusionPressure,
@@ -6,7 +8,7 @@ import {
 } from './intrusion-pressure';
 import type { FactionTeam } from './teams';
 
-/** One intrusion scan per render frame — shared by lighting + any other readers. */
+
 export class IntrusionPressureCache {
   #frameId = -1;
   readonly #pressure: IntrusionPressure = { alpha: 0, beta: 0 };

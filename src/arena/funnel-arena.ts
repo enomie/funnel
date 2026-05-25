@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/funnel-arena.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import { BoxGeometry, Mesh, PlaneGeometry, Scene } from 'three/webgpu';
@@ -17,6 +19,7 @@ import { createTeamZonePodiumRamps } from './team-zone-podium-ramps';
 import { createSideWallCeilingRamps } from './side-wall-ceiling-ramps';
 import { createSpawnShieldCanopies } from './spawn-shield-canopy';
 import { createSpawnShieldCubes } from './spawn-shield-cubes';
+import { createTeamSpawnMascotPedestals } from './team-spawn-mascot-pedestals';
 import type { FunnelZoneId } from './funnel-zones';
 import { createZoneBorderRamps } from './zone-border-ramps';
 import { ENVIRONMENT_COLLISION_GROUPS } from '../physics/collision-groups';
@@ -35,6 +38,7 @@ export function createFunnelArena(scene: Scene, world: World): FunnelArena {
   createShell(scene, world);
   createCeilingFixtures(staticInstances);
   createSpawnShieldCubes(staticInstances, world);
+  createTeamSpawnMascotPedestals(staticInstances, world);
   createSpawnShieldCanopies(staticInstances, world);
   createNeutralCornerCubes(staticInstances, world);
   createNeutralSideWallRamps(staticInstances, world);

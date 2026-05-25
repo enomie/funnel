@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/projectile-visuals.ts
+
 import { Euler, Group, Material, Mesh, Object3D, TorusGeometry } from 'three/webgpu';
 import type { BufferGeometry } from 'three/webgpu';
 import { getUnitLowPolySphereGeometry } from '../render/low-poly-sphere-geometry';
@@ -9,18 +11,15 @@ import {
 } from './projectile-materials';
 import type { ProjectileVisualKind } from './weapon-definitions';
 
-/**
- * World-space projectiles: root moves (position only). No aim/camera/spin rotation on the root.
- * Per-kind mesh may use a fixed local rotation baked at create time (geometry convention).
- */
-/** Sniper / Shock LMB — elongated box bolt (meters). Length aligns with flight direction (+Y in mesh space). */
+
+
 export const BOLT_PROJECTILE_CROSS_SECTION_M = 0.05;
 export const BOLT_PROJECTILE_LENGTH_M = 0.15;
-/** Rocket Launcher — thicker bolt, visible roll in flight. */
+
 export const ROCKET_PROJECTILE_CROSS_SECTION_M = 0.08;
 export const ROCKET_PROJECTILE_LENGTH_M = 0.28;
 
-/** Visual radius per weapon kind (meters), low-poly sphere projectiles. */
+
 const PROJECTILE_RADIUS: Record<ProjectileVisualKind, number> = {
   pistol: 0.11,
   shock: 0.34,
@@ -34,11 +33,11 @@ const PROJECTILE_RADIUS: Record<ProjectileVisualKind, number> = {
   redeemer: 0.46
 };
 
-/** Torus default: ring in local XY, hole axis local +Z. Ripper: rotate mesh +90° X → ring waagrecht (XZ). */
+
 const RIPPER_TORUS = new TorusGeometry(0.32, 0.045, 8, 18);
 const RIPPER_MESH_ROTATION = new Euler(Math.PI / 2, 0, 0);
 
-/** Bio RMB charge — center past muzzle tip (× glow extent); 1 = back touches tip. */
+
 const BIO_CHARGE_PREVIEW_FORWARD_FACTOR = 2.15;
 const VIEWMODEL_PREVIEW_RENDER_ORDER = 12;
 
@@ -50,7 +49,7 @@ export function createProjectileVisual(kind: ProjectileVisualKind, color: number
   return createSphereProjectile(kind, color);
 }
 
-/** Local scale + optional baked rotation for projectile child meshes (not the moving root). */
+
 function bindProjectileMesh(mesh: Mesh, scale: number, rotation?: Euler): void {
   mesh.position.set(0, 0, 0);
   mesh.quaternion.set(0, 0, 0, 1);
@@ -72,7 +71,7 @@ function createProjectileMesh(
   return mesh;
 }
 
-/** Ripper — torus core + stacked scaled torus shells. */
+
 export function createRipperCoreVisual(color: number): Object3D {
   const root = new Group();
   root.name = 'projectile-ripper';
@@ -95,7 +94,7 @@ export function projectileGlowRadius(kind: ProjectileVisualKind, visualScale = 1
   return PROJECTILE_RADIUS[kind] * PROJECTILE_OUTER_GLOW_SCALE * visualScale;
 }
 
-/** Center the preview sphere ahead of the muzzle tip (FPS bore −Z, third-person +Z). */
+
 export function syncMuzzleAttachedPreviewPosition(
   preview: Object3D,
   kind: ProjectileVisualKind,
@@ -108,14 +107,14 @@ export function syncMuzzleAttachedPreviewPosition(
   preview.position.set(0, 0, boreZ);
 }
 
-/** Re-apply on root only; child meshes keep their fixed local rotation/scale. */
+
 export function resetProjectileTransform(object: Object3D): void {
   object.rotation.set(0, 0, 0);
   object.quaternion.set(0, 0, 0, 1);
   object.scale.set(1, 1, 1);
 }
 
-/** Bio RMB charge blob parented to muzzle — draw above FPS viewmodel, ignore depth. */
+
 export function configureViewmodelAttachedProjectilePreview(object: Object3D): void {
   object.renderOrder = VIEWMODEL_PREVIEW_RENDER_ORDER;
   object.traverse((node) => {
@@ -135,7 +134,7 @@ export function configureViewmodelAttachedProjectilePreview(object: Object3D): v
   });
 }
 
-/** Bio preview clones materials — release clones only; shared geometry/cache stay alive. */
+
 export function releaseViewmodelAttachedProjectilePreview(preview: Object3D): void {
   preview.traverse((node) => {
     if (!(node instanceof Mesh)) {

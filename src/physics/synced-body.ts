@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/physics/synced-body.ts
+
 import type { Object3D } from 'three/webgpu';
 import type { RigidBody } from '@dimforge/rapier3d-simd-compat';
 import { actorVisualYaw, type ActorDeathSnapshot } from '../player/actor-death';
@@ -14,7 +16,7 @@ export function syncRigidBodyObjects(items: readonly SyncedBody[]): void {
   }
 }
 
-/** Capsule center + yaw on visual root — player + bots, after `world.step`. */
+
 export function syncHumanoidVisualRoot(
   body: RigidBody,
   root: Object3D,

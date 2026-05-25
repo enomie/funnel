@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/physics/rapier-world.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { EventQueue, World } from '@dimforge/rapier3d-simd-compat';
 import { PHYSICS_CONFIG } from '../config/game-config';

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/arena-static-instances.ts
+
 import {
   BoxGeometry,
   BufferAttribute,
@@ -38,7 +40,7 @@ const FIXTURE_PANEL_THICKNESS_M = 0.08;
 
 const FIXTURE_CENTER_Y = FUNNEL_DIMENSIONS.height - FIXTURE_DROP_M * 0.5;
 const FIXTURE_BOTTOM_Y = FIXTURE_CENTER_Y - FIXTURE_DROP_M * 0.5;
-/** Emissive slab hangs from troffer opening — no overlap with open-bottom shell. */
+
 const FIXTURE_PANEL_CENTER_Y = FIXTURE_BOTTOM_Y - FIXTURE_PANEL_THICKNESS_M * 0.5;
 
 const NEUTRAL_PANEL_EMISSIVE = 0x8a9098;
@@ -76,7 +78,7 @@ function getUnitRampGeometry(): BufferGeometry {
   return unitRampGeometry;
 }
 
-/** Five faces only — bottom open for emissive panel (matches pre-instancing multi-material troffer). */
+
 function getTrofferShellUnitGeometry(): BufferGeometry {
   if (trofferShellGeometry !== null) {
     return trofferShellGeometry;
@@ -152,7 +154,7 @@ function setPropMatrix(
   );
 }
 
-/** Static arena boxes (5³ shields, podium, canopies) + ceiling troffers — one InstancedMesh per zone/material. */
+
 export class ArenaStaticInstances {
   readonly #scene: Scene;
   readonly #boxLayers = new Map<FunnelZoneId, InstancedLayer>();

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/segment-line-instancing.ts
+
 import {
   BoxGeometry,
   InstancedMesh,
@@ -61,7 +63,7 @@ function lineMaterialForColor(color: number): MeshBasicMaterial {
   return material;
 }
 
-/** Instanced thin boxes for projectile trails and hitscan tracers — one draw call per weapon color. */
+
 export class SegmentLineInstancingService {
   readonly #scene: Scene;
   readonly #layers = new Map<string, InstancedLineLayer>();

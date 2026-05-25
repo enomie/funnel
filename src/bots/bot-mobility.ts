@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-mobility.ts
+
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import {
   JUMP_ARM_CLEAR_M,
@@ -7,19 +9,19 @@ import {
 import { computeJumpImpulse, upwardVelocityForApex, type JumpStyle } from '../player/player-jump';
 import type { BotDriveCommand } from './bot-chase-drive';
 
-/** Step vault can repeat after a failed arc — but not in a tight loop. */
+
 const BOT_STEP_JUMP_COOLDOWN_MS = 420;
-/** After this many vaults with no forward progress, stop jumping and let nav peel/escape. */
+
 export const BOT_VAULT_FAIL_LIMIT = 2;
-/** Jump ban duration once vault keeps failing (ms). */
+
 export const BOT_JUMP_BAN_MS = 2800;
 
-/** Pop over ~1 m podium lips — high arc, modest forward (not sprint slam). */
+
 const BOT_VAULT_APEX_M = 3.45;
 const BOT_VAULT_FORWARD_MPS = 2.8;
 const BOT_VAULT_RETAIN = 0.4;
 
-/** Planar progress after landing to count a vault as successful (m). */
+
 export const BOT_VAULT_PROGRESS_MIN_M = 0.55;
 
 export interface BotJumpDecision {
@@ -28,7 +30,7 @@ export interface BotJumpDecision {
 }
 
 export interface BotJumpProbeResult extends BotJumpDecision {
-  /** Set when the path ahead is open enough to allow one vault on the next block. */
+  
   readonly rearmVault: boolean;
 }
 
@@ -108,7 +110,7 @@ export function fillBotJumpDecision(
   out.rearmVault = false;
 }
 
-/** @deprecated Use `fillBotJumpDecision`. */
+
 export function resolveBotJumpDecision(
   world: World,
   body: RigidBody,
@@ -154,7 +156,7 @@ export function applyBotVaultImpulse(
   };
 }
 
-/** Forward progress along the takeoff move bearing since vault (m). */
+
 export function vaultProgressM(
   moveYaw: number,
   fromX: number,

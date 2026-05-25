@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-visual.ts
+
 import type { Group, Scene } from 'three/webgpu';
 import {
   findBotMuzzleSocket,
@@ -18,7 +20,7 @@ import { applyRelativeTeamColors } from '../player/team-visual-colors';
 export class BotVisual {
   readonly #humanoid: HumanoidVisual;
   readonly #aimSpine = new PlayerAimSpine();
-  readonly faction: FactionTeam;
+  #faction: FactionTeam;
   #weaponSocket: Group;
   #muzzleSocket: Group;
 
@@ -29,7 +31,7 @@ export class BotVisual {
     template: ShooterPackCharacter | undefined,
     weapon: WeaponDefinition
   ) {
-    this.faction = slot.faction;
+    this.#faction = slot.faction;
     this.#humanoid = new HumanoidVisual(
       template === undefined ? `bot-fallback-${slot.faction}` : `bot-${slot.faction}`,
       scene
@@ -66,13 +68,21 @@ export class BotVisual {
     return this.#humanoid.locomotionClipId;
   }
 
+  get faction(): FactionTeam {
+    return this.#faction;
+  }
+
+  setFaction(faction: FactionTeam): void {
+    this.#faction = faction;
+  }
+
   equipWeapon(weapon: WeaponDefinition): void {
     this.#weaponSocket = replaceWeaponPlaceholderOnCapsuleRoot(this.root, weapon);
     this.#muzzleSocket = findBotMuzzleSocket(this.root) ?? this.#weaponSocket;
   }
 
   applyViewerColors(viewerTeam: PlayerTeam): void {
-    const role = viewerTeam.relativeRole(this.faction);
+    const role = viewerTeam.relativeRole(this.#faction);
     this.#humanoid.setTeamRole(role);
     applyRelativeTeamColors(this.root, role);
   }
@@ -89,11 +99,11 @@ export class BotVisual {
     deltaSeconds: number,
     input: LocomotionAnimInput,
     aimPitch: number,
-    skipAnimation = false,
+    visualReduced = false,
     nowMs?: number
   ): void {
-    this.#humanoid.updateLocomotion(deltaSeconds, input, nowMs, skipAnimation);
-    if (input.isDead || skipAnimation) {
+    this.#humanoid.updateLocomotion(deltaSeconds, input, nowMs, visualReduced);
+    if (input.isDead || visualReduced) {
       if (input.isDead) {
         this.#weaponSocket.rotation.x = 0;
       }

@@ -1,4 +1,6 @@
-/** Resolve a path under `public/` for the current Vite base URL. */
+// Path: /Users/johann/MyBrew/funnel-real/src/utils/asset-url.ts
+
+
 export function assetUrl(path: string): string {
   const base = import.meta.env.BASE_URL.endsWith('/')
     ? import.meta.env.BASE_URL

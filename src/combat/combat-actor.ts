@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/combat-actor.ts
+
 import type { Collider, RigidBody } from '@dimforge/rapier3d-simd-compat';
 import type { PlayerHealth } from '../player/player-health';
 import type { FactionTeam } from './teams';

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/environment-dynamic-instances.ts
+
 import type { RigidBody } from '@dimforge/rapier3d-simd-compat';
 import {
   InstancedMesh,
@@ -26,7 +28,7 @@ function configuredRainCapacity(shape: DynamicPropSpec, docDefault: number): num
   return docDefault;
 }
 
-/** Max per shape class — sized for configured rain counts (docs/environment-dynamic.md). */
+
 const DYNAMIC_ENVIRONMENT_POOLS = [
   {
     key: 'box-2x2x20',
@@ -171,7 +173,7 @@ export class DynamicEnvironmentInstances {
     return pool;
   }
 
-  /** Reserve an instance slot for a Rapier body already created by the caller. */
+  
   attachBody(shape: DynamicPropSpec, body: RigidBody): DynamicSyncedBody {
     const pool = this.resolvePool(shape);
     const slotIndex = pool.freeSlots.pop();

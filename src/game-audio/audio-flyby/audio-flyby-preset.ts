@@ -1,7 +1,9 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-flyby/audio-flyby-preset.ts
+
 import type { ProjectileVisualKind, WeaponDefinition } from '../../combat/weapon-definitions';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
 
-/** Same fly synth for every projectile — only these two knobs differ per kind. */
+
 const FLYBY: Record<ProjectileVisualKind, { noise: number; tone: number }> = {
   pistol: { noise: 0.38, tone: 168 },
   shock: { noise: 0.3, tone: 200 },
@@ -23,7 +25,7 @@ export interface FlybyPreset {
   toneSquare: boolean;
 }
 
-/** hum + filtered noise loop — timbre from kind; loudness from AUDIO_VOICE_PEAK. */
+
 export function deriveFlybyPreset(
   weapon: WeaponDefinition,
   speed: number,

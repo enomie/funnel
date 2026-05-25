@@ -1,6 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/collada-zip.ts
+
 import { unzipSync } from 'three/addons/libs/fflate.module.js';
 
-/** Mixamo often ships `.dae` as a ZIP archive containing one inner Collada XML file. */
+
 export function colladaXmlFromBuffer(buffer: ArrayBuffer): { xml: string; innerPath: string | null } {
   const bytes = new Uint8Array(buffer);
   if (isZipArchive(bytes)) {
@@ -41,7 +43,7 @@ function findInnerDaePath(zip: Record<string, Uint8Array>): string | null {
   return paths[0] ?? null;
 }
 
-/** PK\x03\x04 — do not use bitwise uint32 (JS breaks on `0x50 << 24`). */
+
 function isZipArchive(bytes: Uint8Array): boolean {
   return bytes.byteLength >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b;
 }

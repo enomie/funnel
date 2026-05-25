@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/bio-charge.ts
+
 import {
   BIO_LOBBER_KILL_RADIUS_MIN_M,
   type FireProfile,

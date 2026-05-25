@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-pickup.ts
+
 import { AUDIO_VOICE_PEAK } from '../audio-config';
 import { AudioContextEngine } from '../audio-mixer';
 import { spatialVectorFromPoint, type AudioPoint } from '../audio-system';
@@ -12,7 +14,7 @@ const PICKUP_TONE_HZ: Record<PickupKind, number> = {
   shield: 780
 };
 
-/** Short spatial chime when a health or shield pickup is collected. */
+
 export function playPickupAt(origin: AudioPoint, kind: PickupKind): void {
   const voice = tryBeginSpatialOneShot(spatialVectorFromPoint(origin), 'generic');
   if (voice === null) {
@@ -59,7 +61,7 @@ export function playPickupAt(origin: AudioPoint, kind: PickupKind): void {
 
 const REDEEMER_PICKUP_DURATION_S = 0.28;
 
-/** Low rising sweep when the center Redeemer is grabbed. */
+
 export function playRedeemerPickupAt(origin: AudioPoint): void {
   const voice = tryBeginSpatialOneShot(spatialVectorFromPoint(origin), 'generic');
   if (voice === null) {

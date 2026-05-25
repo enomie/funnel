@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-footstep-landing.ts
+
 import { getNoiseBuffer } from '../audio-noise-buffer';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
 import { AudioContextEngine } from '../audio-mixer';
@@ -11,7 +13,7 @@ const FOOTSTEP_LAND_THUMP_HZ = 92;
 const FOOTSTEP_LAND_SCRAPE_FILTER_HZ = 420;
 const FOOTSTEP_LAND_SCRAPE_FILTER_Q = 0.85;
 
-/** Heavier body-weight thump when landing from a jump or fall. */
+
 export function playFootstepLandAt(origin: AudioPoint): void {
   const voice = tryBeginSpatialOneShot(spatialVectorFromPoint(origin), 'foot');
   if (voice === null) {

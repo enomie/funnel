@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/hitscan-weapon.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { Collider, RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import { Scene, Vector3 } from 'three/webgpu';
@@ -32,7 +34,7 @@ export interface ShockComboFireContext {
 const BEAM_IMPACT_GAIN = IMPACT_GAIN_NORMAL * 0.42;
 const BEAM_IMPACT_INTERVAL_MS = 96;
 const MAX_HITSCAN_IMPACT_BURSTS = 48;
-/** Skip muzzle plane so rays do not re-hit the shooter capsule edge. */
+
 const MUZZLE_RAY_ORIGIN_NUDGE = 0.08;
 
 let _hitscanCastRay: RAPIER.Ray | null = null;
@@ -100,11 +102,12 @@ export class HitscanWeapon {
     };
   }
 
-  update(nowMs: number): void {
+  update(_nowMs: number): void {
     if (this.#sphereInstancing === null) {
       return;
     }
 
+    const nowMs = performance.now();
     for (let index = this.#impactBursts.length - 1; index >= 0; index -= 1) {
       const burst = this.#impactBursts[index];
       if (!updateImpactBurst(this.#sphereInstancing, burst, nowMs)) {
@@ -141,7 +144,7 @@ export class HitscanWeapon {
     this.#lastBeamImpactAt = 0;
   }
 
-  /** Per-frame beam aim + mesh sync (Pulse RMB). Raycast uses muzzle nudge; visual starts at bore. */
+  
   tickBeamStream(
     weapon: WeaponDefinition,
     fire: FireProfile,
@@ -153,12 +156,12 @@ export class HitscanWeapon {
     this.#prepareHitscanRay(muzzlePosition, direction);
     const hit = this.#raycastWorld(range);
     const nowMs = performance.now();
-    if (
-      hit !== null &&
-      this.#impactSink !== null &&
-      nowMs >= this.#lastBeamImpactAt + BEAM_IMPACT_INTERVAL_MS
-    ) {
-      this.#commitImpact(impact, hit.collider);
+    if (hit !== null && nowMs >= this.#lastBeamImpactAt + BEAM_IMPACT_INTERVAL_MS) {
+        this.#audio.playImpact(weapon, this.#hitPoint, BEAM_IMPACT_GAIN, impact);
+        this.#spawnImpact(weapon, this.#hitPoint, 'hit', impact, nowMs);
+      if (this.#impactSink !== null) {
+        this.#commitImpact(impact, hit.collider);
+      }
       this.#lastBeamImpactAt = nowMs;
     }
     this.#updateBeamStream(weapon.color, muzzlePosition, this.#hitPoint);
@@ -222,7 +225,7 @@ export class HitscanWeapon {
         nowMs >= this.#lastBeamImpactAt + BEAM_IMPACT_INTERVAL_MS
       ) {
         this.#audio.playImpact(weapon, this.#hitPoint, impactGain, impact);
-        this.#spawnImpact(weapon, this.#hitPoint, 'hit', impact);
+        this.#spawnImpact(weapon, this.#hitPoint, 'hit', impact, nowMs);
         this.#commitImpact(impact, hit.collider);
         this.#lastBeamImpactAt = nowMs;
       }
@@ -254,7 +257,7 @@ export class HitscanWeapon {
     this.#impactSink.apply(scratch);
   }
 
-  /** World raycast from prepared `#rayOrigin` / `#rayDirection`; writes `#hitPoint`. */
+  
   #raycastWorld(range: number): RAPIER.RayColliderHit | null {
     const ray = hitscanCastRay(this.#rayOrigin, this.#rayDirection);
     const hit = this.#world.castRay(
@@ -295,7 +298,13 @@ export class HitscanWeapon {
     this.#segmentLines.spawnSegment(start, end, color, durationMs);
   }
 
-  #spawnImpact(weapon: WeaponDefinition, position: Vector3, kind: 'hit' | 'ricochet', impact: ImpactProfile): void {
+  #spawnImpact(
+    weapon: WeaponDefinition,
+    position: Vector3,
+    kind: 'hit' | 'ricochet',
+    impact: ImpactProfile,
+    nowMs = performance.now()
+  ): void {
     if (this.#sphereInstancing === null) {
       return;
     }
@@ -315,7 +324,7 @@ export class HitscanWeapon {
       position,
       kind,
       undefined,
-      performance.now()
+      nowMs
     );
     if (burst !== null) {
       this.#impactBursts.push(burst);

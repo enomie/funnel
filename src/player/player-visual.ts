@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-visual.ts
+
 import { Group, Scene, Vector3 } from 'three/webgpu';
 import { detachSceneObject } from '../render/dispose-three';
 import {
@@ -15,7 +17,7 @@ import { loadShooterPackCharacter, type ShooterPackCharacter } from './shooter-p
 import { PlayerAimSpine } from './player-aim-spine';
 import { applyRelativeTeamColors } from './team-visual-colors';
 
-/** Match eye pivot drop on capsule-root weapon socket when crouched. */
+
 const THIRD_PERSON_CROUCH_WEAPON_DROP_Y =
   PLAYER_CONFIG.cameraHeight - PLAYER_CONFIG.crouchCameraHeight;
 

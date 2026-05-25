@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/bot-placeholder-roster.ts
+
 import type { Scene } from 'three/webgpu';
 import type { ShooterPackCharacter } from '../player/shooter-pack-loader';
 import type { PlayerTeam } from '../player/player-team';

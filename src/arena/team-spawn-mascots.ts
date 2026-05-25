@@ -1,16 +1,17 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/team-spawn-mascots.ts
+
 import { Group, type Object3D, type Scene } from 'three/webgpu';
 import { ENVIRONMENT_CONFIG } from '../config/game-config';
 import {
   enableHumanoidCastShadows,
-  createHumanoidFallbackMesh
+  createHumanoidFallbackMesh,
+  resetHumanoidBindPose
 } from '../player/humanoid-visual-mount';
-import {
-  factionHumanoidRig,
-  type ShooterPackRoster
-} from '../player/humanoid-rig';
+import { factionHumanoidRig, type HumanoidRigId } from '../player/humanoid-rig';
 import { lowestSkinnedMeshYInCapsuleSpace } from '../player/player-mesh-foot-anchor';
 import { cloneShooterPackModel } from '../player/shooter-pack-clone';
-import type { ShooterPackCharacter } from '../player/shooter-pack-loader';
+import { loadColladaFromUrl } from '../player/collada-asset-loader';
+import { shooterPackModelUrlForRig } from '../player/shooter-pack-paths';
 import type { PlayerTeam } from '../player/player-team';
 import {
   attachHumanoidEyes,
@@ -18,11 +19,20 @@ import {
 } from '../player/humanoid-eye-visual';
 import { applyRelativeTeamColors } from '../player/team-visual-colors';
 import type { RelativeTeamRole } from '../combat/team-color-derive';
-import { FACTION_TEAMS, TEAM_DEFINITIONS, type FactionTeam } from '../combat/teams';
-import { teamBulkheadZ } from './spawn-shield-cubes';
+import { FACTION_TEAMS, type FactionTeam } from '../combat/teams';
+import { teamBulkheadZ, yawTowardFunnelCenter } from './spawn-shield-cubes';
 
-/** Meters from bulkhead inner floor toward arena center. */
 export const TEAM_SPAWN_MASCOT_OFFSET_FROM_BULKHEAD_M = 1;
+export const TEAM_SPAWN_MASCOT_PEDESTAL_SIZE_M = 2;
+export const TEAM_SPAWN_MASCOT_PEDESTAL_HEIGHT_M = 1;
+
+export function teamSpawnMascotElevationY(): number {
+  return TEAM_SPAWN_MASCOT_PEDESTAL_HEIGHT_M;
+}
+
+export function teamSpawnMascotPedestalCenterY(): number {
+  return TEAM_SPAWN_MASCOT_PEDESTAL_HEIGHT_M * 0.5;
+}
 
 export function isTeamSpawnMascotsEnabled(): boolean {
   return ENVIRONMENT_CONFIG.teamSpawnMascotsEnabled;
@@ -34,10 +44,8 @@ export function teamSpawnMascotZ(faction: FactionTeam): number {
   return bulkheadZ + towardCenter * TEAM_SPAWN_MASCOT_OFFSET_FROM_BULKHEAD_M;
 }
 
-function yawTowardFunnelCenter(faction: FactionTeam): number {
-  const towardCenter = -Math.sign(TEAM_DEFINITIONS[faction].spawnZ);
-  return towardCenter * Math.PI;
-}
+const MASCOT_RIG_IDS: readonly HumanoidRigId[] = ['y-bot', 'x-bot'];
+const bindPoseTemplates = new Map<HumanoidRigId, Object3D>();
 
 interface MascotEntry {
   readonly root: Group;
@@ -54,23 +62,32 @@ function anchorBindPoseFeetOnFloor(model: Object3D): void {
   model.position.y = -meshBottomY;
 }
 
-function mountMascotCharacter(
-  root: Group,
-  pack: ShooterPackCharacter,
-  role: RelativeTeamRole
-): void {
-  const model = cloneShooterPackModel(pack.model);
+function mountMascotModel(root: Group, model: Object3D, role: RelativeTeamRole): void {
+  resetHumanoidBindPose(model);
   enableHumanoidCastShadows(model);
   anchorBindPoseFeetOnFloor(model);
   attachHumanoidEyes(model, role, HUMANOID_EYE_BIND_POSE_VERTICAL_CM);
   root.add(model);
 }
 
-/** Fallback box height matches `createHumanoidFallbackMesh` geometry. */
 const MASCOT_FALLBACK_HALF_HEIGHT_M = 2.35 * 0.5;
 
 function mountMascotFallback(root: Group): void {
   root.add(createHumanoidFallbackMesh(MASCOT_FALLBACK_HALF_HEIGHT_M));
+}
+
+export async function preloadTeamSpawnMascotModels(): Promise<void> {
+  await Promise.all(
+    MASCOT_RIG_IDS.map(async (rigId) => {
+      if (bindPoseTemplates.has(rigId)) {
+        return;
+      }
+
+      const parsed = await loadColladaFromUrl(shooterPackModelUrlForRig(rigId));
+      parsed.scene.name = `${rigId}-mascot-bind`;
+      bindPoseTemplates.set(rigId, parsed.scene);
+    })
+  );
 }
 
 export class TeamSpawnMascots {
@@ -86,7 +103,7 @@ export class TeamSpawnMascots {
     });
   }
 
-  spawn(roster: ShooterPackRoster = {}): void {
+  spawn(): void {
     this.clear();
     if (!isTeamSpawnMascotsEnabled()) {
       return;
@@ -95,15 +112,16 @@ export class TeamSpawnMascots {
     for (const faction of FACTION_TEAMS) {
       const root = new Group();
       root.name = `team-spawn-mascot-${faction}`;
-      root.position.set(0, 0, teamSpawnMascotZ(faction));
+      root.position.set(0, teamSpawnMascotElevationY(), teamSpawnMascotZ(faction));
       root.rotation.y = yawTowardFunnelCenter(faction);
 
       const role = this.#viewerTeam.relativeRole(faction);
-      const pack = roster[factionHumanoidRig(faction)];
-      if (pack === undefined) {
+      const rigId = factionHumanoidRig(faction);
+      const template = bindPoseTemplates.get(rigId);
+      if (template === undefined) {
         mountMascotFallback(root);
       } else {
-        mountMascotCharacter(root, pack, role);
+        mountMascotModel(root, cloneShooterPackModel(template), role);
       }
 
       this.#scene.add(root);

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-brain.ts
+
 import type { FactionTeam } from '../combat/teams';
 import { fillBotObjective, type BotBrainTarget, type BotObjectiveMode, type MutableBotObjective } from './bot-objective';
 
@@ -6,11 +8,11 @@ export { BOT_SIGHT_RANGE_M } from './bot-objective';
 
 import { getRuntimeProfile } from '../platform/chrome-macos-arm-profile';
 
-/** Brain decisions run at this rate — decoupled from render / physics. */
+
 export const BOT_BRAIN_TICK_HZ = getRuntimeProfile().botBrainTickHz;
 export const BOT_BRAIN_STEP_S = 1 / BOT_BRAIN_TICK_HZ;
 
-/** Think ticks before push ↔ hunt may flip — fight always breaks through immediately. */
+
 const MODE_LOCK_THINKS = 2;
 
 export type BotBrainState = 'idle' | BotObjectiveMode;
@@ -46,7 +48,7 @@ interface MutableBotBrainIntent {
 
 export interface BotBrainFrame {
   readonly intent: BotBrainIntent;
-  /** `true` when at least one brain think step ran this physics frame. */
+  
   readonly stepped: boolean;
 }
 

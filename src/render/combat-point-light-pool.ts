@@ -1,6 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/combat-point-light-pool.ts
+
 import { PointLight, Scene } from 'three/webgpu';
 
-/** Shared cap for combat-attached point lights (Redeemer, future VFX). No shadows — avoids self-shadow on actors/projectiles. */
+
 export const COMBAT_POINT_LIGHT_POOL_CAP = 12;
 
 export class CombatPointLightPool {

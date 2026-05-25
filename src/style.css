@@ -1,20 +1,18 @@
+/* Path: /Users/johann/MyBrew/funnel-real/src/style.css */
+
 :root {
   color-scheme: dark;
   font-family: Helvetica, Arial, sans-serif;
-  /* Arena floor base + viewer ally blue — `team-color-derive.ts` / `grid-tsl.ts` */
+  
   --funnel-surface: #141b24;
   --funnel-surface-rgb: 20, 27, 36;
+  /* Match home --home-surface / navbar + slider cards */
+  --funnel-surface-dark: #070c13;
   --funnel-surface-muted: #3a424d;
   --funnel-surface-muted-rgb: 58, 66, 77;
   --funnel-surface-panel: rgba(var(--funnel-surface-rgb), 0.9);
   --funnel-surface-panel-solid: #1c2530;
-  --funnel-team-ally: #225dff;
-  --funnel-team-ally-rgb: 34, 93, 255;
-  --funnel-team-ally-muted: #9ec8ff;
-  --funnel-team-ally-soft: #b8d4ff;
-  --funnel-team-ally-glow: rgba(var(--funnel-team-ally-rgb), 0.42);
-  --funnel-team-enemy: #d42b2b;
-  --funnel-team-enemy-rgb: 212, 43, 43;
+  /* Ally/enemy palette: injected via injectTeamCssVars() — src/combat/team-color-derive.ts */
   --funnel-text: #eef4ff;
   --funnel-text-muted: #88a5b9;
   --funnel-text-dim: #6f8aa6;
@@ -38,11 +36,10 @@
   --funnel-hud-label-weight: 400;
   --funnel-hud-mono-font:
     ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-  /* Full-screen overlays — blur live WebGPU canvas underneath */
+  
   --funnel-overlay-blur: 14px;
   --funnel-overlay-scrim-center: rgba(var(--funnel-team-ally-rgb), 0.1);
   --funnel-overlay-scrim-edge: rgba(var(--funnel-surface-rgb), 0.52);
-  --funnel-overlay-scrim-danger-center: rgba(255, 74, 61, 0.12);
   --funnel-btn-radius: 0;
   --funnel-btn-min-height: 40px;
   --funnel-btn-padding-x: 20px;
@@ -62,10 +59,8 @@
     border-color 140ms ease,
     background-color 140ms ease,
     color 140ms ease;
-  /* Flat arena grid — `grid-tsl.ts` GRID_BASE_COLOR + TEAM_BASE_HEX.ally lines */
+  
   --funnel-grid-base: #141b24;
-  --funnel-grid-line-minor: rgba(34, 93, 255, 0.28);
-  --funnel-grid-line-major: rgba(34, 93, 255, 0.55);
   --funnel-grid-minor-step: 20px;
   --funnel-grid-major-step: 100px;
   --funnel-brand-font-size: clamp(3.5rem, 10vw, 6rem);
@@ -188,10 +183,10 @@ body {
   z-index: 5;
   pointer-events: none;
   opacity: 0;
-  border: 2px solid rgba(var(--funnel-enemy-rgb, 212, 43, 43), 0);
+  border: 2px solid rgba(var(--funnel-team-enemy-rgb), 0);
   box-shadow:
-    inset 0 0 0 rgba(var(--funnel-enemy-rgb, 212, 43, 43), 0),
-    inset 0 0 0 rgba(var(--funnel-enemy-rgb, 212, 43, 43), 0);
+    inset 0 0 0 rgba(var(--funnel-team-enemy-rgb), 0),
+    inset 0 0 0 rgba(var(--funnel-team-enemy-rgb), 0);
   transition:
     opacity 0.07s ease-out,
     border-color 0.07s ease-out,
@@ -201,20 +196,20 @@ body {
 .funnel-damage-vignette[data-active='true'] {
   opacity: 1;
   border-color: rgba(
-    var(--funnel-enemy-rgb, 212, 43, 43),
+    var(--funnel-team-enemy-rgb),
     calc(0.2 + 0.32 * var(--damage-intensity, 0.55))
   );
   box-shadow:
     inset 0 0 28px rgba(
-      var(--funnel-enemy-rgb, 212, 43, 43),
+      var(--funnel-team-enemy-rgb),
       calc(0.1 + 0.16 * var(--damage-intensity, 0.55))
     ),
     inset 0 0 72px rgba(
-      var(--funnel-enemy-rgb, 212, 43, 43),
+      var(--funnel-team-enemy-rgb),
       calc(0.06 + 0.12 * var(--damage-intensity, 0.55))
     ),
     inset 0 0 140px rgba(
-      var(--funnel-enemy-rgb, 212, 43, 43),
+      var(--funnel-team-enemy-rgb),
       calc(0.03 + 0.08 * var(--damage-intensity, 0.55))
     );
 }
@@ -281,8 +276,8 @@ body {
 
 .funnel-crosshair[data-hit='true'] .funnel-crosshair__line {
   height: 12px;
-  background: rgba(255, 64, 64, 0.96);
-  box-shadow: 0 0 11px rgba(255, 48, 48, 0.78);
+  background: rgba(var(--funnel-team-enemy-rgb), 0.96);
+  box-shadow: 0 0 11px var(--funnel-team-enemy-glow);
 }
 
 .funnel-crosshair[data-kill='true'] {
@@ -292,8 +287,8 @@ body {
 
 .funnel-crosshair[data-kill='true'] .funnel-crosshair__line {
   height: 15px;
-  background: rgba(255, 40, 40, 0.98);
-  box-shadow: 0 0 14px rgba(255, 28, 28, 0.88);
+  background: var(--funnel-team-enemy-bright);
+  box-shadow: 0 0 14px var(--funnel-team-enemy-glow);
 }
 
 .funnel-crosshair[data-kill='true'] .funnel-crosshair__line--tl {
@@ -316,11 +311,43 @@ body {
   bottom: 0;
 }
 
-.funnel-team-scoreboard {
+.funnel-game-brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.35em;
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.funnel-game-brand__word {
+  font-size: 12px;
+  color: #c4ccd4;
+}
+
+.funnel-game-brand__word--core {
+  font-size: 14px;
+  color: var(--funnel-team-ally);
+  text-shadow: 0 0 8px rgba(var(--funnel-team-ally-rgb), 0.35);
+}
+
+.funnel-team-scoreboard-stack {
   position: absolute;
-  top: 16px;
+  top: 28px;
   left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   transform: translateX(-50%);
+}
+
+.funnel-team-scoreboard {
   display: flex;
   align-items: stretch;
   gap: 8px;
@@ -343,7 +370,7 @@ body {
 }
 
 .funnel-team-badge--enemy {
-  border-color: rgba(212, 43, 43, 0.14);
+  border-color: rgba(var(--funnel-team-enemy-rgb), 0.14);
 }
 
 .funnel-team-badge__head {
@@ -352,21 +379,14 @@ body {
   justify-content: center;
   min-height: var(--funnel-hud-panel-head-min-height);
   padding: var(--funnel-hud-panel-head-padding);
-  border-bottom: 1px solid var(--funnel-hud-panel-head-divider);
 }
 
 .funnel-team-badge--own .funnel-team-badge__head {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--funnel-team-ally-rgb), 0.22) 0%,
-    rgba(var(--funnel-team-ally-rgb), 0.08) 100%
-  );
-  border-bottom-color: rgba(var(--funnel-team-ally-rgb), 0.12);
+  background: rgba(var(--funnel-team-ally-rgb), 0.14);
 }
 
 .funnel-team-badge--enemy .funnel-team-badge__head {
-  background: linear-gradient(180deg, rgba(212, 43, 43, 0.2) 0%, rgba(212, 43, 43, 0.07) 100%);
-  border-bottom-color: rgba(212, 43, 43, 0.12);
+  background: rgba(var(--funnel-team-enemy-rgb), 0.12);
 }
 
 .funnel-team-badge__label {
@@ -389,7 +409,7 @@ body {
 
 .funnel-team-badge--enemy .funnel-team-badge__label {
   color: #ffffff;
-  text-shadow: 0 0 8px rgba(212, 43, 43, 0.35);
+  text-shadow: 0 0 8px var(--funnel-team-enemy-glow);
 }
 
 .funnel-team-badge__metrics {
@@ -450,20 +470,16 @@ body {
 }
 
 .funnel-team-badge--own[data-winner='true'] .funnel-team-badge__head {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--funnel-team-ally-rgb), 0.34) 0%,
-    rgba(var(--funnel-team-ally-rgb), 0.12) 100%
-  );
+  background: rgba(var(--funnel-team-ally-rgb), 0.22);
 }
 
 .funnel-team-badge--enemy[data-winner='true'] {
-  border-color: rgba(255, 130, 130, 0.42);
-  box-shadow: 0 0 12px rgba(255, 90, 90, 0.18);
+  border-color: rgba(var(--funnel-team-enemy-rgb), 0.42);
+  box-shadow: 0 0 12px var(--funnel-team-enemy-glow);
 }
 
 .funnel-team-badge--enemy[data-winner='true'] .funnel-team-badge__head {
-  background: linear-gradient(180deg, rgba(212, 43, 43, 0.32) 0%, rgba(212, 43, 43, 0.12) 100%);
+  background: rgba(var(--funnel-team-enemy-rgb), 0.2);
 }
 
 .funnel-personal-stats {
@@ -488,12 +504,7 @@ body {
   justify-content: center;
   min-height: var(--funnel-hud-panel-head-min-height);
   padding: var(--funnel-hud-panel-head-padding);
-  border-bottom: 1px solid rgba(var(--funnel-team-ally-rgb), 0.1);
-  background: linear-gradient(
-    180deg,
-    rgba(var(--funnel-team-ally-rgb), 0.18) 0%,
-    rgba(var(--funnel-team-ally-rgb), 0.06) 100%
-  );
+  background: rgba(var(--funnel-team-ally-rgb), 0.12);
 }
 
 .funnel-personal-stats__title {
@@ -544,7 +555,7 @@ body {
 }
 
 .funnel-personal-stats__metric--deaths .funnel-personal-stats__label {
-  color: #ff9a9a;
+  color: var(--funnel-team-enemy-muted);
 }
 
 .funnel-personal-stats__metric--ratio .funnel-personal-stats__label {
@@ -657,7 +668,6 @@ body {
   justify-content: center;
   min-height: var(--funnel-hud-panel-head-min-height);
   padding: var(--funnel-hud-panel-head-padding);
-  border-bottom: 1px solid var(--funnel-hud-panel-head-divider);
 }
 
 .funnel-hud-panel__title {
@@ -687,8 +697,7 @@ body {
 }
 
 .funnel-health__head {
-  background: linear-gradient(180deg, rgba(88, 255, 176, 0.18) 0%, rgba(88, 255, 176, 0.06) 100%);
-  border-bottom-color: rgba(88, 255, 176, 0.1);
+  background: rgba(88, 255, 176, 0.12);
 }
 
 .funnel-health .funnel-hud-panel__title {
@@ -702,12 +711,7 @@ body {
 }
 
 .funnel-ammo__head {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--funnel-ammo-accent-rgb), 0.18) 0%,
-    rgba(var(--funnel-ammo-accent-rgb), 0.06) 100%
-  );
-  border-bottom-color: rgba(var(--funnel-ammo-accent-rgb), 0.1);
+  background: rgba(var(--funnel-ammo-accent-rgb), 0.12);
 }
 
 .funnel-ammo .funnel-hud-panel__title {
@@ -890,8 +894,7 @@ body {
   justify-content: center;
   min-height: var(--funnel-hud-panel-head-min-height);
   padding: var(--funnel-hud-panel-head-padding);
-  border-bottom: 1px solid var(--funnel-hud-panel-head-divider);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .funnel-fps-hud__title {
@@ -935,7 +938,7 @@ body {
 }
 
 .funnel-fps-hud[data-tier='low'] .funnel-fps-hud__value {
-  color: #ff9a9a;
+  color: var(--funnel-team-enemy-muted);
 }
 
 .funnel-fps-hud__graph {
@@ -981,7 +984,7 @@ body {
   position: absolute;
   inset: 0;
   z-index: 40;
-  background-color: var(--funnel-grid-base);
+  background-color: var(--funnel-surface-dark);
   background-image:
     linear-gradient(var(--funnel-grid-line-major) 1px, transparent 1px),
     linear-gradient(90deg, var(--funnel-grid-line-major) 1px, transparent 1px),
@@ -1271,14 +1274,42 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
   pointer-events: none;
 }
 
-.funnel-prematch-screen__card--loader-minimal .funnel-prematch-screen__kicker {
-  display: none;
+.funnel-prematch-screen__panel--loader {
+  gap: clamp(32px, 6vh, 56px);
 }
 
-.funnel-prematch-host[data-match-phase='game-loading'] .funnel-prematch-screen__card--loader {
-  width: min(360px, 100%);
-  padding: 22px 20px;
+.funnel-prematch-screen__welcome {
+  margin: 0;
+  color: var(--funnel-text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.funnel-prematch-screen__loader-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.funnel-prematch-screen__loader-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 12px;
+  width: min(360px, 100%);
+}
+
+.funnel-prematch-host[data-match-phase='boot-loading'] .funnel-prematch-screen__progress-label,
+.funnel-prematch-host[data-match-phase='game-loading'] .funnel-prematch-screen__progress-label {
+  text-align: center;
+}
+
+.funnel-prematch-host[data-match-phase='boot-loading'] .funnel-prematch-screen__progress-track,
+.funnel-prematch-host[data-match-phase='game-loading'] .funnel-prematch-screen__progress-track {
+  width: 100%;
 }
 
 .funnel-countdown-overlay:not([hidden]),
@@ -1349,6 +1380,13 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
   pointer-events: none;
 }
 
+.funnel-character-select-overlay__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
 .funnel-character-select-overlay__title {
   margin: 0;
   color: var(--funnel-text-dim);
@@ -1413,12 +1451,12 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
 
 .funnel-death-overlay__title {
   margin: 0;
-  color: #ff4a3d;
+  color: var(--funnel-team-enemy-bright);
   font-size: clamp(2.4rem, 12vw, 4.5rem);
   font-weight: 900;
   letter-spacing: 0.14em;
   line-height: 1;
-  text-shadow: 0 0 40px rgba(255, 74, 61, 0.55);
+  text-shadow: 0 0 40px var(--funnel-team-enemy-glow);
 }
 
 .funnel-death-overlay__kicker {
@@ -1437,6 +1475,81 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
   line-height: 1;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 48px var(--funnel-team-ally-glow);
+}
+
+.funnel-revive-hire-panel {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  z-index: 31;
+  display: none;
+  width: min(360px, calc(100vw - 48px));
+  transform: translate(-50%, -50%);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: var(--funnel-hud-panel-radius);
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(var(--funnel-team-ally-rgb), 0.28);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.funnel-revive-hire-panel[data-visible='true'] {
+  display: flex;
+}
+
+.funnel-revive-hire-panel__label {
+  margin: 0;
+  color: var(--funnel-text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.funnel-revive-hire-panel[data-mode='hire'] .funnel-revive-hire-panel__label {
+  color: #ffb347;
+}
+
+.funnel-revive-hire-panel__track {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.funnel-revive-hire-panel__fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--funnel-team-ally) 0%, var(--funnel-team-ally-muted) 100%);
+  transition: width 80ms linear;
+}
+
+.funnel-revive-hire-panel[data-mode='hire'] .funnel-revive-hire-panel__fill {
+  background: linear-gradient(90deg, #ffb347 0%, #ff8c42 100%);
+}
+
+.funnel-revive-hire-panel__percent {
+  margin: 0;
+  color: var(--funnel-text);
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 24px var(--funnel-team-ally-glow);
+}
+
+.funnel-revive-hire-panel[data-mode='hire'] .funnel-revive-hire-panel__percent {
+  color: #ffb347;
+  text-shadow: 0 0 24px rgba(255, 140, 66, 0.45);
 }
 
 .funnel-match-result-overlay {
@@ -1571,7 +1684,7 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
 }
 
 .funnel-match-result-overlay[data-outcome='lost'] .funnel-match-result-overlay__team--enemy .funnel-match-result-overlay__team-label {
-  color: #ff6a5c;
+  color: var(--funnel-team-enemy-soft);
 }
 
 .funnel-match-result-overlay__title {
@@ -1588,7 +1701,7 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
 }
 
 .funnel-match-result-overlay[data-outcome='lost'] .funnel-match-result-overlay__title {
-  color: #ff4a3d;
+  color: var(--funnel-team-enemy-bright);
 }
 
 .funnel-match-result-overlay__action {

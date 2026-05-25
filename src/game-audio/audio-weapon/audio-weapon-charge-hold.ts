@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-weapon/audio-weapon-charge-hold.ts
+
 import type { Vector3 } from 'three/webgpu';
 import { getNoiseBuffer } from '../audio-noise-buffer';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
@@ -34,7 +36,7 @@ interface BioRumbleNodes {
   noiseGain: GainNode;
 }
 
-/** RMB hold SFX at muzzle — rocket tube clicks + bio charge rumble (20 m). */
+
 export class WeaponChargeHoldAudio {
   #lastRocketMarkedCount = 0;
   #bioRumble: BioRumbleNodes | null = null;
@@ -231,7 +233,7 @@ export class WeaponChargeHoldAudio {
     try {
       source.stop(stopTime);
     } catch {
-      /* already stopped */
+      // Source may already be stopped.
     }
   }
 }

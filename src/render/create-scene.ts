@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/create-scene.ts
+
 import {
   AmbientLight,
   Color,
@@ -23,8 +25,8 @@ const FACTION_FIGHT_LIGHT_HEX: Record<FactionTeam, number> = {
 
 const FUNNEL_LIGHT_Y = FUNNEL_DIMENSIONS.height - 1;
 const FUNNEL_LIGHT_SPHERE_RADIUS = 7;
-/** Low-poly ceiling orb — emissive only, no shadow cast. */
-/** Directional key — neutral ceiling wash (unchanged during fight focus). */
+
+
 const FUNNEL_KEY_LIGHT_COLOR = 0xe7f7ff;
 const FUNNEL_IDLE_LIGHT_COLOR = 0xffffff;
 const FUNNEL_LIGHT_RANGE = 0;
@@ -34,15 +36,15 @@ const FUNNEL_FIGHT_LIGHT_INTENSITY = 4200;
 const FUNNEL_ORB_IDLE_EMISSIVE_INTENSITY = 0.9;
 const FUNNEL_ORB_FIGHT_EMISSIVE_INTENSITY = 3;
 const FUNNEL_AMBIENT_INTENSITY = 0.05;
-/** Key von oben — einzige Shadow-Quelle. */
+
 const FUNNEL_KEY_LIGHT_INTENSITY = 0.38;
-/** Shadow-Texel-Auflösung: kleines Frustum um den Spieler (nicht ganze 300 m Arena). */
+
 const SHADOW_FOCUS_HALF_M = 22;
 const SHADOW_MAP_SIZE = getRuntimeProfile().shadowMapSize;
 
 export interface ArenaLighting {
   updateShadowFocus(x: number, z: number): void;
-  /** Center orb + point light — faction hue when one home has more intruders than the other. */
+  
   updateFightFocus(focusFaction: FactionTeam | null): void;
 }
 
@@ -153,7 +155,7 @@ export function createRenderScene(): RenderScene {
       fightTint.setHex(FACTION_FIGHT_LIGHT_HEX[focusFaction]);
       funnelLight.color.copy(fightTint);
       funnelLight.intensity = FUNNEL_FIGHT_LIGHT_INTENSITY;
-      // Emissive-only orb — no white key-light wash on albedo.
+      
       lightOrbMaterial.color.copy(orbOffTint);
       lightOrbMaterial.emissive.copy(fightTint);
       lightOrbMaterial.emissiveIntensity = FUNNEL_ORB_FIGHT_EMISSIVE_INTENSITY;

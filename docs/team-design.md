@@ -140,7 +140,7 @@ ally: {
 | `PlayerTeam.flip('hire')` | **Andere** Akteure, die Fraktion wechseln | Rolle neu berechnen | Re-apply für **deren** Mesh (lokal: du bleibst ally-blau) |
 | Dev `T` | Lokale **Fraktion** in HUD | Suit lokal unverändert ally | HUD `TeamHud.update` + `BotPlaceholderRoster.refreshViewerColors()` |
 
-**Hire (später):** `TeamChangeEvent` mit `reason: 'hire'` → für den umgedrehten Actor `relativeTeamRole` neu → Palette tauschen (Blau ↔ Rot). Intro nennt „instance attributes“ — MVP bleibt Material-Tint; Instancing kommt, wenn viele identische Bot-Meshes **einen** Draw Call teilen.
+**Hire (MVP ✅):** `actor-hired` → `combatActor.setFaction` + `BotVisual.setFaction` / `applyViewerColors` — Material-Tint (Blau ↔ Rot). Lokaler Spieler als Hirer: Ziel-Bot wechselt Viewer-Rolle; `TeamRosterCounter.onHired` aktualisiert Mitgliederzahl. Bot-KI-Hire (Phase K) noch offen — siehe `docs/revive-hire.md`.
 
 ---
 

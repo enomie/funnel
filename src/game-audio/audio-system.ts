@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-system.ts
+
 import { Vector3 } from 'three/webgpu';
 import type { CameraVectors } from '../player/player-camera';
 import { PLAYER_GROUNDED_CENTER_Y } from '../config/game-config';
@@ -47,7 +49,7 @@ export function fillCapsuleFootPoint(
   return out;
 }
 
-/** @deprecated Use `fillCapsuleFootPoint`. */
+
 export function capsuleFootPoint(center: AudioPoint): AudioPoint {
   return fillCapsuleFootPoint(center, {
     x: center.x,
@@ -98,7 +100,7 @@ export function distanceSqFromListener(source: Vector3): number {
   return readAudioListenerPosition(_listenerScratch).distanceToSquared(source);
 }
 
-/** `near` 20 m · `combat` 150 m · `mapWide` full arena. */
+
 export function isWithinHearingRange(source: Vector3, range: SpatialAudioRange = 'combat'): boolean {
   const maxSq =
     range === 'near'

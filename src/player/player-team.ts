@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-team.ts
+
 import {
   DEFAULT_PLAYER_FACTION,
   oppositeFaction,
@@ -28,7 +30,7 @@ export class PlayerTeam {
     return TEAM_DEFINITIONS[this.#team];
   }
 
-  /** Local player is always on their own faction — viewer-relative ally coloring. */
+  
   get localRelativeRole(): RelativeTeamRole {
     return 'ally';
   }
@@ -48,7 +50,7 @@ export class PlayerTeam {
     return true;
   }
 
-  /** Hire mechanic or dev flip — permanent faction change (intro §5). */
+  
   flip(reason: 'hire' | 'dev'): FactionTeam {
     const next = oppositeFaction(this.#team);
     this.assign(next, reason);

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-route-steer.ts
+
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import {
   isRouteSteerProbeDue,
@@ -13,9 +15,9 @@ import {
 } from './bot-body-probe';
 
 const STEER_LOOKAHEAD_M = 6;
-/** Reuse last clear-path steer when the brain goal barely moved (m). */
+
 const STEER_GOAL_REUSE_M = 0.85;
-/** Max phase slots — matches nav stagger spread. */
+
 const STEER_PHASE_SLOT_COUNT = 12;
 
 const _steerCandidateYaws: number[] = [];

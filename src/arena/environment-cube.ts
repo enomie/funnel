@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/environment-cube.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import { Euler, Quaternion } from 'three/webgpu';

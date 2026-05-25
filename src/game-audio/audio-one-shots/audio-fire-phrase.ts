@@ -1,9 +1,11 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-fire-phrase.ts
+
 import type { FireProfile } from '../../combat/weapon-definitions';
 import type { FireAudioPreset } from '../audio-weapon/audio-fire-preset';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
 import { playOscBurst } from './audio-one-shot-synth';
 
-/** Schedule weapon fire synth at `startTime` — returns phrase duration (s). */
+
 export function scheduleFirePhrase(
   context: BaseAudioContext,
   destination: AudioNode,

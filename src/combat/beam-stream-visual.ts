@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/beam-stream-visual.ts
+
 import {
   AdditiveBlending,
   CylinderGeometry,

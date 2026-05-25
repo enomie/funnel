@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/shooter-pack-loader.ts
+
 import { AnimationMixer, type AnimationClip, type Object3D } from 'three/webgpu';
 import { AnimationClipRegistry, findAnimationRoot } from './animation-clip-registry';
 import { remapAnimationClipToBoneNames } from './collada-animation-remap';
@@ -16,7 +18,7 @@ import { discoverShooterPackAnimations } from './shooter-pack-manifest';
 import { clipIdFromShooterPackFile, shooterPackModelUrlForRig } from './shooter-pack-paths';
 
 export interface ShooterPackCharacter {
-  /** Visual root added to the player (scaled/positioned). */
+  
   model: Object3D;
   mixer: AnimationMixer;
   registry: AnimationClipRegistry;

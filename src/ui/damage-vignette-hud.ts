@@ -1,5 +1,6 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/damage-vignette-hud.ts
+
 import { DAMAGE_HIT_FLASH_MS } from '../combat/damage-feedback';
-import { deriveTeamHex } from '../combat/team-color-derive';
 
 const REF_DAMAGE = 84;
 
@@ -9,14 +10,9 @@ export class DamageVignetteHud {
 
   constructor(root: HTMLDivElement) {
     this.#root = root;
-    const hex = deriveTeamHex('enemy', 'base');
-    const r = (hex >> 16) & 255;
-    const g = (hex >> 8) & 255;
-    const b = hex & 255;
-    root.style.setProperty('--funnel-enemy-rgb', `${r.toString()}, ${g.toString()}, ${b.toString()}`);
   }
 
-  /** Team-red browser-edge flash when the local player takes damage. */
+  
   flash(amount: number): void {
     const intensity = Math.min(1, 0.42 + amount / REF_DAMAGE * 0.5);
     this.#root.style.setProperty('--damage-intensity', intensity.toFixed(3));

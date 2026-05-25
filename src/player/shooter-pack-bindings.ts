@@ -1,4 +1,6 @@
-/** Clips wired into `locomotion-anim-controller` (or other systems). */
+// Path: /Users/johann/MyBrew/funnel-real/src/player/shooter-pack-bindings.ts
+
+
 export const SHOOTER_PACK_KNOWN_BINDINGS: Record<string, string> = {
   'firing-rifle': 'combat.fire',
   'jump-backward': 'locomotion.jumpBack',

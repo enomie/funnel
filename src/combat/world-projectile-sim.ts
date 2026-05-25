@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/world-projectile-sim.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { Collider, RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import {
@@ -99,7 +101,7 @@ const REDEEMER_GUIDED_IMPACT_GAIN = IMPACT_GAIN_REDEEMER;
 const RIPPER_RICOCHET_LIMIT = RIPPER_RICOCHET_MAX;
 const _worldUp = new Vector3(0, 1, 0);
 const BOUNCE_SURFACE_NUDGE = 0.035;
-/** Skip shooter capsule / muzzle plane — matches hitscan `MUZZLE_RAY_ORIGIN_NUDGE`. */
+
 const PROJECTILE_SPAWN_ORIGIN_NUDGE_M = 0.08;
 const MIN_STEP_DISTANCE = 0.001;
 const MAX_COLLISION_STEPS_PER_FRAME = RIPPER_RICOCHET_LIMIT + 1;
@@ -227,7 +229,7 @@ export interface WorldProjectile {
   maxRangeM: number;
   expiresAtMs: number;
   spawnedAtMs: number;
-  /** Combat point-light pool slot while in flight (`-1` = none). */
+  
   lightSlot: number;
 }
 
@@ -278,6 +280,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
   readonly #impactEffects: ActiveImpactEffect[] = [];
   readonly #ownerAim = new Map<string, { yaw: number; pitch: number }>();
   #nextProjectileId = 1;
+  #projectileTickNowMs = 0;
 
   constructor(
     scene: Scene,
@@ -592,7 +595,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
   }
 
   tickWorld(nowMs: number, deltaSeconds: number): void {
-    this.#updateProjectiles(deltaSeconds);
+    this.#updateProjectiles(deltaSeconds, nowMs);
     this.#updateImpactEffects(nowMs);
     tickExplosiveImpactFlashes(this.#pointLightPool, this.#redeemerFlashes, nowMs);
     if (this.#rocketSmoke !== null && this.#rocketSmoke.hasActive()) {
@@ -604,9 +607,8 @@ export class WorldProjectileSim implements WorldEffectsSource {
     return this.#bridges.get(projectile.ownerId) ?? null;
   }
 
-  #updateProjectiles(deltaSeconds: number): void {
-    const nowMs = performance.now();
-
+  #updateProjectiles(deltaSeconds: number, nowMs: number): void {
+    this.#projectileTickNowMs = nowMs;
     for (let index = this.#projectiles.length - 1; index >= 0; index -= 1) {
       const projectile = this.#projectiles[index];
 
@@ -1083,7 +1085,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
     return true;
   }
 
-  /** Ripper VFX — always weapon-configured sphere; gameplay damage uses `resolveRipperImpactAt`. */
+  
   #spawnRipperImpactBurst(projectile: WorldProjectile, point: Vector3): void {
     this.#spawnImpact(projectile.weapon, projectile.impact, point, 'hit');
   }
@@ -1212,12 +1214,14 @@ export class WorldProjectileSim implements WorldEffectsSource {
     impact: ImpactProfile,
     position: Vector3,
     kind: ImpactBurstKind,
-    impactRadiusOverride?: number
+    impactRadiusOverride?: number,
+    nowMs?: number
   ): ImpactBurst | null {
     if (this.#sphereInstancing === null) {
       return null;
     }
 
+    const burstNowMs = (nowMs ?? this.#projectileTickNowMs) || performance.now();
     if (this.#impactEffects.length >= MAX_IMPACT_BURSTS) {
       this.#removeImpactEffectAt(0);
     }
@@ -1229,7 +1233,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       position,
       kind,
       impactRadiusOverride,
-      performance.now()
+      burstNowMs
     );
     if (burst !== null) {
       this.#impactEffects.push({ burst, expandingLethal: null });
@@ -1473,7 +1477,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
   }
 }
 
-/** Zero-GC spread fan — callback receives module-scoped direction scratch (copy before async retain). */
+
 export function eachProjectileDirection(
   direction: Vector3,
   count: number,

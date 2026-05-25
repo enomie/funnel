@@ -1,9 +1,11 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/locomotion-stride-sync.ts
+
 import { PLAYER_CONFIG } from '../config/game-config';
 
 const TIME_SCALE_MIN = 0.35;
 const TIME_SCALE_MAX = 6.5;
 
-/** Loop duration from `docs/animations.txt` (sanity / docs only). */
+
 export const CLIP_CYCLE_DURATION_SECONDS: Readonly<Record<string, number>> = {
   walking: 1.367,
   'rifle-run': 0.733,
@@ -13,10 +15,7 @@ export const CLIP_CYCLE_DURATION_SECONDS: Readonly<Record<string, number>> = {
   'strafe-2': 0.533
 };
 
-/**
- * Measured Mixamo hip XZ path per in-place cycle (m) — regen: `npm run measure:locomotion-stride`.
- * Phase clock and timeScale derive from this, not guessed scale factors.
- */
+
 export const CLIP_HIP_PLANAR_PATH_METERS: Readonly<Record<string, number>> = {
   walking: 1.3153,
   'rifle-run': 2.2246,
@@ -26,7 +25,7 @@ export const CLIP_HIP_PLANAR_PATH_METERS: Readonly<Record<string, number>> = {
   'strafe-2': 1.4467
 };
 
-/** One gait clock for the whole blend space — walk/run forward clips, not per-layer duration. */
+
 export function locomotionGaitReferenceClipId(sprint: boolean): string {
   return sprint ? 'rifle-run' : 'walking';
 }
@@ -60,10 +59,7 @@ export function clampLocomotionTimeScale(scale: number): number {
   return Math.min(TIME_SCALE_MAX, Math.max(TIME_SCALE_MIN, scale));
 }
 
-/**
- * timeScale so in-world speed matches locomotion cycle:
- * worldSpeed ≈ (hipPath / duration) × timeScale
- */
+
 export function computeLocomotionTimeScale(clipId: string, worldSpeedMps: number): number {
   const reference = referenceSpeedForClip(clipId);
   if (reference === undefined || reference <= 0) {
@@ -77,7 +73,7 @@ export function computeLocomotionTimeScale(clipId: string, worldSpeedMps: number
   return clampLocomotionTimeScale(worldSpeedMps / reference);
 }
 
-/** Prefer measured body speed so playback tracks Rapier velocity (instant on ground). */
+
 export function locomotionSyncSpeedMps(bodySpeedMps: number, inputTargetMps: number): number {
   if (inputTargetMps < 0.08) {
     return bodySpeedMps < 0.15 ? 0 : bodySpeedMps;
@@ -118,7 +114,7 @@ export function isLocomotionClipWithFootsteps(clipId: string): boolean {
   return locomotionCycleDurationSeconds(clipId) !== undefined;
 }
 
-/** Meters the capsule travels during one normalized locomotion cycle when feet are in sync. */
+
 export function locomotionMetersPerCycle(clipId: string): number {
   const pathMeters = scaledHipPathMeters(clipId);
   if (pathMeters !== undefined) {
@@ -134,7 +130,7 @@ export function locomotionMetersPerCycle(clipId: string): number {
   return reference * duration;
 }
 
-/** Manual phase clock — keeps all blend-space layers on the same footfall phase. */
+
 export function advanceLocomotionPhase(
   phase: number,
   worldSpeedMps: number,

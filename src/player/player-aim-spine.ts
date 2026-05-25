@@ -1,9 +1,11 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-aim-spine.ts
+
 import { Bone, SkinnedMesh, type Object3D } from 'three/webgpu';
 
-/** +pitch = look up (matches `InputState` / camera forward). */
+
 const AIM_PITCH_SIGN = -1;
 
-/** Share of view pitch applied per bone (sums to 1). */
+
 const SPINE_AIM_WEIGHTS: ReadonlyArray<{ name: string; weight: number }> = [
   { name: 'mixamorig_Spine', weight: 0.22 },
   { name: 'mixamorig_Spine1', weight: 0.38 },
@@ -41,10 +43,7 @@ export class PlayerAimSpine {
     }
   }
 
-  /**
-   * Layer view pitch on top of the current clip pose (call after `AnimationMixer.update`).
-   * @param thirdPersonBlend 0 = hidden FP body, 1 = full third-person torso aim.
-   */
+  
   apply(pitch: number, thirdPersonBlend: number, weaponSocket: Object3D): void {
     if (this.#bones.length === 0 || thirdPersonBlend <= 0.01) {
       weaponSocket.rotation.x = 0;

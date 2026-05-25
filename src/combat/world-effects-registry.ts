@@ -1,4 +1,6 @@
-/** Central post-physics tick for all weapon arsenals — one pass, no per-humanoid duplication. */
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/world-effects-registry.ts
+
+
 
 export interface WorldEffectsSource {
   needsWorldTick(nowMs: number): boolean;

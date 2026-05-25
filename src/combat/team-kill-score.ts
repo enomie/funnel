@@ -1,6 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/team-kill-score.ts
+
 import { areSameFaction, type FactionTeam } from './teams';
 
-/** Match-wide frags per faction (kills of the opposing team). */
+
 export class TeamKillScore {
   readonly #kills: Record<FactionTeam, number> = { alpha: 0, beta: 0 };
 

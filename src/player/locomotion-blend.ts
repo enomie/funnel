@@ -1,7 +1,6 @@
-/**
- * 2D locomotion blend space (Unity/Unreal-style): normalized WASD → forward + strafe
- * layers with weights |fwd| : |str| on a unit circle.
- */
+// Path: /Users/johann/MyBrew/funnel-real/src/player/locomotion-blend.ts
+
+
 
 export type LocomotionBlendRole = 'forward' | 'strafe';
 
@@ -31,7 +30,7 @@ const CLIP = {
   strafeRight: 'strafe'
 } as const;
 
-/** Unit input on the blend-space circle (diagonal ≈ 0.707 / 0.707). */
+
 export function normalizedLocomotionAxes(input: LocomotionBlendInput): {
   forward: number;
   strafe: number;
@@ -77,7 +76,7 @@ export interface LocomotionBlendResult {
   dominantClipId: string;
 }
 
-/** Reuses `out.layers` — caller clears length via returned layer count semantics. */
+
 export function resolveLocomotionBlendInto(
   out: LocomotionBlendResult,
   input: LocomotionBlendInput

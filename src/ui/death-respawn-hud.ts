@@ -1,4 +1,6 @@
-/** Full-screen death overlay: WASTED + respawn countdown. */
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/death-respawn-hud.ts
+
+
 
 export interface DeathRespawnHudMount {
   shell: HTMLElement;
@@ -32,7 +34,7 @@ export class DeathRespawnHud {
     mount.shell.append(overlay);
   }
 
-  /** `secondsLeft` — whole seconds until respawn; `0` hides overlay (alive or respawning). */
+  
   update(isDead: boolean, secondsLeft: number): void {
     if (!isDead || secondsLeft <= 0) {
       if (this.#visible) {

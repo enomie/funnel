@@ -1,7 +1,9 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/shadow-lod.ts
+
 import { Mesh, type Object3D } from 'three/webgpu';
 import { getRuntimeProfile } from '../platform/chrome-macos-arm-profile';
 
-/** Viewer-relative shadow quality — cast/receive toggles only, no extra draw variants. */
+
 const CAST_NEAR_M = 12;
 const CAST_NEAR_EXIT_M = 14;
 const RECEIVE_MID_M = 22;
@@ -12,7 +14,7 @@ const CAST_NEAR_EXIT_SQ = CAST_NEAR_EXIT_M * CAST_NEAR_EXIT_M;
 const RECEIVE_MID_SQ = RECEIVE_MID_M * RECEIVE_MID_M;
 const RECEIVE_MID_EXIT_SQ = RECEIVE_MID_EXIT_M * RECEIVE_MID_EXIT_M;
 
-/** Subjects processed per frame — full roster refresh in ~4 frames at 40 actors. */
+
 const SUBJECTS_PER_FRAME = getRuntimeProfile().shadowSubjectsPerFrame;
 
 type ShadowLodTier = 0 | 1 | 2;
@@ -119,7 +121,7 @@ export class ShadowLodController {
     }
   }
 
-  /** Re-scan after weapon mesh swap on an already registered actor root. */
+  
   refresh(root: Object3D): void {
     const subject = this.#subjects.find((entry) => entry.root === root);
     if (subject === undefined) {

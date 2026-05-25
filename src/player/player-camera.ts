@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-camera.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { Collider, World } from '@dimforge/rapier3d-simd-compat';
 import { Group, Object3D, PerspectiveCamera, Scene, Vector3 } from 'three/webgpu';
@@ -14,7 +16,7 @@ import { ACTOR_RAY_QUERY_GROUPS } from '../physics/collision-groups';
 import { eyeHeightOffsetFromCapsule } from './humanoid-eye-height';
 import type { PlayerFrame } from './player-controller';
 
-/** Same convention as WASD / `planarVelocityFromInput`: yaw=0 → +Z. */
+
 const LOOK_AT_DISTANCE = 12;
 const THIRD_PERSON_SHOULDER = PLAYER_CONFIG.cameraSide;
 const FIRST_PERSON_FOV = 74;
@@ -217,7 +219,7 @@ export class PlayerCamera {
     this.#pivot.set(frame.position.x, frame.position.y + eyeHeight, frame.position.z);
   }
 
-  /** Camera sits behind the player on XZ (opposite of facing), over the right shoulder. */
+  
   #computeThirdPersonDesired(yaw: number): void {
     _flatForward.set(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
     _flatRight.set(-Math.cos(yaw), 0, Math.sin(yaw)).normalize();
@@ -269,10 +271,7 @@ export class PlayerCamera {
     }
   }
 
-  /**
-   * Keep full boom distance unless geometry blocks the view from camera → player.
-   * (Pivot → camera rays falsely hit walls behind the player in the funnel.)
-   */
+  
   #clampThirdPersonWithLineOfSight(pivot: Vector3, desired: Vector3): Vector3 {
     _boomAxis.subVectors(desired, pivot);
     const boomLength = _boomAxis.length();

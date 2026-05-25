@@ -1,4 +1,7 @@
-// @ts-nocheck — TSL node graph; upstream three/tsl typings are incomplete under strict TS.
+// Path: /Users/johann/MyBrew/funnel-real/src/render/materials/rocket-smoke-trail-tsl.ts
+// @ts-nocheck
+
+
 import { DoubleSide, MeshBasicNodeMaterial, NormalBlending } from 'three/webgpu';
 import {
   float,
@@ -37,7 +40,7 @@ function buildSmokeOpacityNode(lifetimeNode: ReturnType<typeof instancedDynamicB
   return radialAlpha.mul(lifetimeNode).mul(float(SMOKE_ALPHA));
 }
 
-/** Cached normal-blended smoke for rocket trails — view-facing quads, one draw call. */
+
 export function rocketSmokeTrailMaterial(lifetimeArray: Float32Array): MeshBasicNodeMaterial {
   if (cachedMaterial !== undefined && cachedLifetimeArray === lifetimeArray) {
     return cachedMaterial;

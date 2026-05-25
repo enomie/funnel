@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/locomotion-anim-controller.ts
+
 import {
   AnimationAction,
   LoopOnce,
@@ -95,7 +97,7 @@ export interface LocomotionAnimInput {
 type LocomotionAnimInputParams = Omit<LocomotionAnimInput, 'crouch' | 'sliding'> &
   Partial<Pick<LocomotionAnimInput, 'crouch' | 'sliding'>>;
 
-/** Fills `out` in place — no allocation on hot path. */
+
 export function buildLocomotionAnimInputInto(
   out: LocomotionAnimInput,
   params: LocomotionAnimInputParams
@@ -115,7 +117,7 @@ export function buildLocomotionAnimInputInto(
   return out;
 }
 
-/** Shared player + bot locomotion payload — `crouch` / `sliding` default to false. */
+
 export function buildLocomotionAnimInput(params: LocomotionAnimInputParams): LocomotionAnimInput {
   return buildLocomotionAnimInputInto(
     {
@@ -139,13 +141,13 @@ export function buildLocomotionAnimInput(params: LocomotionAnimInputParams): Loc
 export class LocomotionAnimController {
   readonly #registry: AnimationClipRegistry;
   readonly #mixer: AnimationMixer;
-  /** Single-clip path: idle, airborne, land, crouch, death. */
+  
   #locomotion: AnimationAction | null = null;
   #locomotionClipId: string = CLIP.idle;
   readonly #blendLayers = new Map<LocomotionBlendRole, BlendLayerSlot>();
   #dominantBlendClipId: string = CLIP.idle;
   readonly #blendScratch: LocomotionBlendResult = { idle: true, layers: [], dominantClipId: CLIP.idle };
-  /** Shared 0–1 footfall phase for all blend-space layers (Unreal-style sync). */
+  
   #locomotionPhase = 0;
   #overlay: AnimationAction | null = null;
   #jumpPlayedThisAirborne = false;
@@ -225,12 +227,12 @@ export class LocomotionAnimController {
     return this.#locomotionClipId;
   }
 
-  /** Death clip finished — mixer frozen; skip mesh/eye sync on visual pass. */
+  
   get deathPoseSettled(): boolean {
     return this.#deathPoseSettled;
   }
 
-  /** After bot respawn — leave death pose and return to idle locomotion. */
+  
   reviveToIdle(): void {
     this.#deathPoseSettled = false;
     this.#fadeOutOverlay();

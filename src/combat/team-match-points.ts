@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/team-match-points.ts
+
 import { MATCH_CONFIG } from '../config/game-config';
 import { areSameFaction, type FactionTeam } from './teams';
 
@@ -47,7 +49,7 @@ export class TeamMatchPoints {
     return this.#points[faction];
   }
 
-  /** Zero-padded display value for team badges (`000` … `999`). */
+  
   formatDisplayPoints(faction: FactionTeam): string {
     const clamped = Math.min(MATCH_CONFIG.pointsDisplayMax, Math.max(0, this.#points[faction]));
     return String(clamped).padStart(3, '0');

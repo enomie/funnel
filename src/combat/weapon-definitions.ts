@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/weapon-definitions.ts
+
 import {
   shockOrbComboKillRadiusM,
   shockOrbSoloKillRadiusM
@@ -17,56 +19,56 @@ export type ProjectileVisualKind =
 
 export type WeaponFireMode = 'primary' | 'secondary';
 
-/** Shock RMB orb — keep in sync with `secondary.projectileScale` below. */
+
 const SHOCK_ORB_PROJECTILE_SCALE = 1.12;
 const SHOCK_ORB_SOLO_KILL_M = shockOrbSoloKillRadiusM(SHOCK_ORB_PROJECTILE_SCALE);
 const SHOCK_ORB_COMBO_KILL_M = shockOrbComboKillRadiusM(SHOCK_ORB_PROJECTILE_SCALE);
 
-/** Default sphere expansion time for small impacts (ms). */
+
 export const DEFAULT_IMPACT_EXPAND_MS = 200;
-/** Redeemer nuke — synced with expanding lethal damage + spread audio. */
+
 export const REDEEMER_IMPACT_EXPAND_MS = 3000;
-/** Bio Lobber — lethal splash radius (LMB fixed, RMB charge min→max). */
+
 export const BIO_LOBBER_KILL_RADIUS_MIN_M = 1;
 export const BIO_LOBBER_KILL_RADIUS_MAX_M = 10;
 export const BIO_LOBBER_IMPACT_EXPAND_MAX_MS = 900;
-/** Flak LMB pellets, RMB grenade pop, and splitters — lethal splash (VFX capped separately). */
+
 export const FLAK_KILL_RADIUS_M = 2;
 
 export type FireDelivery = 'projectile' | 'hitscan' | 'beamTick' | 'zoom';
 
-/** `semi` = one shot per LMB/RMB press; `auto` = repeat while held (Gatling, Pulse stream). */
+
 export type FireTrigger = 'semi' | 'auto';
 
 export type ProjectileTrajectory = 'linear' | 'ballistic';
 
 export interface FireProfile {
-  /** Default `semi`. */
+  
   trigger?: FireTrigger;
-  /** Default `projectile`. `beamTick` = short-range hitscan stream (Pulse RMB). */
+  
   delivery?: FireDelivery;
   fireIntervalMs: number;
   projectileCount: number;
   spreadRadians: number;
   speed: number;
   damage: number;
-  /** Hitscan / beamTick ray length (m). Falls back to `speed` when > 0, else arena default. */
+  
   hitscanRangeM?: number;
-  /** Shock orb etc. — Phase 3 combo listens for these tags. */
+  
   projectileTags?: readonly string[];
-  /** `ballistic` uses `PHYSICS_CONFIG.gravity` each frame (Flak grenade, Bio lob). */
+  
   trajectory?: ProjectileTrajectory;
-  /** Extra world +Y on initial aim before normalize (arc lobs). */
+  
   lobUpBias?: number;
-  /** Multiplier on `projectile-visuals` radius (Bio LMB clumps vs RMB blob). */
+  
   projectileScale?: number;
-  /** Override weapon tint for this fire mode. */
+  
   projectileColor?: number;
-  /** Bio RMB: hold time before charge ramp begins (ms). */
+  
   chargeMinMs?: number;
-  /** Bio RMB: hold time for full charge (ms). */
+  
   chargeMaxMs?: number;
-  /** Bio RMB: fraction of max `projectileScale` at minimum charge. */
+  
   chargeMinScale?: number;
 }
 
@@ -88,32 +90,32 @@ export interface AmmoProfile {
 
 export interface ImpactProfile {
   directDamage: number;
-  /** Max splash radius / impact sphere size (m). Drives VFX end scale and AoE when > 0. */
+  
   impactRadius: number;
-  /** Time (ms) for the impact sphere to grow to `impactRadius`. */
+  
   impactExpandMs: number;
   ricochetMax: number;
   explodeOnContact: boolean;
-  /** Bio-style: stick at surface, then detonate after delay (ms). */
+  
   stickDelayMs?: number;
-  /** Flak grenade: on impact spawn N shrapnel bolts that explode separately (RMB). */
+  
   childShrapnelCount?: number;
   childShrapnelSpeed?: number;
   childShrapnelSpreadRadians?: number;
   childShrapnelDamage?: number;
   childShrapnelImpactRadius?: number;
   childShrapnelScale?: number;
-  /** Low hop off surface (world +Y), then gravity. */
+  
   childShrapnelArcUpBias?: number;
-  /** Max travel from split point (meters). */
+  
   childShrapnelMaxRangeM?: number;
-  /** Force pop after this many ms in flight. */
+  
   childShrapnelMaxFlightMs?: number;
-  /** Everyone within `impactRadius` dies (no splash falloff). */
+  
   lethalSplash?: boolean;
-  /** Lethal damage front expands with the impact sphere over `impactExpandMs` (Redeemer). */
+  
   expandingLethal?: boolean;
-  /** Splash (and direct hit) ignores team — Redeemer nuke. */
+  
   splashFriendlyFire?: boolean;
 }
 
@@ -121,7 +123,7 @@ export interface WeaponDefinition {
   slotLabel: string;
   name: string;
   color: number;
-  /** Placeholder box only (meters): X = width, Y = height, Z = barrel length along player +Z. */
+  
   width: number;
   length: number;
   height: number;
@@ -130,20 +132,20 @@ export interface WeaponDefinition {
   secondary: FireProfile;
   primaryImpact: ImpactProfile;
   secondaryImpact: ImpactProfile;
-  /** Pistol alt-fire: tap RMB fires N rounds with `secondaryBurstShotIntervalMs` spacing. */
+  
   secondaryBurstShots?: number;
   secondaryBurstShotIntervalMs?: number;
-  /** Sniper RMB: multiply base FOV while `secondaryHeld` (e.g. 0.38 ≈ scope). */
+  
   sniperZoomFovScale?: number;
-  /** Shock LMB beam hits RMB orb (`shock-combo.ts`). */
+  
   comboImpact?: ImpactProfile;
-  /** Rocket Launcher: rotating barrel sockets for LMB spawn offsets. */
+  
   barrelCount?: number;
-  /** Redeemer RMB: camera follows projectile while steering (`redeemer-guided.ts`). */
+  
   guidedRedeemerSecondary?: boolean;
-  /** Bio RMB: hold at muzzle → scale blob, release to lob (`bio-charge.ts`). */
+  
   bioChargeSecondary?: boolean;
-  /** Slots 1–9: magazine + reload (`ammo-controller.ts`). */
+  
   ammo?: AmmoProfile;
 }
 
@@ -176,7 +178,7 @@ export interface FireInputGates {
   readonly pressed: boolean;
 }
 
-/** Semi = edge (`pressed`); auto = sustain (`held`). */
+
 export function fireInputOpen(fire: FireProfile, gates: FireInputGates): boolean {
   return fireTriggerFor(fire) === 'auto' ? gates.held : gates.pressed;
 }
@@ -572,7 +574,7 @@ export const WEAPON_DEFINITIONS: readonly WeaponDefinition[] = [
       DEFAULT_IMPACT_EXPAND_MS
     ),
     ammo: {
-      ammoMax: 10,
+      ammoMax: 20,
       reloadMs: 2000,
       reloadKind: 'beamOverheat',
       beamMaxHoldMs: 3000

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-health.ts
+
 import { PLAYER_CONFIG } from '../config/game-config';
 
 export interface DamageResult {
@@ -57,7 +59,7 @@ export class PlayerHealth {
     return performance.now() - this.#lastDamageAtMs >= this.#regenDelayMs;
   }
 
-  /** Shield absorbs damage first; overflow hits health. Shield never regens on its own. */
+  
   damage(amount: number): DamageResult {
     if (this.#dead || amount <= 0) {
       return {
@@ -87,7 +89,7 @@ export class PlayerHealth {
     };
   }
 
-  /** Passive health refill — call once per frame from the game loop. */
+  
   tickRegen(nowMs: number, deltaSeconds: number): void {
     if (this.#dead || this.#health >= this.#maxHealth || deltaSeconds <= 0) {
       return;
@@ -103,7 +105,7 @@ export class PlayerHealth {
     );
   }
 
-  /** Shield belt pickup — does not reset the health regen delay. */
+  
   addShield(amount: number): number {
     if (this.#dead || amount <= 0) {
       return 0;
@@ -114,7 +116,7 @@ export class PlayerHealth {
     return this.#shield - before;
   }
 
-  /** Health pack pickup — does not reset the health regen delay. */
+  
   addHealth(amount: number): number {
     if (this.#dead || amount <= 0) {
       return 0;

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/jump-pad-impulse.ts
+
 import { PLAYER_CONFIG } from '../config/game-config';
 import { fillPlanarVelocityFromInput, type MovementKeys } from './player-movement-speed';
 import {
@@ -6,13 +8,13 @@ import {
   type JumpStyle
 } from './player-jump';
 
-/** UT99-style launch — high arc with strong carry toward center. */
+
 export const JUMP_PAD_APEX_M = 30;
 const JUMP_PAD_CENTER_THRUST_MPS = 16;
 const JUMP_PAD_PLANAR_RETAIN = 0.8;
 const JUMP_PAD_WISH_BLEND = 0.65;
 
-/** Mega-jump off team flank pads — boost toward funnel center + movement carry. */
+
 export function computeJumpPadImpulse(
   padX: number,
   padZ: number,
@@ -51,7 +53,7 @@ export function computeJumpPadImpulse(
   };
 }
 
-/** Capsule vs axis-aligned jump-pad volume (walk-through trigger). */
+
 export function capsuleIntersectsJumpPadVolume(
   actorX: number,
   actorY: number,

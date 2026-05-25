@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/humanoid-physics.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type {
   Collider,
@@ -12,7 +14,7 @@ import {
 } from '../physics/collision-groups';
 import { stanceHalfHeight } from './player-stance';
 
-/** Downward ray length beyond capsule bottom (m) — player + bots. */
+
 export const HUMANOID_GROUND_RAY_EXTRA_M = 0.18;
 
 const CAPSULE_FRICTION = 1.15;
@@ -28,7 +30,7 @@ export interface CreateHumanoidRapierBodyOptions {
   readonly x: number;
   readonly y: number;
   readonly z: number;
-  /** Player capsule — contact-force events for ground reconciliation. */
+  
   readonly contactForceEvents?: boolean;
 }
 
@@ -63,7 +65,7 @@ export interface DisposeHumanoidRapierBodyOptions extends HumanoidRapierBody {
   readonly characterController: KinematicCharacterController;
 }
 
-/** Mirror of `createHumanoidRapierBody` — single Rapier teardown path for player + bots. */
+
 export function disposeHumanoidRapierBody(
   world: World,
   options: DisposeHumanoidRapierBodyOptions
@@ -87,7 +89,7 @@ function groundProbeRay(originX: number, originY: number, originZ: number): RAPI
   return _groundProbeRay;
 }
 
-/** Downward ray from capsule center — true when floor is within reach. */
+
 export function probeHumanoidGrounded(
   world: World,
   body: RigidBody,
@@ -126,7 +128,7 @@ export interface HumanoidPlanarStepResult {
 
 const _planarStepScratch = { correctedX: 0, correctedZ: 0 };
 
-/** Grounded planar move via Rapier character controller — player + bots. */
+
 export function fillHumanoidPlanarStep(
   params: HumanoidPlanarStepParams,
   out: { correctedX: number; correctedZ: number } = _planarStepScratch
@@ -135,7 +137,7 @@ export function fillHumanoidPlanarStep(
   const velocity = body.linvel();
 
   body.setLinvel({ x: planarVelocityX, y: velocity.y, z: planarVelocityZ }, true);
-  // filterGroups required — CC ignores collider collision groups and blocks on pickups otherwise.
+  
   controller.computeColliderMovement(
     collider,
     {
@@ -164,7 +166,7 @@ export function fillHumanoidPlanarStep(
   return out;
 }
 
-/** @deprecated Use `fillHumanoidPlanarStep`. */
+
 export function applyHumanoidPlanarStep(params: HumanoidPlanarStepParams): HumanoidPlanarStepResult {
   return fillHumanoidPlanarStep(params, { correctedX: 0, correctedZ: 0 });
 }

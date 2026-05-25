@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/ceiling-fixtures.ts
+
 import { FUNNEL_DIMENSIONS, FUNNEL_ZONE_COUNT, funnelZoneExtentZ } from '../config/game-config';
 import type { ArenaStaticInstances } from './arena-static-instances';
 import type { FunnelZoneId } from './funnel-zones';
@@ -34,7 +36,7 @@ function fixtureCentersZForZone(minZ: number, maxZ: number): number[] {
   return centers;
 }
 
-/** Hanging troffer panels — 2×10 m, 5 m drop, 2 m gap along Z; zone-colored glow underside. */
+
 export function createCeilingFixtures(instances: ArenaStaticInstances): void {
   for (let zoneIndex = 0; zoneIndex < FUNNEL_ZONE_COUNT; zoneIndex += 1) {
     const { minZ, maxZ } = funnelZoneExtentZ(zoneIndex);
@@ -49,7 +51,7 @@ export function createCeilingFixtures(instances: ArenaStaticInstances): void {
   }
 }
 
-/** Exported for layout docs / tests. */
+
 export const CEILING_FIXTURE_LAYOUT = {
   gridModuleM: GRID_MODULE_M,
   widthM: FIXTURE_WIDTH_M,

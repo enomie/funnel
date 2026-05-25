@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-controller.ts
+
 import type {
   Collider,
   KinematicCharacterController,
@@ -40,24 +42,24 @@ import {
 import { BotNavigationCache } from './bot-navigation-cache';
 import { BotRouteSteerCache } from './bot-route-steer';
 
-/** Body + weapon aim — same rate as human mouse turn feel (not snap). */
+
 const BOT_TURN_SMOOTH_RATE = 12;
-/** Net planar drift from anchor before position stall resets (m) — ignores micro-jitter. */
+
 const STALL_NET_EPS_M = 0.28;
-/** Consecutive position-stall samples before counting as stuck. */
+
 const STALL_FRAME_THRESHOLD = 8;
-/** Must close this much toward chase goal per goal-stall window (m). */
+
 const GOAL_APPROACH_EPS_M = 0.14;
-/** Chase goal stall frames while sprinting direct (no detour). */
+
 const GOAL_STALL_FRAME_THRESHOLD = 12;
-/** Goal-stall only applies beyond this chase radius (m). */
+
 const GOAL_STALL_MIN_DIST_M = 3.2;
 
 export class BotController {
   readonly body: RigidBody;
   readonly collider: Collider;
   readonly health: PlayerHealth;
-  readonly faction: FactionTeam;
+  #faction: FactionTeam;
   readonly navigation = new BotNavigationCache();
   readonly routeSteer = new BotRouteSteerCache();
   readonly #world: World;
@@ -99,7 +101,7 @@ export class BotController {
 
   constructor(world: World, slot: BotSpawnSlot, navPhaseSlot = 0, navPhaseSlotCount = 1) {
     this.#world = world;
-    this.faction = slot.faction;
+    this.#faction = slot.faction;
     this.#yaw = slot.yaw;
     this.#aimYaw = slot.yaw;
     this.#aimPitch = 0;
@@ -139,6 +141,14 @@ export class BotController {
     return this.#aimPitch;
   }
 
+  get faction(): FactionTeam {
+    return this.#faction;
+  }
+
+  setFaction(faction: FactionTeam): void {
+    this.#faction = faction;
+  }
+
   get diedAtMs(): number {
     return this.#death.diedAtMs;
   }
@@ -159,7 +169,7 @@ export class BotController {
     return this.#lastDrive;
   }
 
-  /** UT-style jump pad — launch once per pad enter while overlapping trigger volume. */
+  
   launchFromJumpPad(impulse: JumpImpulseResult, nowMs: number): void {
     if (this.health.isDead) {
       return;
@@ -193,7 +203,7 @@ export class BotController {
     return this.#navPhaseSlotCount;
   }
 
-  /** Capsule cast + landing headroom — once per render frame while moving. */
+  
   probeJumpAhead(
     world: World,
     nowMs: number,
@@ -247,7 +257,7 @@ export class BotController {
     return out;
   }
 
-  /** @deprecated Prefer `locomotionInputInto` on hot paths. */
+  
   locomotionInput(): LocomotionAnimInput {
     return this.locomotionInputInto({
       movement: { forward: false, back: false, left: false, right: false },
@@ -265,7 +275,7 @@ export class BotController {
     });
   }
 
-  /** Once per render frame after physics — single ground ray (matches player). */
+  
   afterPhysics(): void {
     if (this.health.isDead) {
       return;
@@ -317,6 +327,25 @@ export class BotController {
   respawnAt(slot: BotSpawnSlot): void {
     this.health.respawn();
     resetActorDeathPhysics(this.body, this.collider, this.#death);
+    this.#resetLocomotionState(slot.x, slot.z, slot.yaw);
+    this.body.setTranslation({ x: slot.x, y: slot.y, z: slot.z }, true);
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.navigation.reset(slot.x, slot.z, slot.yaw, this.#navPhaseSlot, this.#navPhaseSlotCount);
+    this.routeSteer.reset(slot.x, slot.z, slot.yaw, this.#navPhaseSlot, this.#navPhaseSlotCount);
+  }
+
+  reviveInPlace(): void {
+    if (!this.health.isDead) {
+      return;
+    }
+
+    this.health.respawn();
+    resetActorDeathPhysics(this.body, this.collider, this.#death);
+    const translation = this.body.translation();
+    this.#resetLocomotionState(translation.x, translation.z, this.#yaw);
+  }
+
+  #resetLocomotionState(anchorX: number, anchorZ: number, yaw: number): void {
     this.#lastDrive = null;
     this.#stuckFrames = 0;
     this.#stallFrames = 0;
@@ -328,46 +357,25 @@ export class BotController {
     this.#vaultArmed = true;
     this.#brainJumpDecision.shouldJump = false;
     this.#brainJumpDecision.jumpStyle = 'idle';
-    this.body.setTranslation({ x: slot.x, y: slot.y, z: slot.z }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    this.#yaw = slot.yaw;
-    this.#aimYaw = slot.yaw;
+    this.#yaw = yaw;
+    this.#aimYaw = yaw;
     this.#aimPitch = 0;
-    this.#stallAnchorX = slot.x;
-    this.#stallAnchorZ = slot.z;
+    this.#stallAnchorX = anchorX;
+    this.#stallAnchorZ = anchorZ;
     this.#goalDistAnchor = 0;
     this.#goalStallFrames = 0;
     this.#grounded = true;
     this.#wasGrounded = true;
-    this.navigation.reset(slot.x, slot.z, slot.yaw, this.#navPhaseSlot, this.#navPhaseSlotCount);
-    this.routeSteer.reset(slot.x, slot.z, slot.yaw, this.#navPhaseSlot, this.#navPhaseSlotCount);
   }
 
-  /** Rematch intro — full heal, air spawn in match-start band. */
   beginMatchStartDrop(slot: BotSpawnSlot): void {
     this.health.respawn();
     if (this.#death.applied) {
       resetActorDeathPhysics(this.body, this.collider, this.#death);
     }
-    this.#lastDrive = null;
-    this.#stuckFrames = 0;
-    this.#stallFrames = 0;
-    this.#goalStallFrames = 0;
-    this.#lastJumpAtMs = 0;
-    this.#vaultFailures = 0;
-    this.#jumpBannedUntilMs = 0;
-    this.#vaultInFlight = false;
-    this.#vaultArmed = true;
-    this.#brainJumpDecision.shouldJump = false;
-    this.#brainJumpDecision.jumpStyle = 'idle';
+    this.#resetLocomotionState(slot.x, slot.z, slot.yaw);
     this.body.setTranslation({ x: slot.x, y: slot.y, z: slot.z }, true);
-    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    this.#yaw = slot.yaw;
-    this.#aimYaw = slot.yaw;
-    this.#aimPitch = 0;
-    this.#stallAnchorX = slot.x;
-    this.#stallAnchorZ = slot.z;
-    this.#goalDistAnchor = 0;
     const spawnAirborne = slot.y > PLAYER_GROUNDED_CENTER_Y + 0.05;
     this.#grounded = !spawnAirborne;
     this.#wasGrounded = this.#grounded;
@@ -489,7 +497,7 @@ export class BotController {
     this.#stuckFrames = Math.min(this.#stuckFrames + 1, 120);
   }
 
-  /** Direct chase only — detours may move away from the mission goal on purpose. */
+  
   #updateGoalStallFrames(
     drive: BotDriveCommand,
     botX: number,

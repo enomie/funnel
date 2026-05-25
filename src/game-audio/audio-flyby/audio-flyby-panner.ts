@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-flyby/audio-flyby-panner.ts
+
 import type { Vector3 } from 'three/webgpu';
 import { setupSpatialPanner } from '../audio-system';
 

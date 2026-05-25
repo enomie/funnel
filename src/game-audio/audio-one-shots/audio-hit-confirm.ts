@@ -1,9 +1,11 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-hit-confirm.ts
+
 import { AUDIO_VOICE_PEAK } from '../audio-config';
 import { AudioContextEngine } from '../audio-mixer';
 import { getNoiseBuffer } from '../audio-noise-buffer';
 import { scheduleExponentialDecay } from './audio-one-shot-synth';
 
-/** Non-spatial UI tick when local player damages an enemy — COD-style hit marker. */
+
 export const HIT_CONFIRM_DURATION_S = 0.036;
 export const KILL_CONFIRM_DURATION_S = 0.082;
 
@@ -71,7 +73,7 @@ export function playHitConfirm(): void {
   noiseSource.stop(time + durationS);
 }
 
-/** Deeper two-tone confirm when local player gets a kill. */
+
 export function playKillConfirm(): void {
   AudioContextEngine.get().resume();
   const context = AudioContextEngine.get().context;

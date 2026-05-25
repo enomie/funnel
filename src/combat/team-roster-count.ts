@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/team-roster-count.ts
+
 import type { ActorRegistry } from './actor-registry';
 import type { CombatActor } from './combat-actor';
 import type { FactionTeam } from './teams';
@@ -12,7 +14,7 @@ type MutableTeamRosterCounts = {
   beta: number;
 };
 
-/** Incremental living roster — O(1) HUD reads; idempotent death/revive by actor id. */
+
 export class TeamRosterCounter {
   readonly #counts: MutableTeamRosterCounts = { alpha: 0, beta: 0 };
   readonly #livingActorIds = new Set<string>();
@@ -65,6 +67,20 @@ export class TeamRosterCounter {
     this.#counts[faction] += 1;
   }
 
+  onHired(actorId: string, previousFaction: FactionTeam, newFaction: FactionTeam): void {
+    if (previousFaction === newFaction) {
+      this.onRevive(actorId, newFaction);
+      return;
+    }
+
+    if (this.#livingActorIds.has(actorId)) {
+      this.onFactionChange(actorId, previousFaction, newFaction);
+      return;
+    }
+
+    this.onRevive(actorId, newFaction);
+  }
+
   onFactionChange(actorId: string, from: FactionTeam, to: FactionTeam): void {
     if (!this.#livingActorIds.has(actorId)) {
       return;
@@ -75,7 +91,7 @@ export class TeamRosterCounter {
   }
 }
 
-/** Full scan — dev/tests or one-off rebuild only. */
+
 export function fillTeamRosterCounts(
   registry: ActorRegistry,
   out: MutableTeamRosterCounts
@@ -99,7 +115,7 @@ export function fillTeamRosterCounts(
   return out;
 }
 
-/** @deprecated Use `fillTeamRosterCounts`. */
+
 export function countTeamRosterMembers(registry: ActorRegistry): TeamRosterCounts {
   return fillTeamRosterCounts(registry, { alpha: 0, beta: 0 });
 }

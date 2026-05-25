@@ -1,8 +1,11 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/humanoid-visual-mount.ts
+
 import {
   AnimationMixer,
   BoxGeometry,
   Mesh,
   MeshStandardMaterial,
+  SkinnedMesh,
   type Object3D
 } from 'three/webgpu';
 import type { AnimationClipRegistry } from './animation-clip-registry';
@@ -40,6 +43,14 @@ export function enableHumanoidCastShadows(root: Object3D): void {
   });
 }
 
+export function resetHumanoidBindPose(root: Object3D): void {
+  root.traverse((object) => {
+    if (object instanceof SkinnedMesh) {
+      object.skeleton.pose();
+    }
+  });
+}
+
 export function createHumanoidFallbackMesh(
   bottomY = HUMANOID_FALLBACK_MESH_BOTTOM_Y
 ): Mesh {
@@ -52,7 +63,7 @@ export function createHumanoidFallbackMesh(
   return body;
 }
 
-/** Y-Bot on `root` — shared player (live model) and bot (clone) mount path. */
+
 export function mountHumanoidCharacter(
   root: Object3D,
   model: Object3D,

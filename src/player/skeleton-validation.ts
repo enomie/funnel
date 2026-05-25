@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/skeleton-validation.ts
+
 import { Bone, SkinnedMesh, type AnimationClip, type Object3D } from 'three/webgpu';
 
 export interface SkeletonValidationResult {

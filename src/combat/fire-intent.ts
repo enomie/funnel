@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/fire-intent.ts
+
 import type { Vector3 } from 'three/webgpu';
 import type { BotBrainIntent } from '../bots/bot-brain';
 import type { InputSnapshot } from '../input/input-state';
@@ -19,7 +21,7 @@ export interface FireIntent {
   readonly aimPitch: number;
 }
 
-/** Hold / release edges for Bio charge and Rocket volley (player RMB or bot equivalent). */
+
 export interface SecondaryHoldGates {
   readonly pressed: boolean;
   readonly held: boolean;
@@ -52,7 +54,7 @@ export const IDLE_SECONDARY_HOLD: SecondaryHoldGates = {
   released: false
 };
 
-/** Player render loop — one scratch reused every frame. */
+
 export const PLAYER_FIRE_INTENT_SCRATCH: MutableFireIntent = {
   primary: { held: false, pressed: false },
   secondary: { held: false, pressed: false },
@@ -68,7 +70,7 @@ export const PLAYER_SECONDARY_HOLD_SCRATCH: MutableSecondaryHoldGates = {
 
 const _primaryGateScratch: WeaponFireGates = { held: false, pressed: false };
 
-/** Bio/Rocket RMB — hold-release path, not tap-to-fire gates. */
+
 export function weaponUsesHoldSecondary(weapon: WeaponDefinition): boolean {
   return weaponHasBioChargeSecondary(weapon) || weaponHasRocketMagazine(weapon);
 }
@@ -88,7 +90,7 @@ function fillSnapshotFireGates(
   out.pressed = snapshot.secondaryPressed;
 }
 
-/** LMB and RMB cannot fire the same frame — primary wins. Semi held alone does not block the other button. */
+
 function applyExclusiveFireIntent(intent: MutableFireIntent, weapon: WeaponDefinition): void {
   const primaryActive = fireInputOpen(weapon.primary, intent.primary);
   const secondaryActive =
@@ -117,18 +119,18 @@ function fillBotFireGates(
   out.pressed = wants && brainStepped;
 }
 
-/** Bot semi: one virtual click per brain step; auto: sustained hold. */
+
 export function botFireGates(wants: boolean, auto: boolean, brainStepped: boolean): WeaponFireGates {
   fillBotFireGates(wants, auto, brainStepped, _primaryGateScratch);
   return _primaryGateScratch;
 }
 
-/** @deprecated Use `fillBotFireGates` */
+
 export function fireGates(wantsFire: boolean, auto: boolean): WeaponFireGates {
   return botFireGates(wantsFire, auto, true);
 }
 
-/** @deprecated Use `fillBotFireGates` */
+
 export const primaryFireGates = (wantsFire: boolean, auto: boolean): WeaponFireGates =>
   botFireGates(wantsFire, auto, true);
 
@@ -175,7 +177,7 @@ export function fillSecondaryHoldFromInput(
   return out;
 }
 
-/** Bot Bio/Rocket hold — begin on first brain step in range, release on drop or auto-complete. */
+
 export function fillSecondaryHoldFromBrain(
   wantsSecondary: boolean,
   brainStepped: boolean,
@@ -226,7 +228,7 @@ export function fireGatesOpen(gates: WeaponFireGates): boolean {
   return gates.held || gates.pressed;
 }
 
-/** @deprecated Use `fireGatesOpen` */
+
 export const primaryFireOpen = (intent: FireIntent): boolean => fireGatesOpen(intent.primary);
 
 export function applyPrimaryFireIntent(
@@ -269,7 +271,7 @@ export function applySecondaryFireIntent(
   return weapon.tryFire('secondary', nowMs, muzzlePosition, direction, intent.secondary);
 }
 
-/** Per-frame beam sustain — call from render loop while RMB / bot secondary held. */
+
 export function tickSecondaryBeamHold(
   weapon: WeaponArsenal,
   intent: FireIntent,
@@ -319,7 +321,7 @@ function applyRocketSecondaryHold(
   }
 }
 
-/** Player + bot RMB — Bio/Rocket hold-release, then shared secondary/beam path. */
+
 export function applyCombinedSecondaryIntent(
   weapon: WeaponArsenal,
   intent: FireIntent,

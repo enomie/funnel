@@ -1,9 +1,11 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/weapon-aim.ts
+
 import { type Object3D, Vector3 } from 'three/webgpu';
 import type { FireProfile } from './weapon-definitions';
 import { fireDeliveryFor } from './weapon-definitions';
 import { resolveHitscanRange } from './hitscan-weapon';
 
-/** Projectile bots engage before hitscan falloff on short-range weapons. */
+
 const PROJECTILE_ENGAGE_RANGE_M = 92;
 
 export function aimDirectionFromYawPitch(

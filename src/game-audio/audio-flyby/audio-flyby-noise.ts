@@ -1,6 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-flyby/audio-flyby-noise.ts
+
 let flyLoopBuffer: AudioBuffer | null = null;
 
-/** Shared loop buffer for all projectile fly voices. */
+
 export function getFlybyNoiseBuffer(context: BaseAudioContext): AudioBuffer {
   if (flyLoopBuffer !== null) {
     return flyLoopBuffer;

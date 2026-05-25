@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-route-clearance.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import { PLAYER_CONFIG } from '../config/game-config';
@@ -5,17 +7,17 @@ import { ACTOR_RAY_QUERY_GROUPS } from '../physics/collision-groups';
 
 const FOOT_BELOW_CENTER_M = PLAYER_CONFIG.halfHeight + PLAYER_CONFIG.radius;
 
-/** Minimum standing headroom (m) — bots do not crouch-crawl under rain debris. */
+
 export const BOT_STAND_HEADROOM_M =
   PLAYER_CONFIG.halfHeight * 2 + PLAYER_CONFIG.radius * 2 + 0.12;
 
 const OVERHEAD_RAY_MAX_M = 30;
 const OVERHEAD_FLOOR_PAD_M = 0.08;
 
-/** Sample overhead along a candidate move bearing (m). */
+
 const ROUTE_SAMPLE_DISTANCES_M: readonly number[] = [0.55, 1.25, 2.5, 4.5, 7];
 
-/** Consecutive sample drop larger than this → route narrows (angled crate lip). */
+
 const NECK_DOWN_STEP_M = 0.32;
 
 const _routeHeadroomsScratch: number[] = [];
@@ -23,7 +25,7 @@ const _routeHeadroomsScratch: number[] = [];
 export interface RouteHeadroomProfile {
   readonly minHeadroomM: number;
   readonly neckDownDropM: number;
-  /** Early samples allow standing, later ones do not — walk-in trap. */
+  
   readonly isNeckDownTrap: boolean;
 }
 
@@ -77,7 +79,7 @@ export function probeRouteHeadroom(
   return { minHeadroomM, neckDownDropM, isNeckDownTrap };
 }
 
-/** Penalty for nav scoring — higher = avoid this bearing. */
+
 export function scoreRouteHeadroomPenalty(profile: RouteHeadroomProfile): number {
   let penalty = 0;
 
@@ -94,7 +96,7 @@ export function scoreRouteHeadroomPenalty(profile: RouteHeadroomProfile): number
   return penalty;
 }
 
-/** True when vaulting forward would land the bot in sub-standing headroom. */
+
 export function headroomBlocksVault(
   ctx: HeadroomProbeContext,
   dirX: number,

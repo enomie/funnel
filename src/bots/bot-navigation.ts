@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-navigation.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import {
@@ -39,33 +41,33 @@ function navProbeRay(originX: number, originY: number, originZ: number, dirX: nu
   return _navProbeRay;
 }
 
-/** Longest forward probe when picking a move direction. */
+
 const NAV_PROBE_MAX_M = 12;
-/** Half-angle of the probe fan toward the goal (rad). */
+
 const NAV_FAN_HALF_RAD = Math.PI * 0.42;
-/** Probe count across the fan — odd so straight-ahead is sampled. */
+
 const NAV_PROBE_COUNT = 11;
-/** Full-circle samples when escaping dead ends. */
+
 const NAV_ESCAPE_PROBE_COUNT = 16;
-/** How far ahead the steered sub-goal sits along the chosen bearing. */
+
 const NAV_STEER_LOOKAHEAD_M = 7;
-/** Enter widen fan after this many stuck physics steps. */
+
 export const NAV_STUCK_WIDEN_FRAMES = 5;
-/** Start lateral peel — scher increasingly off the goal bearing. */
+
 export const NAV_STUCK_PEEL_FRAMES = 12;
-/** Full 360° clearance escape + reverse. */
+
 export const NAV_STUCK_ESCAPE_FRAMES = 28;
-/** Extra fan width during widen (rad). */
+
 const NAV_STUCK_EXTRA_FAN_RAD = Math.PI * 0.35;
-/** Peel angle at peel start / just before escape (rad). */
+
 const NAV_PEEL_ANGLE_MIN_RAD = (22 * Math.PI) / 180;
 const NAV_PEEL_ANGLE_MAX_RAD = (82 * Math.PI) / 180;
-/** Margin from shell side walls when scoring lateral clearance. */
+
 const NAV_WALL_MARGIN_M = PLAYER_CONFIG.radius + 0.45;
-/** Penalize rapid bearing changes (reduces visual flicker). */
+
 const NAV_TURN_HYSTERESIS = 0.22;
 
-/** Probe heights from capsule center — includes head band for sloped / overhead hits. */
+
 const NAV_PROBE_Y_OFFSETS: readonly number[] = [
   -(PLAYER_CONFIG.halfHeight + PLAYER_CONFIG.radius) + 0.35,
   -(PLAYER_CONFIG.halfHeight + PLAYER_CONFIG.radius) + 0.72,
@@ -101,7 +103,7 @@ export interface BotNavigationInput {
   readonly goalZ: number;
   readonly stuckFrames: number;
   readonly priorMoveYaw?: number;
-  /** +1 = peel left, −1 = peel right — committed for the peel phase. */
+  
   readonly peelSign?: 1 | -1;
 }
 
@@ -232,7 +234,7 @@ export function fillBotNavigationGoal(
   return out;
 }
 
-/** @deprecated Use `fillBotNavigationGoal`. */
+
 export function resolveBotNavigationGoal(input: BotNavigationInput): BotNavigationResult {
   return fillBotNavigationGoal(input, { x: 0, z: 0, moveYaw: 0 });
 }

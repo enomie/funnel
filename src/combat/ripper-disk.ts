@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/ripper-disk.ts
+
 import type { Collider } from '@dimforge/rapier3d-simd-compat';
 import { Mesh, MeshBasicMaterial, Object3D, Vector3 } from 'three/webgpu';
 import { PLAYER_CONFIG } from '../config/game-config';
@@ -10,11 +12,11 @@ import type { ActorRegistry } from './actor-registry';
 import type { CombatActor } from './combat-actor';
 import type { ImpactProfile, ProjectileVisualKind } from './weapon-definitions';
 
-/** Fresh Ripper disk — one full health bar (shield first, then HP). */
+
 export const RIPPER_KILL_DAMAGE = 100;
 export const RIPPER_RICOCHET_MAX = 5;
 
-/** Matches `PROJECTILE_RADIUS.ripper` in `projectile-visuals.ts`. */
+
 const RIPPER_VISUAL_RADIUS = 0.32;
 const RIPPER_HIT_RADIUS_FACTOR = 1.12;
 
@@ -29,15 +31,12 @@ export interface RipperActorStepHit {
   distance: number;
 }
 
-/** Swept disk radius — scales with `projectileScale` (RMB wider = more reach). */
+
 export function ripperHitRadius(visualScale: number): number {
   return RIPPER_VISUAL_RADIUS * visualScale * RIPPER_HIT_RADIUS_FACTOR;
 }
 
-/**
- * Closest actor grazed by the disk along `[origin, origin + direction * maxDistance]`.
- * Wider RMB disks use a larger sweep; damage stays in `resolveRipperImpactAt`.
- */
+
 export function findFirstRipperActorAlongStep(
   registry: ActorRegistry,
   origin: Vector3,
@@ -126,7 +125,7 @@ export function resolveRipperImpactAt(
   };
 }
 
-/** Per-projectile glow clone — dim hull opacity after ricochets. */
+
 export function prepareRipperProjectileVisual(object: Object3D, _baseColor: number): void {
   syncRipperProjectileFade(object, 1);
 }

@@ -1,6 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/projectile-materials.ts
+
 import { AdditiveBlending, MeshBasicMaterial } from 'three/webgpu';
 
-/** Stacked additive shells — inner bright, outer faint (fake bloom). */
+
 export const PROJECTILE_GLOW_LAYERS = [
   { scale: 1.03, opacity: 0.34 },
   { scale: 1.06, opacity: 0.26 },

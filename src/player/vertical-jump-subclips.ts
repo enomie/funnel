@@ -1,19 +1,15 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/vertical-jump-subclips.ts
+
 import { AnimationUtils, type AnimationClip } from 'three/webgpu';
 import type { AnimationClipRegistry } from './animation-clip-registry';
 
-/** Mixamo exports ~30 fps; subclip frame indices use this. */
+
 const MIXAMO_FPS = 30;
 
-/**
- * `jump-up` full clip: stand → deepest crouch (~40%) → extend back to stand.
- * Only the crouch/launch window is used at physics takeoff (not the return-to-stand tail).
- */
+
 const JUMP_UP_TAKEOFF_END_NORM = 0.42;
 
-/**
- * `jump-down`: still pose until ~0.50, then knee absorb (~0.50–0.72), then stand-up tail.
- * Subclip = drop + short absorb only (no ledge idle, no full extension to idle).
- */
+
 const JUMP_DOWN_LAND_START_NORM = 0.5;
 const JUMP_DOWN_LAND_END_NORM = 0.84;
 

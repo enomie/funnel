@@ -1,6 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/humanoid-eye-height.ts
+
 import { PLAYER_CONFIG } from '../config/game-config';
 
-/** Capsule-center → eye pivot offsets (m) — tuned on Y/X-Bot idle/crouch/death clips. */
+
 export const HUMANOID_EYE_HEIGHT_OFFSET = {
   stand: PLAYER_CONFIG.cameraHeight,
   crouch: PLAYER_CONFIG.crouchCameraHeight,

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-footstep.ts
+
 import { capsuleBottomOffsetY } from '../../player/player-stance';
 import { getFootstepNoiseBuffer } from '../audio-noise-buffer';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
@@ -13,7 +15,7 @@ const FOOTSTEP_STEP_FILTER_Q = 1.15;
 
 const _footstepOriginScratch: AudioPoint = { x: 0, y: 0, z: 0 };
 
-/** World point at the character's lowest extent — capsule bottom hemisphere tip. */
+
 export function fillFootstepOriginFromCapsule(
   capsuleCenter: AudioPoint,
   crouching: boolean,
@@ -26,7 +28,7 @@ export function fillFootstepOriginFromCapsule(
   return out;
 }
 
-/** @deprecated Use `fillFootstepOriginFromCapsule`. */
+
 export function footstepOriginFromCapsule(
   capsuleCenter: AudioPoint,
   crouching: boolean
@@ -34,7 +36,7 @@ export function footstepOriginFromCapsule(
   return fillFootstepOriginFromCapsule(capsuleCenter, crouching);
 }
 
-/** Short ground tap while walking or sprinting. */
+
 export function playFootstepStepAt(origin: AudioPoint): void {
   const voice = tryBeginSpatialOneShot(spatialVectorFromPoint(origin), 'foot');
   if (voice === null) {

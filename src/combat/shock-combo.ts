@@ -1,14 +1,16 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/shock-combo.ts
+
 import { Vector3 } from 'three/webgpu';
 import { projectileCoreRadius } from './projectile-visuals';
 
-/** Must match `projectileTags` on Shock RMB in `weapon-definitions.ts`. */
+
 export const SHOCK_ORB_PROJECTILE_TAG = 'shock-orb';
 
-/** Lethal splash = N × visible orb core radius (`projectileScale` on RMB). */
+
 export const SHOCK_ORB_SOLO_KILL_RADIUS_FACTOR = 6;
-/** Combo lethal splash = N × solo orb kill radius (LMB beam hits orb). */
+
 export const SHOCK_COMBO_KILL_RADIUS_FACTOR = 5;
-/** Slightly larger than mesh for forgiving UT-style combo timing. */
+
 const SHOCK_ORB_HIT_RADIUS_FACTOR = 1.1;
 
 const _offset = new Vector3();
@@ -72,11 +74,7 @@ export function listShockOrbTargets(
   return targets;
 }
 
-/**
- * Closest orb intersected by the beam segment `[origin, origin + direction * maxDistance]`.
- * Orbs have no Rapier collider — combo is tested before the world raycast.
- * `direction` must already be unit length (hitscan prepares `#rayDirection` that way).
- */
+
 export function findFirstShockOrbAlongRay(
   origin: Vector3,
   direction: Vector3,

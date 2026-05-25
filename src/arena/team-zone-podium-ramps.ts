@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/team-zone-podium-ramps.ts
+
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import type { FactionTeam } from '../combat/teams';
 import type { ArenaStaticInstances } from './arena-static-instances';
@@ -8,7 +10,7 @@ import {
   teamZonePodiumSlots
 } from './team-zone-podiums';
 
-/** Matches podium footprint — bulkhead-side access ramp per team flank pad. */
+
 export const TEAM_ZONE_PODIUM_RAMP_WIDTH_M = 5;
 export const TEAM_ZONE_PODIUM_RAMP_DEPTH_M = 5;
 export const TEAM_ZONE_PODIUM_RAMP_HEIGHT_M = TEAM_ZONE_PODIUM_HEIGHT_M;
@@ -47,7 +49,7 @@ function teamZonePodiumRampSlots(): readonly TeamZonePodiumRampSlot[] {
   return slots;
 }
 
-/** 5×5×1 m ramps on the neutral-opposed face of each team podium. */
+
 export function createTeamZonePodiumRamps(instances: ArenaStaticInstances, world: World): void {
   const rampSize: [number, number, number] = [
     TEAM_ZONE_PODIUM_RAMP_WIDTH_M,

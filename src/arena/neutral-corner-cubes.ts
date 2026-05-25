@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/neutral-corner-cubes.ts
+
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import { FUNNEL_DIMENSIONS, funnelZoneExtentZ } from '../config/game-config';
 import type { ArenaStaticInstances } from './arena-static-instances';
@@ -11,7 +13,7 @@ interface NeutralCornerSlot {
   readonly z: number;
 }
 
-/** 5 m cubes flush to side walls and neutral zone Z bounds (5 m grid aligned). */
+
 function neutralCornerSlots(): readonly NeutralCornerSlot[] {
   const halfW = FUNNEL_DIMENSIONS.width * 0.5;
   const { minZ, maxZ } = funnelZoneExtentZ(1);
@@ -29,7 +31,7 @@ function neutralCornerSlots(): readonly NeutralCornerSlot[] {
   ];
 }
 
-/** Four fixed 5³ m corner pillars in the neutral zone — docs/environment.md. */
+
 export function createNeutralCornerCubes(instances: ArenaStaticInstances, world: World): void {
   for (const slot of neutralCornerSlots()) {
     addFixedEnvironmentCube(instances, world, slot.x, slot.z, 'neutral');

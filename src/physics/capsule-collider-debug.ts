@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/physics/capsule-collider-debug.ts
+
 import {
   CapsuleGeometry,
   Group,
@@ -17,7 +19,7 @@ function disposeGeometry(geometry: BufferGeometry): void {
   geometry.dispose();
 }
 
-/** Wireframe mirror of the Rapier capsule — world-aligned, no visual yaw. */
+
 export class HumanoidCapsuleDebugView {
   readonly root = new Group();
   readonly #mesh: Mesh;

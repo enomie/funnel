@@ -1,4 +1,6 @@
-/** Session flag: home Start Match → game.html auto-boot. */
+// Path: /Users/johann/MyBrew/funnel-real/src/home/boot-gate.ts
+
+
 
 export const FUNNEL_BOOT_SESSION_KEY = 'funnel:boot';
 

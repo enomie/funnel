@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/team-presence-scoring.ts
+
 import { isInEnemyTerritory } from '../arena/funnel-zones';
 import type { ActorRegistry } from './actor-registry';
 import type { TeamMatchPoints } from './team-match-points';
@@ -17,7 +19,7 @@ export function resetPresenceTickAccumulator(accumulator: PresenceTickAccumulato
   accumulator.seconds = 0;
 }
 
-/** Award +1 point per living actor in enemy territory each full second; returns winner if decided. */
+
 export function tickTeamPresenceScoring(
   deltaSeconds: number,
   accumulator: PresenceTickAccumulator,

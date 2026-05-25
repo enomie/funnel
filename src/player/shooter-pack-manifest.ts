@@ -1,10 +1,12 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/shooter-pack-manifest.ts
+
 import {
   CHARACTER_SELECT_UI_CLIP_IDS,
   clipIdFromShooterPackFile,
   SHOOTER_PACK_EXCLUDED_DAE
 } from './shooter-pack-paths';
 
-/** Build-time discovery of `public/Shooter-Pack/animation-*.dae` (excludes base model). */
+
 const animationModules = import.meta.glob(
   '../../public/Shooter-Pack/animation-*.dae',
   { query: '?url', import: 'default', eager: true }

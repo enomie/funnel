@@ -1,25 +1,24 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-jump.ts
+
 import { PHYSICS_CONFIG, PLAYER_CONFIG } from '../config/game-config';
 import { fillPlanarVelocityFromInput, type MovementKeys } from './player-movement-speed';
 
-/**
- * Single world gravity (m/s²). Jump speeds are derived from target apex height:
- * vy = √(2 · g · h) — Rapier integrates a natural parabola (steep at launch, flatter later).
- */
+
 const GRAVITY = Math.abs(PHYSICS_CONFIG.gravity.y);
 
-/** Desired apex above takeoff (meters). */
+
 const APEX_HEIGHT_IDLE = 1.55;
 const APEX_HEIGHT_WALK = 2.1;
 const APEX_HEIGHT_RUN = 2.85;
 const APEX_HEIGHT_BACKWARD = 1.85;
 
-/** Stand hop — retain sliding carry; forward arc uses view yaw (see jump sketch). */
+
 const HORIZONTAL_RETAIN_IDLE = 0.92;
 
-/** Planar speed at apex for stand jump — thrust ramps with height during ascent. */
+
 const IDLE_JUMP_FORWARD_MPS = PLAYER_CONFIG.walkSpeed;
 
-/** Takeoff planar fraction — launch is mostly vertical; forward thrust ramps with height. */
+
 export const JUMP_TAKEOFF_PLANAR_SCALE = 0.06;
 
 function idleForwardPlanarFromYaw(yaw: number): { x: number; z: number } {
@@ -44,12 +43,12 @@ export interface JumpImpulseResult {
   y: number;
   z: number;
   style: JumpStyle;
-  /** Idle-only — planar target reached by height-gated ascent thrust. */
+  
   airThrustWishX: number;
   airThrustWishZ: number;
 }
 
-/** Ascent-only thrust — forward target scales with height gained (see sketch: steep up, then bend forward). */
+
 export interface JumpAirThrustState {
   takeoffY: number;
   apexHeightM: number;
@@ -80,7 +79,7 @@ export function createJumpAirThrustState(
   };
 }
 
-/** Ramp planar speed toward wish while rising — coast on descent. */
+
 export function applyJumpAirThrust(
   state: JumpAirThrustState,
   bodyY: number,
@@ -113,10 +112,7 @@ export function applyJumpAirThrust(
   return { x: vx + dx, z: vz + dz };
 }
 
-/**
- * Takeoff impulse: walk/run/backward keep full planar inertia; idle launches mostly
- * vertical then thrusts forward along view yaw as height builds (jump sketch).
- */
+
 export function computeJumpImpulse(request: JumpImpulseRequest): JumpImpulseResult {
   const { movement, yaw, sprint, crouch, linvel } = request;
   const wish = fillPlanarVelocityFromInput(movement, { sprint, crouch }, yaw);

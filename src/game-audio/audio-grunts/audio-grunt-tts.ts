@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-grunts/audio-grunt-tts.ts
+
 import type { HumanoidRigId } from '../../player/humanoid-rig';
 import { tryBeginSpatialOneShot } from '../audio-spatial-voice';
 import { fillCapsuleFootPoint, spatialVectorFromPoint } from '../audio-system';
@@ -19,16 +21,13 @@ export function getGruntSynth(): GruntSynth {
   return sharedSynth;
 }
 
-/** Speak phonetic / grunt text with the voice matched to the mannequin rig (mono). */
+
 export async function speakGrunt(text: string, rigId: HumanoidRigId): Promise<void> {
   AudioContextEngine.get().resume();
   await getGruntSynth().playText(gruntVoiceSettingsForRig(rigId), text);
 }
 
-/**
- * Spatial grunt at capsule feet — heard by player and all bots.
- * `capsuleCenter` = Rapier body translation.
- */
+
 export async function speakGruntAt(
   text: string,
   rigId: HumanoidRigId,
@@ -52,13 +51,13 @@ export async function speakGruntAt(
   voice.endAfter(source);
 }
 
-/** Speak with an explicit male/female preset (debug or UI). */
+
 export async function speakGruntVoice(text: string, voiceId: GruntVoiceId): Promise<void> {
   AudioContextEngine.get().resume();
   await getGruntSynth().playText(gruntVoiceSettingsForId(voiceId), text);
 }
 
-/** Preview normalized Lautschrift without playing audio. */
+
 export function normalizeGruntText(text: string): string {
   return getGruntSynth().normalizePhoneticText(text);
 }

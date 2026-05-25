@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/weapon-bar-hud.ts
+
 import { WEAPON_DEFINITIONS } from '../combat/weapon-definitions';
 
 export interface WeaponBarHudNodes {

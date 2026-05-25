@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-weapon/audio-fire-preset.ts
+
 import type { FireProfile, ImpactProfile, ProjectileVisualKind, WeaponDefinition } from '../../combat/weapon-definitions';
 
 export interface FireAudioPreset {

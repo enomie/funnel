@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/humanoid-rig.ts
+
 import type { FactionTeam } from '../combat/teams';
 import type { ShooterPackCharacter } from './shooter-pack-loader';
 
@@ -10,7 +12,7 @@ export const HUMANOID_RIG_MODEL_FILES: Record<HumanoidRigId, string> = {
   'x-bot': 'mixamo-x-bot-t-pose.dae'
 };
 
-/** Faction mascot mannequin — Alpha Y-Bot, Beta X-Bot. */
+
 export const FACTION_HUMANOID_RIG: Record<FactionTeam, HumanoidRigId> = {
   alpha: 'y-bot',
   beta: 'x-bot'
@@ -31,7 +33,7 @@ function hashUnit(input: string): number {
   return (hash >>> 0) / 4294967295;
 }
 
-/** Stable per-bot rig roll (same bot keeps its mannequin on respawn). */
+
 export function pickBotRigId(botId: string): HumanoidRigId {
   return hashUnit(botId) >= 0.5 ? 'x-bot' : 'y-bot';
 }

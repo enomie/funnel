@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-controller.ts
+
 import type {
   Collider,
   KinematicCharacterController,
@@ -183,7 +185,7 @@ export class PlayerController {
     return this.#death;
   }
 
-  /** Once per render frame: jump buffer, coyote, ground probe. */
+  
   beginFrame(input: InputSnapshot): void {
     this.#lastInputSnapshot = input;
     this.#frameNow = performance.now();
@@ -198,7 +200,7 @@ export class PlayerController {
     this.#applyJumpImpulse(this.#frameNow, input);
   }
 
-  /** Once per Rapier fixed sub-step. */
+  
   fixedUpdate(fixedStep: number, input: InputSnapshot): void {
     if (this.health.isDead) {
       return;
@@ -207,7 +209,7 @@ export class PlayerController {
     this.#applyMovement(fixedStep, input);
   }
 
-  /** After `world.step` + contact-force drain — single ground reconcile per frame. */
+  
   afterPhysics(): void {
     if (this.health.isDead) {
       return;
@@ -315,7 +317,7 @@ export class PlayerController {
     this.#movementLocked = locked;
   }
 
-  /** UT-style jump pad — launch once per pad enter while overlapping trigger volume. */
+  
   launchFromJumpPad(impulse: JumpImpulseResult, nowMs: number): void {
     if (this.health.isDead || this.#movementLocked) {
       return;
@@ -332,7 +334,7 @@ export class PlayerController {
     this.#footsteps.playJumpAt(this.body.translation(), this.visual.rigId);
   }
 
-  /** Countdown intro — air spawn in match-start band; falls until grounded while input locked. */
+  
   beginMatchStartDrop(faction: FactionTeam): void {
     const spawn = playerMatchStartDropPosition(faction);
     this.body.setTranslation(spawn, true);
@@ -347,7 +349,7 @@ export class PlayerController {
     this.#jumpAirThrust = null;
   }
 
-  /** Living player — team pocket teleport (dev flip / hire). */
+  
   spawnAtFaction(faction: FactionTeam): void {
     const spawn = playerFactionSpawnPosition(faction);
     this.body.setTranslation(spawn, true);
@@ -361,7 +363,7 @@ export class PlayerController {
     snapRigidBodyToGround(this.#world, this.body, false);
   }
 
-  /** Rematch — full heal, clear death, air drop at match-start band. */
+  
   prepareMatchRestart(faction: FactionTeam): void {
     this.health.respawn();
     if (this.#death.applied) {
@@ -372,7 +374,7 @@ export class PlayerController {
     this.beginMatchStartDrop(faction);
   }
 
-  /** Auto-respawn or future revive — restores health, physics, and locomotion at team spawn. */
+  
   respawnAtFaction(faction: FactionTeam): void {
     if (!this.health.isDead) {
       return;
@@ -382,6 +384,17 @@ export class PlayerController {
     resetActorDeathPhysics(this.body, this.collider, this.#death);
     this.#standFromCrouch();
     this.spawnAtFaction(faction);
+    this.visual.reviveLocomotion();
+  }
+
+  reviveInPlace(): void {
+    if (!this.health.isDead) {
+      return;
+    }
+
+    this.health.respawn();
+    resetActorDeathPhysics(this.body, this.collider, this.#death);
+    this.#standFromCrouch();
     this.visual.reviveLocomotion();
   }
 
@@ -484,7 +497,7 @@ export class PlayerController {
       return;
     }
 
-    // Ascent: idle hop only — height-gated carry; walk/run keep takeoff inertia.
+    
     if (this.#jumpAirThrust !== null) {
       const pos = this.body.translation();
       const thrust = applyJumpAirThrust(

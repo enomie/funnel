@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-flyby/audio-flyby-voice.ts
+
 import { Vector3 } from 'three/webgpu';
 import type { WeaponDefinition } from '../../combat/weapon-definitions';
 import {
@@ -39,7 +41,7 @@ export function getAudioFlybyVoice(): AudioFlybyVoice {
   return shared;
 }
 
-/** Fixed subgraph per slot — sources run continuously, gain mutes when idle. */
+
 export class AudioFlybyVoice {
   readonly #slots: FlySlot[] = Array.from({ length: WEAPON_AUDIO_FLY_VOICE_CAP }, () => ({
     active: false,
@@ -79,7 +81,7 @@ export class AudioFlybyVoice {
     return slotIndex;
   }
 
-  /** False when the slot was released — caller must clear flySlot and may re-attach. */
+  
   sync(slotIndex: number, position: Vector3, direction: Vector3, speed: number): boolean {
     const slot = this.#slots[slotIndex];
     if (!slot.active || slot.graph === null) {
@@ -107,7 +109,7 @@ export class AudioFlybyVoice {
     try {
       graph.panner.disconnect();
     } catch {
-      /* already torn down */
+      // Panner may already be disconnected.
     }
     slot.active = false;
   }

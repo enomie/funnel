@@ -1,6 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/low-poly-sphere-geometry.ts
+
 import { IcosahedronGeometry } from 'three/webgpu';
 
-/** Detail 0 — 20 faces; scale via instance/world matrix, not per-radius geometry clones. */
+
 const LOW_POLY_SPHERE_DETAIL = 5;
 
 let unitLowPolySphere: IcosahedronGeometry | null = null;

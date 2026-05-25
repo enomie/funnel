@@ -1,8 +1,10 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-impact-default.ts
+
 import type { ImpactProfile, WeaponDefinition } from '../../combat/weapon-definitions';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
 import { playNoiseBurst, playSweepOscBurst } from './audio-one-shot-synth';
 
-/** Per-weapon mix: `crack` = transient noise, `tone` = thump start Hz, `body` = debris layer. */
+
 const IMPACT: Record<
   WeaponDefinition['visualKind'],
   { crack: number; tone: number; body: number }
@@ -53,7 +55,7 @@ export function defaultImpactPhraseDuration(weapon: WeaponDefinition, impact: Im
   return Math.max(sound.durationS, sound.crackDurationS) + 0.02;
 }
 
-/** Generic weapon impact — transient crack + thump + optional body scrape. */
+
 export function scheduleDefaultImpactPhrase(
   weapon: WeaponDefinition,
   impact: ImpactProfile,

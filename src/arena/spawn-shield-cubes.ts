@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/spawn-shield-cubes.ts
+
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import { FUNNEL_DIMENSIONS } from '../config/game-config';
 import { type FactionTeam } from '../combat/teams';
@@ -9,18 +11,18 @@ import {
 } from './environment-cube';
 import type { FunnelZoneId } from './funnel-zones';
 
-/** @deprecated Use ENVIRONMENT_CUBE_SIZE_M — kept for existing imports. */
+
 export const SPAWN_SHIELD_CUBE_SIZE_M = ENVIRONMENT_CUBE_SIZE_M;
 
 const SPAWN_SHIELD_HALF_M = ENVIRONMENT_CUBE_HALF_M;
 
-/** 50 m width → 5 × 5 m cubes with 5 m gaps (wall-flush on front row). */
+
 export const SPAWN_SHIELD_ROW_COUNT = 5;
 const SPAWN_SHIELD_ROW_GAP_M = ENVIRONMENT_CUBE_SIZE_M;
 
 export type SpawnShieldRowId = 'front' | 'rear';
 
-/** Grid-aligned Z centers — rear row 10 m toward bulkhead (5 m cube + 5 m row gap). */
+
 export const SPAWN_SHIELD_ROW_Z: Record<FactionTeam, Record<SpawnShieldRowId, number>> = {
   alpha: { front: -122.5, rear: -132.5 },
   beta: { front: 122.5, rear: 132.5 }
@@ -34,10 +36,7 @@ interface SpawnShieldCubeSlot {
   readonly z: number;
 }
 
-/**
- * Front row flush to left wall; rear row offset +5 m in X so gaps stagger.
- * Walkable 5 m slots zigzag; no straight lane for projectiles from neutral.
- */
+
 function spawnShieldRowCentersX(row: SpawnShieldRowId): readonly number[] {
   const halfW = FUNNEL_DIMENSIONS.width * 0.5;
   const lateralStep = ENVIRONMENT_CUBE_SIZE_M + SPAWN_SHIELD_ROW_GAP_M;
@@ -51,7 +50,7 @@ function spawnShieldRowZ(faction: FactionTeam, row: SpawnShieldRowId): number {
   return SPAWN_SHIELD_ROW_Z[faction][row];
 }
 
-/** Row Z center for a team's spawn shield line. */
+
 export function teamSpawnShieldRowZ(faction: FactionTeam, row: SpawnShieldRowId): number {
   return spawnShieldRowZ(faction, row);
 }
@@ -81,7 +80,7 @@ function addSpawnShieldCube(
   addFixedEnvironmentCube(instances, world, slot.x, slot.z, factionZoneId(faction));
 }
 
-/** Twenty fixed 5³ m spawn shields (2 staggered rows × 5 per team) — docs/environment.md. */
+
 export function createSpawnShieldCubes(instances: ArenaStaticInstances, world: World): void {
   for (const slot of spawnShieldSlots('alpha')) {
     addSpawnShieldCube(instances, world, 'alpha', slot);
@@ -91,13 +90,18 @@ export function createSpawnShieldCubes(instances: ArenaStaticInstances, world: W
   }
 }
 
-/** World Z of team bulkhead (north alpha / south beta). */
+
 export function teamBulkheadZ(faction: FactionTeam): number {
   const halfLength = FUNNEL_DIMENSIONS.length * 0.5;
   return faction === 'alpha' ? -halfLength : halfLength;
 }
 
-/** Z extent of the 15 m spawn pocket behind the rear shield row (bulkhead → rear block back face). */
+/** Mixamo bind pose faces +Z; beta bulkhead sits at +Z and must flip toward center. */
+export function yawTowardFunnelCenter(faction: FactionTeam): number {
+  return teamBulkheadZ(faction) > 0 ? Math.PI : 0;
+}
+
+
 export function teamSpawnPocketExtentZ(faction: FactionTeam): { minZ: number; maxZ: number } {
   const bulkheadZ = teamBulkheadZ(faction);
   const rearRowZ = spawnShieldRowZ(faction, 'rear');
@@ -110,15 +114,15 @@ export function teamSpawnPocketExtentZ(faction: FactionTeam): { minZ: number; ma
   };
 }
 
-/** Depth of spawn pocket behind rear shields (bulkhead − rear back face; currently 15 m). */
+
 export const TEAM_SPAWN_POCKET_DEPTH_M =
   teamSpawnPocketExtentZ('alpha').maxZ - teamSpawnPocketExtentZ('alpha').minZ;
 
-/** Match-start intro drop — 15 m band starting 30 m from bulkhead (docs/environment.md). */
+
 export const MATCH_START_DROP_DEPTH_M = 15;
 const MATCH_START_DROP_OFFSET_FROM_BULKHEAD_M = 30;
 
-/** Z extent of the match-start drop band (30…45 m from bulkhead; alpha `−120…−105`, beta `+105…+120`). */
+
 export function teamMatchStartDropExtentZ(faction: FactionTeam): { minZ: number; maxZ: number } {
   const bulkheadZ = teamBulkheadZ(faction);
   const towardCenter = -Math.sign(bulkheadZ);
@@ -136,21 +140,21 @@ export function teamSpawnPocketCenterZ(faction: FactionTeam): number {
   return (minZ + maxZ) * 0.5;
 }
 
-/** Evenly spaced Z inside the spawn pocket (index `0 … count-1`). */
+
 export function spawnPocketZ(faction: FactionTeam, index: number, count: number): number {
   const { minZ, maxZ } = teamSpawnPocketExtentZ(faction);
   const step = (maxZ - minZ) / (count + 1);
   return minZ + step * (index + 1);
 }
 
-/** Evenly spaced Z inside the match-start drop band (index `0 … count-1`). */
+
 export function matchStartDropZ(faction: FactionTeam, index: number, count: number): number {
   const { minZ, maxZ } = teamMatchStartDropExtentZ(faction);
   const step = (maxZ - minZ) / (count + 1);
   return minZ + step * (index + 1);
 }
 
-/** Gap X for match-start roster slot — cycles front-row shield gaps. */
+
 export function matchStartDropX(index: number): number {
   const gaps = spawnShieldGapCentersX('front');
   if (gaps.length === 0) {
@@ -160,7 +164,7 @@ export function matchStartDropX(index: number): number {
   return gaps[index % gaps.length] ?? 0;
 }
 
-/** Walkable gap centers between adjacent cubes in a shield row (5 m slots). */
+
 export function spawnShieldGapCentersX(row: SpawnShieldRowId): readonly number[] {
   const centers = spawnShieldRowCentersX(row);
   const gaps: number[] = [];
@@ -172,7 +176,7 @@ export function spawnShieldGapCentersX(row: SpawnShieldRowId): readonly number[]
   return gaps;
 }
 
-/** Nearest 5 m gap X for bots leaving the spawn pocket. */
+
 export function nearestSpawnShieldGapX(row: SpawnShieldRowId, botX: number): number {
   const gaps = spawnShieldGapCentersX(row);
   let nearestGap = gaps[0] ?? 0;

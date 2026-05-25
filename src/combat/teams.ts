@@ -1,8 +1,19 @@
-/** Faction identity — two opposing sides in the funnel (intro §5, §8). */
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/teams.ts
+
+
 import { deriveTeamHex, type RelativeTeamRole } from './team-color-derive';
 
-export type { DerivedTeamColorKind, RelativeTeamRole } from './team-color-derive';
-export { deriveTeamHex, TEAM_BASE_HEX } from './team-color-derive';
+export type { DerivedTeamColorKind, RelativeTeamRole, TeamUiNuance } from './team-color-derive';
+export {
+  deriveTeamHex,
+  deriveTeamUiHex,
+  TEAM_BASE_HEX,
+  teamHexToCssHex,
+  teamHexToRgb,
+  teamHexToRgbString,
+  teamRgbaCss
+} from './team-color-derive';
+export { injectGameTeamCssVars, injectTeamCssVars } from './team-css-vars';
 
 export type FactionTeam = 'alpha' | 'beta';
 
@@ -10,14 +21,14 @@ export const FACTION_TEAMS: readonly FactionTeam[] = ['alpha', 'beta'];
 
 export interface FactionTeamDefinition {
   readonly id: FactionTeam;
-  /** HUD / scoreboard label, e.g. "Team Alpha". */
+  
   readonly label: string;
   readonly shortLabel: string;
-  /** Spawn anchor along funnel Z (opposing tunnel ends). */
+  
   readonly spawnZ: number;
 }
 
-/** Pocket center Z — all spawns live in the 15 m strip behind shield rows. */
+
 export const TEAM_DEFINITIONS: Record<FactionTeam, FactionTeamDefinition> = {
   alpha: {
     id: 'alpha',
@@ -35,7 +46,7 @@ export const TEAM_DEFINITIONS: Record<FactionTeam, FactionTeamDefinition> = {
 
 export const DEFAULT_PLAYER_FACTION: FactionTeam = 'beta';
 
-/** Default segment tint — see `applyRelativeTeamColors` for joint vs segment split. */
+
 export const RELATIVE_TEAM_COLORS = {
   ally: {
     color: deriveTeamHex('ally'),

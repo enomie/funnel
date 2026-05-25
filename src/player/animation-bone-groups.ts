@@ -1,4 +1,6 @@
-/** Mixamo leg / foot bones — excluded from upper-body combat overlays. */
+// Path: /Users/johann/MyBrew/funnel-real/src/player/animation-bone-groups.ts
+
+
 export const LOWER_BODY_BONE_PREFIXES = [
   'mixamorig_LeftUpLeg',
   'mixamorig_RightUpLeg',

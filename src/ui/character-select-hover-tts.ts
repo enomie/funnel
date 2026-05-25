@@ -1,10 +1,12 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/character-select-hover-tts.ts
+
 import type { HumanoidRigId } from '../player/humanoid-rig';
 import { speakGrunt } from '../game-audio/audio-grunts/audio-grunt-tts';
 
 const HOVER_GREETING = 'Hello';
 const HOVER_GREETING_INTERVAL_MS = 2000;
 
-/** Repeating rig-voiced TTS while a character-select figure is hovered. */
+
 export class CharacterSelectHoverTts {
   #intervalId = 0;
   #activeRig: HumanoidRigId | null = null;

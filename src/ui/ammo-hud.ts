@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/ammo-hud.ts
+
 import type { AmmoCellState, AmmoHudSnapshot } from '../combat/ammo-controller';
 
 export interface AmmoHudNodes {

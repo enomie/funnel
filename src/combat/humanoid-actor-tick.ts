@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/humanoid-actor-tick.ts
+
 import type { Vector3 } from 'three/webgpu';
 import type { LocomotionAnimInput } from '../player/locomotion-anim-controller';
 import type { WeaponArsenal } from './weapon-arsenal';
@@ -21,7 +23,7 @@ export interface HumanoidRenderTickContext {
   readonly onRevive?: () => void;
 }
 
-/** Death → weapon suspend/update → visual root → locomotion — once per frame after `world.step`. */
+
 export function tickHumanoidRenderFrame(
   context: HumanoidRenderTickContext,
   locomotionInput: LocomotionAnimInput

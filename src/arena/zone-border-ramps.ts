@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/zone-border-ramps.ts
+
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import { FUNNEL_DIMENSIONS, funnelZoneExtentZ } from '../config/game-config';
 import type { ArenaStaticInstances } from './arena-static-instances';
@@ -10,7 +12,7 @@ import type { FunnelZoneId } from './funnel-zones';
 
 type TeamZoneId = Extract<FunnelZoneId, 'alpha' | 'beta'>;
 
-/** Center offset from neutral border into the adjoining team zone. */
+
 const TEAM_ZONE_RAMP_INSET_M = 2.5;
 
 interface ZoneBorderRampSlot {
@@ -20,7 +22,7 @@ interface ZoneBorderRampSlot {
   readonly rotationY: number;
 }
 
-/** 5³ m ramps at side walls — inset into team zone, slope flipped along Z. */
+
 function zoneBorderRampSlots(): readonly ZoneBorderRampSlot[] {
   const halfWidth = FUNNEL_DIMENSIONS.width * 0.5;
   const halfRampWidth = ENVIRONMENT_RAMP_SIZE_M * 0.5;
@@ -36,7 +38,7 @@ function zoneBorderRampSlots(): readonly ZoneBorderRampSlot[] {
   ];
 }
 
-/** Fixed team-colored ramps where neutral meets alpha/beta along the side walls. */
+
 export function createZoneBorderRamps(instances: ArenaStaticInstances, world: World): void {
   const rampSize: [number, number, number] = [
     ENVIRONMENT_RAMP_SIZE_M,

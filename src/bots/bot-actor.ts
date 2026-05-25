@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-actor.ts
+
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import { Vector3 } from 'three/webgpu';
 import type { Scene } from 'three/webgpu';
@@ -18,6 +20,7 @@ import { secondaryFireEnabled } from '../combat/weapon-definitions';
 import { tickHumanoidRenderFrame, type HumanoidCombatSuspendState, type HumanoidRenderTickContext } from '../combat/humanoid-actor-tick';
 import { createCombatActor, type CombatActor } from '../combat/combat-actor';
 import type { BotSpawnSlot } from '../combat/match-roster';
+import type { FactionTeam } from '../combat/teams';
 import { rollSpawnWeapon, redeemerWeaponDefinition } from '../combat/spawn-weapon-roll';
 import { aimDirectionFromYawPitch, resolveMuzzleWorldPosition } from '../combat/weapon-aim';
 import { WeaponArsenal, WEAPON_ARSENAL_BOT_BUDGET } from '../combat/weapon-arsenal';
@@ -37,7 +40,7 @@ import { BotController } from './bot-controller';
 import { hasLineOfSightToTarget, BOT_EYE_HEIGHT_OFFSET } from './bot-perception';
 import type { GameEventBus } from '../core/event-bus';
 import { tryAcquireBotRespawn } from './bot-respawn-budget';
-import { botRespawnDueAtMs } from './bot-respawn';
+import { botAutoRespawnDue } from './bot-respawn';
 import type { BotCombatContext } from './bot-roster';
 import { BotTargetFocus } from './bot-target-focus';
 import { BotVisual } from './bot-visual';
@@ -47,13 +50,15 @@ import { syncHumanoidVisualRoot } from '../physics/synced-body';
 const _muzzlePosition = new Vector3();
 const _aimDirection = new Vector3();
 const _weaponBodyPosition = new Vector3();
-/** Rockets marked before bot releases RMB volley (player can hold up to mag size). */
+
 const BOT_ROCKET_VOLLEY_MARKS = 3;
-/** Release Bio blob once charge fraction crosses this (matches full charge feel). */
+
 const BOT_BIO_RELEASE_FRACTION = 0.92;
-/** Beyond this distance from the viewer, skip mixer/foot/eye work (root sync still runs). */
-const BOT_ANIMATION_LOD_DISTANCE_M = 40;
-const BOT_ANIMATION_LOD_DISTANCE_SQ = BOT_ANIMATION_LOD_DISTANCE_M * BOT_ANIMATION_LOD_DISTANCE_M;
+
+const BOT_ANIM_LOD_EXIT_M = 46;
+const BOT_ANIM_LOD_ENTER_M = 34;
+const BOT_ANIM_LOD_EXIT_SQ = BOT_ANIM_LOD_EXIT_M * BOT_ANIM_LOD_EXIT_M;
+const BOT_ANIM_LOD_ENTER_SQ = BOT_ANIM_LOD_ENTER_M * BOT_ANIM_LOD_ENTER_M;
 
 export class BotActor {
   readonly controller: BotController;
@@ -73,7 +78,7 @@ export class BotActor {
   #secondaryHoldActive = false;
   #combatStepPending = false;
   #driveActive = false;
-  #skipAnimationLod = false;
+  #visualReducedLod = false;
   readonly #weaponAimScratch = { yaw: 0, pitch: 0 };
   readonly #driveScratch: MutableBotDriveCommand = {
     faceYaw: 0,
@@ -210,7 +215,7 @@ export class BotActor {
     );
   }
 
-  /** Brain + nav once per render frame — must not run per physics sub-step. */
+  
   preparePhysicsFrame(deltaSeconds: number, nowMs: number, context: BotCombatContext): void {
     if (this.controller.health.isDead) {
       this.#driveActive = false;
@@ -265,13 +270,13 @@ export class BotActor {
     }
   }
 
-  /** Pre-match countdown — gravity fall + visual sync (no brain/combat). */
+  
   tickCountdownDrop(deltaSeconds: number, nowMs: number): void {
     if (this.controller.health.isDead) {
       return;
     }
 
-    this.#skipAnimationLod = false;
+    this.#visualReducedLod = false;
     const translation = this.controller.body.translation();
 
     _weaponBodyPosition.set(translation.x, translation.y, translation.z);
@@ -313,15 +318,21 @@ export class BotActor {
     const dx = player.x - translation.x;
     const dy = player.y - translation.y;
     const dz = player.z - translation.z;
-    this.#skipAnimationLod =
-      !this.controller.health.isDead &&
-      dx * dx + dy * dy + dz * dz > BOT_ANIMATION_LOD_DISTANCE_SQ;
+    const distSq = dx * dx + dy * dy + dz * dz;
+    if (this.controller.health.isDead) {
+      this.#visualReducedLod = false;
+    } else if (this.#visualReducedLod) {
+      if (distSq <= BOT_ANIM_LOD_ENTER_SQ) {
+        this.#visualReducedLod = false;
+      }
+    } else if (distSq > BOT_ANIM_LOD_EXIT_SQ) {
+      this.#visualReducedLod = true;
+    }
 
     const tickContext = this.#humanoidTickContext;
     tickContext.isDead = this.controller.health.isDead;
     tickContext.nowMs = nowMs;
     tickContext.deltaSeconds = deltaSeconds;
-    tickContext.afterDeathSync = this.#afterDeathSyncBound;
     this.#weaponAimScratch.yaw = this.controller.aimYaw;
     this.#weaponAimScratch.pitch = this.controller.aimPitch;
 
@@ -354,14 +365,14 @@ export class BotActor {
       delta,
       input,
       this.controller.aimPitch,
-      this.#skipAnimationLod,
+      this.#visualReducedLod,
       this.#humanoidTickContext.nowMs
     );
   };
 
-  readonly #afterDeathSyncBound = (deathNowMs: number): void => {
-    this.#tryRespawn(deathNowMs);
-  };
+  tryAutoRespawn(nowMs: number): void {
+    this.#tryRespawn(nowMs);
+  }
 
   #tickCombat(nowMs: number, context: BotCombatContext): void {
     const brainStepped = this.#combatStepPending;
@@ -433,6 +444,28 @@ export class BotActor {
     this.visual.applyViewerColors(viewerTeam);
   }
 
+  reviveInPlace(): void {
+    this.controller.reviveInPlace();
+    this.#brain.reset();
+    this.#targetFocus.reset();
+    this.#combatSuspend.active = false;
+    this.#secondaryHoldActive = false;
+    this.visual.reviveLocomotion();
+  }
+
+  hireInPlace(newFaction: FactionTeam, viewerTeam: PlayerTeam): void {
+    this.controller.reviveInPlace();
+    this.controller.setFaction(newFaction);
+    this.combatActor.setFaction(newFaction);
+    this.visual.setFaction(newFaction);
+    this.#brain.reset();
+    this.#targetFocus.reset();
+    this.#combatSuspend.active = false;
+    this.#secondaryHoldActive = false;
+    this.visual.applyViewerColors(viewerTeam);
+    this.visual.reviveLocomotion();
+  }
+
   dispose(world: World, registry: ActorRegistry): void {
     registry.unregister(this.combatActor);
     this.weapon.releaseAllWorldEffects();
@@ -445,13 +478,20 @@ export class BotActor {
       return;
     }
 
-    const deathTime = this.controller.diedAtMs;
-    const dueAt = botRespawnDueAtMs(
-      deathTime,
-      this.#respawnPhaseSlot,
-      this.#respawnPhaseSlotCount
-    );
-    if (nowMs < dueAt || !tryAcquireBotRespawn()) {
+    const deathSnapshot = this.controller.deathSnapshot;
+    if (deathSnapshot.channelerId !== null) {
+      return;
+    }
+
+    if (
+      !botAutoRespawnDue(
+        nowMs,
+        deathSnapshot,
+        this.#respawnPhaseSlot,
+        this.#respawnPhaseSlotCount
+      ) ||
+      !tryAcquireBotRespawn()
+    ) {
       return;
     }
 
@@ -481,7 +521,7 @@ export class BotActor {
     this.visual.equipWeapon(weaponDef);
   }
 
-  /** Rematch — clear combat state and air-drop at match-start slot. */
+  
   prepareMatchRestart(): void {
     this.weapon.suspendCombat();
     this.controller.beginMatchStartDrop(this.#matchStartSlot);

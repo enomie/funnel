@@ -1,4 +1,6 @@
-/** Procedural grunt / phonetic voice synth (from docs/_examples/male-female-sound). */
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-grunts/audio-grunt-synth.ts
+
+
 
 import { AUDIO_GRUNT_OUTPUT_GAIN, GRUNT_PHRASE_BUFFER_CACHE_CAP } from '../audio-config';
 

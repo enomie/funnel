@@ -1,4 +1,6 @@
-/** Visual part tint — `weapon` = solid weapon color, `glow` = same color emissive @ 0.8. */
+// Path: /Users/johann/MyBrew/funnel-real/src/weapon-jsons/weapon-mesh-types.ts
+
+
 export type WeaponMeshPartStyle = 'weapon' | 'glow';
 
 export type WeaponMeshPart =

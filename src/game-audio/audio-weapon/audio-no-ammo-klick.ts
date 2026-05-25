@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-weapon/audio-no-ammo-klick.ts
+
 import type { Vector3 } from 'three/webgpu';
 import { tryBeginSpatialOneShot } from '../audio-spatial-voice';
 import { AudioContextEngine } from '../audio-mixer';
@@ -12,7 +14,7 @@ const NO_AMMO_KLICK_MIN_INTERVAL_MS = 180;
 
 let lastKlickAtMs = 0;
 
-/** Dry trigger snap — one sound for every weapon when firing with no ammo. */
+
 export function playNoAmmoKlick(position: Vector3, nowMs: number): void {
   if (nowMs < lastKlickAtMs + NO_AMMO_KLICK_MIN_INTERVAL_MS) {
     return;

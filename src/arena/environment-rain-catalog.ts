@@ -1,6 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/environment-rain-catalog.ts
+
 import type { DynamicPropSpec } from './environment-dynamic-shapes';
 
-/** Sequential rain catalog — large props first; 2×2×20 pillars last. */
+
 export const RAIN_WAVE_CATALOG = [
   { id: 'cube-5', shape: { kind: 'box', size: [5, 5, 5] } },
   { id: 'cube-3', shape: { kind: 'box', size: [3, 3, 3] } },

@@ -1,18 +1,20 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/humanoid-eye-visual.ts
+
 import { Bone, Mesh, Quaternion, type Object3D, Vector3 } from 'three/webgpu';
 import type { RelativeTeamRole } from '../combat/team-color-derive';
 import { getUnitLowPolySphereGeometry } from '../render/low-poly-sphere-geometry';
 import { getTeamJointMaterial, isHumanoidEyeMeshName } from './team-visual-colors';
 
 const HEAD_BONE = 'mixamorig_Head';
-/** Mixamo locals are cm; model root `scale` 0.01 → meters in world. */
+
 const EYE_RADIUS_CM = 3;
 const EYE_SCALE_Y = 0.55;
 const EYE_SCALE_XZ = 0.92;
-/** Face shell ~12.2 cm forward in idle — poke slightly past surface. */
+
 const EYE_FORWARD_CM = 13.2;
 const EYE_LATERAL_CM = 3.2;
 const EYE_VERTICAL_CM = 12.5;
-/** T-pose spawn mannequins — head pitch differs from rifle-idle eye tuning. */
+
 export const HUMANOID_EYE_BIND_POSE_VERTICAL_CM = EYE_VERTICAL_CM - 5;
 
 const _headOffset = new Vector3();
@@ -57,7 +59,7 @@ export function resetHeadBoneEyeSyncGate(gate: HeadBoneEyeSyncGate): void {
   gate.headQw = NaN;
 }
 
-/** Skip eye matrix pass when clip and head world pose are unchanged. */
+
 export function shouldSyncHumanoidEyes(
   character: Object3D,
   clipId: string,
@@ -157,7 +159,7 @@ function eyeVerticalCmFor(character: Object3D): number {
   return typeof override === 'number' ? override : EYE_VERTICAL_CM;
 }
 
-/** Create / reparent eye meshes on the character root (WebGPU-safe — not bone children). */
+
 export function attachHumanoidEyes(
   character: Object3D,
   role: RelativeTeamRole,
@@ -175,7 +177,7 @@ export function attachHumanoidEyes(
   syncHumanoidEyes(character);
 }
 
-/** Snap eyes to animated head bone — call after mixer (and aim-spine when used). */
+
 export function syncHumanoidEyes(character: Object3D): void {
   const head = findHeadBone(character);
   if (head === null) {

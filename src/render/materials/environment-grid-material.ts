@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/materials/environment-grid-material.ts
+
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import type { FunnelZoneId } from '../../arena/funnel-zones';
 import { TEAM_BASE_HEX } from '../../combat/teams';
@@ -10,7 +12,7 @@ import {
 
 const NEUTRAL_GRID_COLOR = 0x7b7b7b;
 const JUMP_PAD_GRID_COLOR = PICKUP_FIELD_CONFIG.shield.color;
-/** Walk-through pads — readable grid without looking ghostly. */
+
 const JUMP_PAD_GRID_OPACITY = 0.62;
 const JUMP_PAD_GRID_EMISSIVE = 0.5;
 
@@ -27,7 +29,7 @@ function materialCacheKey(zoneId: FunnelZoneId): string {
   return `${zoneId}-${GRID_BASE_COLOR.toString(16)}`;
 }
 
-/** Cached MeshStandardNodeMaterial with procedural world grid (G0+). */
+
 export function zoneGridMaterial(zoneId: FunnelZoneId = 'neutral'): MeshStandardNodeMaterial {
   const cacheKey = materialCacheKey(zoneId);
   const cached = MATERIAL_CACHE.get(cacheKey);
@@ -46,7 +48,7 @@ export function zoneGridMaterial(zoneId: FunnelZoneId = 'neutral'): MeshStandard
   return material;
 }
 
-/** Transparent turquoise world grid — jump pads on team podiums. */
+
 export function jumpPadGridMaterial(): MeshStandardNodeMaterial {
   if (jumpPadGridMaterialCached !== null) {
     return jumpPadGridMaterialCached;

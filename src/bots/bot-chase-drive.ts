@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-chase-drive.ts
+
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import { PLAYER_CONFIG } from '../config/game-config';
 import type { BotBrainIntent } from './bot-brain';
@@ -7,10 +9,10 @@ import { planarSpeedFromInput } from '../player/player-movement-speed';
 import type { BotNavigationCache } from './bot-navigation-cache';
 import type { BotRouteSteerCache } from './bot-route-steer';
 
-/** Stop moving when within this radius of the mission goal (m) — not the steered sub-goal. */
+
 const CHASE_STOP_RADIUS_M = 2.8;
 
-/** Body yaw while chasing — look at target when hunting or shooting on push. */
+
 function resolveChaseFaceYaw(intent: BotBrainIntent, movementFaceYaw: number): number {
   if (intent.state === 'hunt') {
     return intent.aimYaw;
@@ -41,7 +43,7 @@ export interface BotDriveCommand {
   readonly movement: MovementKeys;
   readonly chaseGoalX: number;
   readonly chaseGoalZ: number;
-  /** Nav / route-steer detour — goal-approach stall is suppressed while true. */
+  
   readonly routeDetour: boolean;
 }
 
@@ -137,7 +139,7 @@ export function fillChaseDrive(
   out.routeDetour = routeDetour;
 }
 
-/** Capsule-cast detour when goal bearing is blocked — before stuck escalation. */
+
 export function tickBotRouteSteerFrame(
   world: World,
   body: RigidBody,
@@ -166,7 +168,7 @@ export function tickBotRouteSteerFrame(
   routeSteer.updateInPlace();
 }
 
-/** Once per render frame — heavy nav ray fans only while stuck (budgeted). */
+
 export function tickBotNavigationFrame(
   world: World,
   body: RigidBody,
@@ -197,7 +199,7 @@ export function tickBotNavigationFrame(
   navCache.updateInPlace(frameDeltaSeconds);
 }
 
-/** @returns `false` when the bot should hold position (no chase drive). */
+
 export function fillDriveFromBrainIntent(
   botX: number,
   botZ: number,

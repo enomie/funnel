@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/pickup-field.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import {
@@ -64,7 +66,7 @@ function pickupHalfExtentY(kind: PickupKind): number {
     : PICKUP_FIELD_CONFIG.shield.radius;
 }
 
-/** Health + shield pickups — Rapier dynamic bodies, air-drop respawn (docs/environment-dynamic.md § Pickups). */
+
 export class PickupField {
   readonly #world: World;
   readonly #registry: ActorRegistry;
@@ -72,6 +74,7 @@ export class PickupField {
   readonly #slots: PickupSlot[] = [];
   readonly #healthMesh: InstancedMesh;
   readonly #shieldMesh: InstancedMesh;
+  readonly #collectRadiusSq: number;
   readonly #shieldScale: number;
   #started = false;
 
@@ -79,6 +82,7 @@ export class PickupField {
     this.#world = deps.world;
     this.#registry = deps.registry;
     this.#onCollected = deps.onCollected;
+    this.#collectRadiusSq = PICKUP_FIELD_CONFIG.collectRadiusM ** 2;
     this.#shieldScale = PICKUP_FIELD_CONFIG.shield.radius;
 
     const [healthW, healthH, healthD] = PICKUP_FIELD_CONFIG.health.size;
@@ -114,7 +118,7 @@ export class PickupField {
     this.#shieldMesh.instanceMatrix.needsUpdate = true;
   }
 
-  /** Drop all pickups from the rain band once match props have landed. Idempotent. */
+  
   begin(): void {
     if (this.#started) {
       return;
@@ -227,46 +231,46 @@ export class PickupField {
   }
 
   #tryCollect(): void {
-    const collectRadiusM = PICKUP_FIELD_CONFIG.collectRadiusM;
-
-    for (const slot of this.#slots) {
-      const pickupBody = slot.body;
-      if (pickupBody === null) {
-        continue;
+    this.#registry.forEachActor((actor) => {
+      if (actor.health.isDead) {
+        return;
       }
 
-      const pickup = pickupBody.translation();
+      const actorBody = actor.body.translation();
 
-      this.#registry.forEachActorNear(
-        pickup.x,
-        pickup.y,
-        pickup.z,
-        collectRadiusM,
-        (actor) => {
-          if (slot.body !== pickupBody) {
-            return;
-          }
-
-          if (slot.kind === 'shield') {
-            if (actor.health.shield >= actor.health.maxShield) {
-              return;
-            }
-          } else if (actor.health.health >= actor.health.maxHealth) {
-            return;
-          }
-
-          const granted =
-            slot.kind === 'shield'
-              ? actor.health.addShield(PICKUP_FIELD_CONFIG.shield.grantAmount)
-              : actor.health.addHealth(PICKUP_FIELD_CONFIG.health.grantAmount);
-          if (granted <= 0) {
-            return;
-          }
-
-          this.#onCollected?.(slot.kind, { x: pickup.x, y: pickup.y, z: pickup.z });
-          this.#spawnDrop(slot);
+      for (const slot of this.#slots) {
+        const pickupBody = slot.body;
+        if (pickupBody === null) {
+          continue;
         }
-      );
-    }
+
+        if (slot.kind === 'shield') {
+          if (actor.health.shield >= actor.health.maxShield) {
+            continue;
+          }
+        } else if (actor.health.health >= actor.health.maxHealth) {
+          continue;
+        }
+
+        const pickup = pickupBody.translation();
+        const dx = pickup.x - actorBody.x;
+        const dy = pickup.y - actorBody.y;
+        const dz = pickup.z - actorBody.z;
+        if (dx * dx + dy * dy + dz * dz > this.#collectRadiusSq) {
+          continue;
+        }
+
+        const granted =
+          slot.kind === 'shield'
+            ? actor.health.addShield(PICKUP_FIELD_CONFIG.shield.grantAmount)
+            : actor.health.addHealth(PICKUP_FIELD_CONFIG.health.grantAmount);
+        if (granted <= 0) {
+          continue;
+        }
+
+        this.#onCollected?.(slot.kind, { x: pickup.x, y: pickup.y, z: pickup.z });
+        this.#spawnDrop(slot);
+      }
+    });
   }
 }

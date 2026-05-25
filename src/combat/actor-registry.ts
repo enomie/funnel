@@ -1,7 +1,9 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/actor-registry.ts
+
 import type { Collider, RigidBody } from '@dimforge/rapier3d-simd-compat';
 import type { CombatActor } from './combat-actor';
 
-/** Planar grid cell (m) — funnel is long/narrow; ~40 actors max. */
+
 const SPATIAL_CELL_M = 14;
 const SPATIAL_CELL_OFFSET = 512;
 
@@ -65,7 +67,7 @@ export class ActorRegistry {
     return this.#byActorId.get(actorId) ?? null;
   }
 
-  /** Rebuild planar spatial buckets once per render frame before AoE / ripper queries. */
+  
   beginFrame(frameId: number): void {
     if (this.#spatialFrameId === frameId) {
       return;
@@ -93,7 +95,7 @@ export class ActorRegistry {
     }
   }
 
-  /** Splash / blast / ripper broad-phase — only actors in overlapping grid cells. */
+  
   forEachActorNear(
     centerX: number,
     centerY: number,
@@ -137,7 +139,7 @@ export class ActorRegistry {
     }
   }
 
-  /** Full roster — presence scoring, HUD counts, legacy paths. */
+  
   forEachActor(callback: (actor: CombatActor) => void): void {
     for (const actor of this.#actors) {
       callback(actor);

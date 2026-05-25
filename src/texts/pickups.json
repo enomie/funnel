@@ -1,0 +1,12 @@
+{
+  "health": {
+    "name": "Health Pack",
+    "color": "#44ff88",
+    "description": "Green box that falls from the sky. Walk over it to restore 25 health. A new pack drops when one is taken."
+  },
+  "shield": {
+    "name": "Shield Belt",
+    "color": "#44ddff",
+    "description": "Cyan sphere that falls from the sky. Walk over it to gain 50 shield. A new belt drops when one is taken."
+  }
+}

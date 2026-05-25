@@ -1,5 +1,7 @@
-/** Shared duration for damage vignette + joint emissive flash (ms). */
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/damage-feedback.ts
+
+
 export const DAMAGE_HIT_FLASH_MS = 480;
 
-/** Joint emissive peak on hit — same team color, much brighter than idle joints (0.42). */
+
 export const JOINT_HIT_FLASH_EMISSIVE_INTENSITY = 6;

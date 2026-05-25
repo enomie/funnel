@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-navigation-cache.ts
+
 import { tryAcquireNavRayRefresh } from './bot-nav-ray-budget';
 import { BOT_BRAIN_STEP_S } from './bot-brain';
 import {
@@ -18,9 +20,9 @@ const BEARING_LOCK_BY_PHASE: Record<NavStuckPhase, number> = {
 };
 
 const NAV_ACCUMULATOR_CAP_S = BOT_BRAIN_STEP_S * 4;
-/** Deterministic slot spread — bots stagger refreshes across one brain tick window. */
+
 const NAV_PHASE_SLOT_COUNT = 12;
-/** Seek-mode nav runs at this fraction of brain tick rate (fewer ray fans while cruising). */
+
 const NAV_SEEK_REFRESH_BRAIN_MULTIPLIER = 2;
 
 export interface BotNavigationSnapshot extends BotNavigationGoal {

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/materials/environment-dynamic-style.ts
+
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import {
   buildObjectGridColorNode,
@@ -5,13 +7,13 @@ import {
   GRID_BASE_COLOR
 } from './grid-tsl';
 
-/** Major 5 m grid lines — docs/environment-dynamic.md. */
+
 export const DYNAMIC_GRID_MAJOR = 0xea7028;
 
-/** Inner 1 m grid lines (~52% major brightness). */
+
 export const DYNAMIC_GRID_MINOR = 0x8a4218;
 
-/** 1 m props need stronger lines than 5 m static shell blocks. */
+
 const DYNAMIC_GRID_LINE_STRENGTH_SCALE = 2.4;
 const DYNAMIC_GRID_EMISSIVE_STRENGTH = 0.42;
 
@@ -19,7 +21,7 @@ const MATERIAL_CACHE_KEY = `dynamic-${GRID_BASE_COLOR.toString(16)}-${DYNAMIC_GR
 
 let cachedMaterial: MeshStandardNodeMaterial | undefined;
 
-/** Cached orange grid material for dynamic rain / debris props. */
+
 export function dynamicGridMaterial(): MeshStandardNodeMaterial {
   if (cachedMaterial !== undefined) {
     return cachedMaterial;

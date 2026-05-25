@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/jump-pad-field.ts
+
 import {
   BoxGeometry,
   InstancedMesh,
@@ -36,11 +38,11 @@ interface JumpPadFieldDeps {
 const _composePosition = new Vector3();
 const _composeMatrix = new Matrix4();
 
-/** Transparent turquoise trigger pads on team podiums — walk-through, mega-jump on enter. */
+
 export class JumpPadField {
   readonly #slots: readonly JumpPadSlot[] = JUMP_PAD_WORLD_SLOTS;
   readonly #mesh: InstancedMesh;
-  /** Per pad × actor slot — set while capsule overlaps volume. */
+  
   readonly #inside = new Uint8Array(JUMP_PAD_COUNT * ACTOR_SLOT_COUNT);
 
   constructor(deps: JumpPadFieldDeps) {

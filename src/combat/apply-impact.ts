@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/apply-impact.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { Collider, RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import { Vector3 } from 'three/webgpu';
@@ -11,12 +13,15 @@ import type { ImpactProfile } from './weapon-definitions';
 
 const SPLASH_CENTER_FRACTION = 1;
 const SPLASH_EDGE_FRACTION = 0.35;
-/** Enough to clear max health + shield in one hit. */
+
 const LETHAL_DAMAGE = 9999;
-/** Chest-height aim point above actor root for splash occlusion rays. */
+
 const SPLASH_AIM_Y_OFFSET = 0.55;
-/** Allow hits when the blocking collider is essentially at the target. */
+
 const SPLASH_LOS_TOLERANCE_M = 0.35;
+
+/** Capsule outer reach — expanding lethal kills when the wave hits the hull, not the body center. */
+const EXPANDING_LETHAL_ACTOR_REACH_M = 0.95;
 
 let _splashLosRay: RAPIER.Ray | null = null;
 
@@ -34,7 +39,7 @@ export interface ApplyImpactDeps {
   world: World;
 }
 
-/** Partial request — `sourceFaction` is injected by the weapon layer. */
+
 export type CombatImpactRequest = Omit<ApplyImpactRequest, 'sourceFaction'>;
 
 export interface CombatImpactSink {
@@ -218,14 +223,23 @@ export interface ExpandingLethalBlastTick {
   center: Vector3;
   currentRadius: number;
   killedActorIds: Set<string>;
-  /** Actors occluded by static geometry — skip repeat raycasts each tick. */
-  blockedActorIds: Set<string>;
   friendlyFire: boolean;
-  /** Throttle LOS sweeps (ms) — full actor pass at most every 50 ms. */
-  lastLosSweepMs: number;
+  lastSweepMs: number;
 }
 
-/** Kill actors newly engulfed by an expanding blast front (Redeemer nuke). */
+function actorWithinExpandingLethalRadius(
+  center: Vector3,
+  actor: CombatActor,
+  currentRadius: number
+): boolean {
+  const bodyPoint = actor.body.translation();
+  const dx = bodyPoint.x - center.x;
+  const dy = bodyPoint.y - center.y;
+  const dz = bodyPoint.z - center.z;
+  const centerDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  return centerDistance - EXPANDING_LETHAL_ACTOR_REACH_M <= currentRadius;
+}
+
 export function tickExpandingLethalBlast(
   deps: ApplyImpactDeps,
   tick: ExpandingLethalBlastTick,
@@ -235,21 +249,20 @@ export function tickExpandingLethalBlast(
     return;
   }
 
-  if (nowMs - tick.lastLosSweepMs < 50) {
+  if (nowMs - tick.lastSweepMs < 50) {
     return;
   }
 
-  tick.lastLosSweepMs = nowMs;
+  tick.lastSweepMs = nowMs;
 
-  const radius = tick.currentRadius;
-  const excludeBody = resolveSourceBody(deps, tick.sourceActorId);
+  const queryRadius = tick.currentRadius + EXPANDING_LETHAL_ACTOR_REACH_M;
   deps.registry.forEachActorNear(
     tick.center.x,
     tick.center.y,
     tick.center.z,
-    radius,
+    queryRadius,
     (actor) => {
-      if (tick.killedActorIds.has(actor.id) || tick.blockedActorIds.has(actor.id)) {
+      if (tick.killedActorIds.has(actor.id)) {
         return;
       }
 
@@ -257,8 +270,7 @@ export function tickExpandingLethalBlast(
         return;
       }
 
-      if (!hasSplashLineOfSight(deps, tick.center, actor, excludeBody)) {
-        tick.blockedActorIds.add(actor.id);
+      if (!actorWithinExpandingLethalRadius(tick.center, actor, tick.currentRadius)) {
         return;
       }
 
@@ -315,7 +327,7 @@ function splashLosRay(originX: number, originY: number, originZ: number, dirX: n
   return _splashLosRay;
 }
 
-/** Rapier ray from blast center to target — static geometry and other bodies block splash. */
+
 function hasSplashLineOfSight(
   deps: ApplyImpactDeps,
   center: Vector3,

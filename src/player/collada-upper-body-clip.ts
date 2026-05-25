@@ -1,7 +1,9 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/collada-upper-body-clip.ts
+
 import type { AnimationClip } from 'three/webgpu';
 import { isLowerBodyTrack } from './animation-bone-groups';
 
-/** Keep spine/arms/head only so locomotion legs can keep running under fire. */
+
 export function clipToUpperBodyOnly(clip: AnimationClip): AnimationClip {
   const tracks = clip.tracks.filter((track) => !isLowerBodyTrack(track.name));
 

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-weapon/audio-weapon-bake.ts
+
 import { WEAPON_DEFINITIONS, type FireProfile, type ImpactProfile, type WeaponDefinition } from '../../combat/weapon-definitions';
 import { getBakedPhraseCache, type BakedPhrase } from '../audio-baked-phrase';
 import { AudioContextEngine } from '../audio-mixer';
@@ -99,7 +101,7 @@ async function ensureNoAmmoBake(sampleRate: number): Promise<void> {
   });
 }
 
-/** Pre-render all weapon fire/impact/dry-fire one-shots — call from `warmGameAudio`. */
+
 export async function warmWeaponBakes(): Promise<void> {
   AudioContextEngine.get().resume();
   const sampleRate = AudioContextEngine.get().context.sampleRate;

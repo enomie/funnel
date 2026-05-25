@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/instance-hidden-matrix.ts
+
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 
 const HIDDEN_Y = -5000;
@@ -8,7 +10,7 @@ const _quaternion = new Quaternion();
 const _scale = new Vector3();
 const _hiddenMatrix = new Matrix4();
 
-/** Off-screen instance transform — recompose on every release (never cache alongside sync scratch). */
+
 export function hiddenInstanceMatrix(): Matrix4 {
   return _hiddenMatrix.compose(
     _position.set(0, HIDDEN_Y, 0),

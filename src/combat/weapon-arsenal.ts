@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/weapon-arsenal.ts
+
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import {
   Object3D,
@@ -282,7 +284,7 @@ export class WeaponArsenal implements WorldEffectsSource {
     this.#mechanicsAudioOrigin.copy(position);
   }
 
-  /** Reload / RMB-hold SFX — skip when idle so bot rosters avoid per-frame audio sync. */
+  
   needsMechanicsAudioTick(nowMs: number): boolean {
     if (this.#bioCharge.isHolding || this.#rocketMagazine.isMarking) {
       return true;

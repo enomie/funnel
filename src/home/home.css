@@ -1,44 +1,23 @@
+/* Path: /Users/johann/MyBrew/funnel-real/src/home/home.css — standalone landing page */
+
 :root {
   color-scheme: dark;
   font-family: Helvetica, Arial, sans-serif;
-  --funnel-surface: #141b24;
-  --funnel-surface-rgb: 20, 27, 36;
-  --funnel-surface-muted-rgb: 58, 66, 77;
-  --funnel-team-ally: #225dff;
-  --funnel-team-ally-rgb: 34, 93, 255;
-  --funnel-team-ally-muted: #9ec8ff;
-  --funnel-team-ally-soft: #b8d4ff;
-  --funnel-team-ally-glow: rgba(var(--funnel-team-ally-rgb), 0.42);
-  --funnel-team-enemy: #d42b2b;
-  --funnel-team-enemy-rgb: 212, 43, 43;
-  --funnel-home-orange: #ffb347;
-  --funnel-home-orange-rgb: 255, 179, 71;
-  --funnel-home-orange-soft: #ffd9a3;
-  --funnel-text: #eef4ff;
-  --funnel-text-dim: #6f8aa6;
-  --funnel-grid-base: #141b24;
-  --funnel-grid-line-minor: rgba(34, 93, 255, 0.28);
-  --funnel-grid-line-major: rgba(34, 93, 255, 0.55);
-  --funnel-grid-minor-step: 20px;
-  --funnel-grid-major-step: 100px;
-  --funnel-btn-radius: 0;
-  --funnel-btn-min-height: 48px;
-  --funnel-btn-padding-x: 28px;
-  --funnel-btn-font-size: 12px;
-  --funnel-btn-letter-spacing: 0.14em;
-  --funnel-btn-border: var(--funnel-team-ally);
-  --funnel-btn-bg: var(--funnel-team-ally);
-  --funnel-btn-color: var(--funnel-text);
-  --funnel-btn-hover-border: var(--funnel-team-ally);
-  --funnel-btn-hover-bg: transparent;
-  --funnel-btn-hover-color: var(--funnel-text);
-  --funnel-btn-active-bg: rgba(var(--funnel-team-ally-rgb), 0.16);
-  --funnel-btn-transition:
-    border-color 140ms ease,
-    background-color 140ms ease,
-    color 140ms ease,
-    box-shadow 140ms ease;
-  --funnel-brand-font-size: clamp(3.5rem, 10vw, 6rem);
+  --home-text: #eef4ff;
+  --home-text-dim: #8a9bb0;
+  /* TEAM_BASE_HEX.ally — src/combat/team-color-derive.ts */
+  --home-team: #225dff;
+  --home-team-rgb: 34, 93, 255;
+  /* TEAM_BASE_HEX.enemy — src/combat/team-color-derive.ts */
+  --home-team-enemy: #d42b2b;
+  --home-grid-base: #070c13;
+  --home-surface: var(--home-grid-base); /* = style.css --funnel-surface-dark */
+  --home-grid-minor: rgba(14, 52, 154, 0.28);
+  --home-grid-major: rgba(16, 58, 173, 0.55);
+  --home-line: rgba(16, 58, 173, 0.55);
+  --home-card-border: rgba(255, 255, 255, 0.12);
+  --home-card-width: 300px;
+  --home-hero-width: min(1120px, calc(100% - 40px));
 }
 
 * {
@@ -46,251 +25,211 @@
 }
 
 html,
-body.funnel-home {
+body.home {
   margin: 0;
   min-height: 100%;
   min-height: 100dvh;
 }
 
-body.funnel-home {
+body.home {
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: none;
-  background: var(--funnel-grid-base);
-  color: var(--funnel-text);
+  background-color: var(--home-grid-base);
+  background-image:
+    linear-gradient(var(--home-grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--home-grid-major) 1px, transparent 1px),
+    linear-gradient(var(--home-grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--home-grid-minor) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: center center;
+  background-attachment: fixed;
+  color: var(--home-text);
   -webkit-tap-highlight-color: transparent;
 }
 
-.funnel-btn {
+body.home > * {
+  flex-shrink: 0;
+}
+
+/* —— Navbar —— */
+
+.home-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  background-color: var(--home-surface);
+  background-image: none;
+  border-bottom: 1px solid var(--home-line);
+}
+
+.home-nav__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-nav__logo {
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: var(--home-team);
+}
+
+.home-nav__subtitle {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--home-text-dim);
+}
+
+.home-nav__start {
+  min-height: 44px;
+  padding: 0 24px;
+}
+
+.home-start {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: var(--funnel-btn-min-height);
-  padding: 0 var(--funnel-btn-padding-x);
-  border: 1px solid var(--funnel-btn-border);
-  border-radius: var(--funnel-btn-radius);
-  background: var(--funnel-btn-bg);
-  color: var(--funnel-btn-color);
+  border: 1px solid var(--home-team);
+  border-radius: 0;
+  background: var(--home-team);
+  color: var(--home-text);
   font: inherit;
-  font-size: var(--funnel-btn-font-size);
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: var(--funnel-btn-letter-spacing);
-  line-height: 1;
-  text-transform: uppercase;
-  text-align: center;
-  white-space: nowrap;
+  letter-spacing: normal;
+  text-transform: none;
   cursor: pointer;
-  user-select: none;
-  box-shadow: 0 0 32px rgba(var(--funnel-team-ally-rgb), 0.35);
-  transition: var(--funnel-btn-transition);
+  white-space: nowrap;
 }
 
-.funnel-btn:hover:not(:disabled) {
-  border-color: var(--funnel-btn-hover-border);
-  background: var(--funnel-btn-hover-bg);
-  color: var(--funnel-btn-hover-color);
-  box-shadow: 0 0 48px rgba(var(--funnel-team-ally-rgb), 0.55);
+.home-start:hover {
+  background: transparent;
+  color: var(--home-text);
 }
 
-.funnel-btn:active:not(:disabled) {
-  background: var(--funnel-btn-active-bg);
+.home-start:focus-visible {
+  outline: 2px solid var(--home-team);
+  outline-offset: 2px;
 }
 
-.funnel-btn:focus,
-.funnel-btn:focus-visible {
-  outline: none;
-}
+/* —— Hero —— */
 
-/* Background — same flat arena grid as .funnel-prematch-host (do not replace without explicit ask) */
-
-.funnel-home__background {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-color: var(--funnel-grid-base);
-  background-image:
-    linear-gradient(var(--funnel-grid-line-major) 1px, transparent 1px),
-    linear-gradient(90deg, var(--funnel-grid-line-major) 1px, transparent 1px),
-    linear-gradient(var(--funnel-grid-line-minor) 1px, transparent 1px),
-    linear-gradient(90deg, var(--funnel-grid-line-minor) 1px, transparent 1px);
-  background-size:
-    var(--funnel-grid-major-step) var(--funnel-grid-major-step),
-    var(--funnel-grid-major-step) var(--funnel-grid-major-step),
-    var(--funnel-grid-minor-step) var(--funnel-grid-minor-step),
-    var(--funnel-grid-minor-step) var(--funnel-grid-minor-step);
-  background-position: center center;
-}
-
-/* --- Layout --- */
-
-.funnel-home__main {
-  position: relative;
-  z-index: 1;
-  flex: 1 1 auto;
+.home-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(12px, 2vh, 18px);
-  margin: 0 auto;
-  padding: clamp(32px, 6vh, 64px) 0 clamp(32px, 5vh, 48px);
-}
-
-.funnel-home__hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  justify-content: center;
+  gap: 10px;
   width: 100%;
+  max-width: var(--home-hero-width);
+  margin-inline: auto;
+  padding: clamp(48px, 12vh, 96px) 20px clamp(24px, 4vh, 40px);
   text-align: center;
 }
 
-.funnel-home__kicker {
+.home-hero__kicker {
   margin: 0;
-  color: var(--funnel-text-dim);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
+  color: var(--home-text-dim);
 }
 
-.funnel-home__brand {
+.home-hero__brand {
   margin: 0;
-  color: var(--funnel-team-ally);
-  font-size: var(--funnel-brand-font-size);
+  font-size: clamp(3.5rem, 14vw, 7rem);
   font-weight: 900;
   letter-spacing: 0.06em;
   line-height: 0.95;
-  text-shadow: 0 0 56px var(--funnel-team-ally-glow);
+  color: var(--home-team);
+  text-shadow: 0 0 48px rgba(var(--home-team-rgb), 0.42);
 }
 
-.funnel-home__tagline {
-  margin: 0 0 8px;
-  color: var(--funnel-team-ally-soft);
-  font-size: clamp(0.95rem, 2vw, 1.15rem);
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.funnel-home__start {
-  min-width: min(360px, 100%);
-}
-
-.funnel-home__lore {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  width: 100%;
-  padding: 18px 18px 16px;
-  border: 1px solid rgba(var(--funnel-team-ally-rgb), 0.35);
-  background: rgba(var(--funnel-surface-rgb), 0.82);
-  backdrop-filter: blur(8px);
-}
-
-.funnel-home__lore-title {
+.home-hero__tagline {
   margin: 0;
-  color: var(--funnel-team-ally-soft);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  font-weight: 600;
   letter-spacing: 0.14em;
-  line-height: 1.25;
   text-transform: uppercase;
+  color: #a8c4e0;
+  white-space: nowrap;
 }
 
-.funnel-home__lore--orange {
-  border-color: rgba(var(--funnel-home-orange-rgb), 0.45);
+.home-hero__blurb {
+  margin: 12px 0 0;
+  width: 100%;
+  max-width: var(--home-hero-width);
+  padding: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--home-text-dim);
 }
 
-.funnel-home__lore--orange .funnel-home__lore-title {
-  color: var(--funnel-home-orange-soft);
-}
+/* —— Hero CTA —— */
 
-.funnel-home__lore--enemy {
-  border-color: rgba(var(--funnel-team-enemy-rgb), 0.45);
-}
-
-.funnel-home__lore--enemy .funnel-home__lore-title {
-  color: var(--funnel-team-enemy);
-}
-
-.funnel-home__lore-body {
+.home-hero-cta {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.funnel-home__lore-body p {
-  margin: 0;
-  color: #c8d6e4;
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.funnel-home__lore-body a {
-  color: var(--funnel-team-ally-muted);
-  text-decoration: underline;
-  text-decoration-color: rgba(var(--funnel-team-ally-rgb), 0.45);
-  text-underline-offset: 2px;
-  transition: color 140ms ease, text-decoration-color 140ms ease;
-}
-
-.funnel-home__lore-body a:hover {
-  color: var(--funnel-team-ally-soft);
-  text-decoration-color: rgba(var(--funnel-team-ally-rgb), 0.75);
-}
-
-.funnel-home__controls {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 12px;
+  align-items: center;
+  gap: 16px;
   width: 100%;
-  margin: 0;
-  padding: 0;
-  color: #c8d6e4;
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.funnel-home__controls dt {
-  margin: 0;
-  color: var(--funnel-text-dim);
-  font-weight: 700;
-}
-
-.funnel-home__controls dd {
-  margin: 0;
-}
-
-.funnel-home__footer {
-  width: 100%;
-  padding: 0 0 22px;
+  max-width: var(--home-hero-width);
+  margin-inline: auto;
+  padding: 0 20px clamp(36px, 6vh, 56px);
   text-align: center;
 }
 
-.funnel-home__platform-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.2em 0.45em;
+.home-hero-cta__warning {
   margin: 0;
-  color: var(--funnel-text-dim);
+  width: 100%;
   font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-  opacity: 0.88;
+  line-height: 1.4;
+  color: var(--home-team-enemy);
 }
 
-.funnel-home__platform-chip {
+.home-hero-cta__warning strong {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-hero-cta__start {
+  min-height: 48px;
+  min-width: min(360px, 100%);
+  padding: 0 28px;
+}
+
+.home-hero-cta__platforms {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--home-text-dim);
+  opacity: 0.88;
+  white-space: nowrap;
+}
+
+.home-hero-cta__platform-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.3em;
 }
 
-.funnel-home__platform-icon {
+.home-hero-cta__platform-icon {
   display: block;
   width: 12px;
   height: 12px;
@@ -298,22 +237,282 @@ body.funnel-home {
   opacity: 0.92;
 }
 
-html.funnel-platform-target .funnel-home__platform-note {
-  color: var(--funnel-team-ally-muted);
+/* —— Infinite sliders —— */
+
+.home-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 32px 0 24px;
 }
 
-@media (max-width: 899px) {
-  .funnel-home__main {
-    padding-top: 40px;
+.home-slider {
+  position: relative;
+}
+
+.home-slider__heading {
+  margin: 0 0 14px;
+  padding: 0 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--home-text-dim);
+}
+
+.home-slider__viewport {
+  position: relative;
+  width: 100%;
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+
+.home-slider--static .home-slider__viewport {
+  mask-image: none;
+}
+
+.home-slider__static {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
+.home-slider__static--probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  width: 100%;
+}
+
+.home-slider__clip {
+  overflow: hidden;
+  width: 100%;
+}
+
+.home-slider__track {
+  display: flex;
+  align-items: stretch;
+  width: max-content;
+  animation: home-slider-scroll var(--slider-duration, 40s) linear infinite;
+}
+
+.home-slider__track:hover {
+  animation-play-state: paused;
+}
+
+.home-slider__group {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  padding-right: 16px;
+}
+
+@keyframes home-slider-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* —— Cards —— */
+
+.home-card {
+  flex: 0 0 var(--home-card-width);
+  width: var(--home-card-width);
+  padding: 16px 18px;
+  border: 1px solid var(--home-card-border);
+  border-radius: 0;
+  background-color: var(--home-surface);
+}
+
+.home-card--weapon,
+.home-card--pickup {
+  border-color: var(--card-accent, var(--home-card-border));
+}
+
+.home-card--weapon .home-card__title,
+.home-card--pickup .home-card__title {
+  color: var(--card-accent, var(--home-text));
+}
+
+.home-card__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.home-card__slot {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--card-accent, var(--home-text-dim));
+}
+
+.home-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.home-card--tip .home-card__title {
+  color: var(--home-team);
+  margin-bottom: 8px;
+}
+
+.home-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-card__lead,
+.home-card__fire,
+.home-card__combo {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #c0cedc;
+}
+
+.home-card__fire {
+  font-size: 12px;
+  color: #9aabb8;
+}
+
+.home-card__combo {
+  color: #ffd27a;
+  font-size: 12px;
+}
+
+/* —— Keys —— */
+
+.home-keys {
+  padding: 8px 20px 32px;
+}
+
+.home-keys__heading {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--home-text-dim);
+}
+
+.home-keys__grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  max-width: 640px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.home-keys__grid dt {
+  margin: 0;
+  font-weight: 700;
+  color: var(--home-text-dim);
+}
+
+.home-keys__grid dd {
+  margin: 0;
+  color: #c0cedc;
+}
+
+/* —— Footer —— */
+
+.home-footer {
+  margin-top: auto;
+  padding: 24px 20px 28px;
+  background-color: var(--home-grid-base);
+  background-image: none;
+  border-top: 1px solid var(--home-line);
+  text-align: center;
+}
+
+.home-footer__meta,
+.home-footer__credits,
+.home-footer__visitor {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--home-text-dim);
+}
+
+.home-footer__credits a {
+  color: var(--home-team);
+}
+
+.home-footer__visitor {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.home-footer__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00ff66;
+  box-shadow: 0 0 8px #00ff66;
+  animation: home-pulse 1.5s infinite alternate;
+}
+
+@keyframes home-pulse {
+  from {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .home-hero__tagline,
+  .home-hero__blurb,
+  .home-hero-cta__warning,
+  .home-hero-cta__platforms {
+    white-space: normal;
   }
 
-  .funnel-home__start {
-    width: 100%;
+  .home-hero-cta__platforms {
+    flex-wrap: wrap;
+  }
+}
+
+@media (min-width: 901px) {
+  .home-hero__blurb,
+  .home-hero-cta__warning {
+    white-space: nowrap;
   }
 }
 
 @media (max-width: 520px) {
-  .funnel-home__lore {
-    padding: 14px;
+  .home-nav {
+    padding: 12px 14px;
+  }
+
+  .home-nav__start {
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
+  .home-hero-cta__start {
+    width: 100%;
+  }
+
+  :root {
+    --home-card-width: 260px;
   }
 }

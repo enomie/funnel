@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/core/event-bus.ts
+
 import type { GameEventMap, GameEventName } from './game-events';
 
 type GameEventListener<K extends GameEventName> = (payload: GameEventMap[K]) => void;

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/team-hud.ts
+
 import type { TeamKillScore } from '../combat/team-kill-score';
 import type { TeamMatchPoints } from '../combat/team-match-points';
 import { rosterMembersForFaction, type TeamRosterCounts } from '../combat/team-roster-count';

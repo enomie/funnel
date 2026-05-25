@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/humanoid-capsule-sync.ts
+
 import type { Collider, RigidBody } from '@dimforge/rapier3d-simd-compat';
 import {
   capsuleCenterYOnGround,
@@ -6,7 +8,7 @@ import {
   stanceHalfHeight
 } from './player-stance';
 
-/** Stand (1.75 m) or crouch/death geometry (1 m). */
+
 export type HumanoidCapsuleMode = 'stand' | 'crouch';
 
 const CROUCH_MODE: HumanoidCapsuleMode = 'crouch';
@@ -58,7 +60,7 @@ export function pinBodyCapsuleToGround(
   );
 }
 
-/** One transition: resize capsule and keep bottom on `groundY`. */
+
 export function transitionCapsuleOnGround(params: {
   readonly collider: Collider;
   readonly body: RigidBody;

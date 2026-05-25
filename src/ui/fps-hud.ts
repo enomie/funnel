@@ -1,3 +1,7 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/fps-hud.ts
+
+import { deriveTeamHex, deriveTeamUiHex, teamRgbaCss } from '../combat/team-color-derive';
+
 const HISTORY_SIZE = 96;
 const UI_UPDATE_MS = 80;
 const GRAPH_WIDTH = 128;
@@ -96,8 +100,8 @@ export class FpsHud {
     }
 
     const fillGradient = context.createLinearGradient(0, 0, 0, height);
-    fillGradient.addColorStop(0, 'rgba(34, 93, 255, 0.38)');
-    fillGradient.addColorStop(1, 'rgba(34, 93, 255, 0)');
+    fillGradient.addColorStop(0, teamRgbaCss(deriveTeamHex('ally'), 0.38));
+    fillGradient.addColorStop(1, teamRgbaCss(deriveTeamHex('ally'), 0));
 
     context.beginPath();
     context.moveTo(points[0].x, height);
@@ -115,7 +119,7 @@ export class FpsHud {
     for (let index = 1; index < points.length; index += 1) {
       context.lineTo(points[index].x, points[index].y);
     }
-    context.strokeStyle = 'rgba(158, 200, 255, 0.92)';
+    context.strokeStyle = teamRgbaCss(deriveTeamUiHex('ally', 'muted'), 0.92);
     context.lineWidth = 1.25;
     context.stroke();
 

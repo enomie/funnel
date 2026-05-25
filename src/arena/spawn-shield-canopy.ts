@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/spawn-shield-canopy.ts
+
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import { FUNNEL_DIMENSIONS } from '../config/game-config';
 import type { FactionTeam } from '../combat/teams';
@@ -5,7 +7,7 @@ import type { ArenaStaticInstances } from './arena-static-instances';
 import { addFixedEnvironmentBox, ENVIRONMENT_CUBE_HALF_M, ENVIRONMENT_CUBE_SIZE_M } from './environment-cube';
 import { SPAWN_SHIELD_ROW_Z, teamBulkheadZ } from './spawn-shield-cubes';
 
-/** Full funnel width × (ceiling − cube top) × spawn stack depth (pocket + 2 shield rows). */
+
 export const SPAWN_SHIELD_CANOPY_SIZE_M = {
   width: FUNNEL_DIMENSIONS.width,
   height: FUNNEL_DIMENSIONS.height - ENVIRONMENT_CUBE_SIZE_M,
@@ -15,7 +17,7 @@ export const SPAWN_SHIELD_CANOPY_SIZE_M = {
 const CANOPY_BASE_Y_M = ENVIRONMENT_CUBE_SIZE_M;
 const CANOPY_CENTER_Y_M = CANOPY_BASE_Y_M + SPAWN_SHIELD_CANOPY_SIZE_M.height * 0.5;
 
-/** Bulkhead → front face of front shield row (15 m pocket + 15 m shields = 30 m). */
+
 export function spawnShieldCanopyExtentZ(faction: FactionTeam): { minZ: number; maxZ: number } {
   const bulkheadZ = teamBulkheadZ(faction);
   const frontRowZ = SPAWN_SHIELD_ROW_Z[faction].front;
@@ -33,7 +35,7 @@ function spawnShieldCanopyCenter(faction: FactionTeam): [number, number, number]
   return [0, CANOPY_CENTER_Y_M, (minZ + maxZ) * 0.5];
 }
 
-/** Overhead cover above spawn pocket + shield rows — docs/environment.md. */
+
 export function createSpawnShieldCanopies(instances: ArenaStaticInstances, world: World): void {
   const size: [number, number, number] = [
     SPAWN_SHIELD_CANOPY_SIZE_M.width,

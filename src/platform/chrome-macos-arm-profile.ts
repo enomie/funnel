@@ -1,4 +1,6 @@
-/** Runtime tuning for Google Chrome on Apple Silicon MacBooks (M1+) — thermal-first. */
+// Path: /Users/johann/MyBrew/funnel-real/src/platform/chrome-macos-arm-profile.ts
+
+
 
 export const PLATFORM_TARGET_NOTE =
   'Optimized for macOS + M1 and latest Chrome browser';
@@ -6,7 +8,7 @@ export const PLATFORM_TARGET_NOTE =
 const PLATFORM_APPLE_ICON = '/icons/platform-apple.svg';
 const PLATFORM_CHROME_ICON = '/icons/platform-chrome.svg';
 
-/** Home-screen footer line with brand icons (sentence case, not uppercase). */
+
 export function renderPlatformTargetNoteHtml(): string {
   return `
     <span class="funnel-prematch-screen__platform-note-part">Optimized for</span>
@@ -28,21 +30,21 @@ export interface RuntimePlatformProfile {
   readonly shadowMapSize: number;
   readonly shadowsEnabled: boolean;
   readonly navRayBudgetPerFrame: number;
-  /** Max route-steer fan refreshes (~12 capsule casts each) per render frame. */
+  
   readonly routeSteerFanBudgetPerFrame: number;
   readonly shadowSubjectsPerFrame: number;
   readonly rendererAntialias: boolean;
   readonly rendererSamples: number;
   readonly pointerLockUnadjustedMovement: boolean;
-  /** Roster cap per team (human + bots). */
+  
   readonly playersPerTeam: number;
-  /** `0` = uncapped render loop. */
+  
   readonly maxRenderHz: number;
   readonly physicsMaxSubSteps: number;
   readonly botBrainTickHz: number;
-  /** Scales configured rain counts on low-end profiles (`1` = full). */
+  
   readonly rainWaveCountScale: number;
-  /** Multiplier on Tetris drop cadence (`1` = default 50 Hz). */
+  
   readonly rainDropIntervalScale: number;
 }
 
@@ -55,7 +57,7 @@ interface NavigatorUaData {
   readonly brands?: readonly NavigatorUaDataBrand[];
 }
 
-/** Chrome + M1 MacBook — cool & quiet defaults (Retina DPR capped, no MSAA/shadows). */
+
 const TARGET_PROFILE: RuntimePlatformProfile = {
   isTarget: true,
   pixelRatioCap: 1,
@@ -119,7 +121,7 @@ function isMacOS(): boolean {
   return /Mac/.test(navigator.platform) || /Mac OS X/.test(navigator.userAgent);
 }
 
-/** WebGL renderer string — reliable sync signal on M1+ MacBook Chrome. */
+
 function probeAppleSiliconGpu(): boolean {
   try {
     const canvas = document.createElement('canvas');
@@ -156,7 +158,7 @@ function applyDocumentProfile(profile: RuntimePlatformProfile): void {
   root.classList.toggle('funnel-platform-target', profile.isTarget);
 }
 
-/** Call once before any module reads `getRuntimeProfile()`. */
+
 export function initRuntimeProfile(): RuntimePlatformProfile {
   if (runtimeProfile !== null) {
     return runtimeProfile;
@@ -176,7 +178,7 @@ export function getRendererPixelRatio(): number {
   return Math.min(window.devicePixelRatio, pixelRatioCap);
 }
 
-/** Returns false when the render loop should skip this rAF tick (frame cap / hidden tab). */
+
 export function shouldAdvanceGameFrame(nowMs: number, lastTickMs: number): boolean {
   if (document.visibilityState === 'hidden') {
     return false;

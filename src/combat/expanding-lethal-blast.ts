@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/expanding-lethal-blast.ts
+
 import type { Collider } from '@dimforge/rapier3d-simd-compat';
 import { Vector3 } from 'three/webgpu';
 import type { ApplyImpactDeps } from './apply-impact';
@@ -8,18 +10,17 @@ import {
 } from './apply-impact';
 import type { FactionTeam } from './teams';
 
-/** Redeemer-style blast: damage front expands with the impact sphere over `expandMs`. */
+
 export interface ExpandingLethalBlast {
   readonly center: Vector3;
   readonly maxRadius: number;
   readonly expandMs: number;
   readonly spawnedAtMs: number;
   readonly killedActorIds: Set<string>;
-  readonly blockedActorIds: Set<string>;
   readonly sourceFaction: FactionTeam;
   readonly sourceActorId?: string;
   readonly friendlyFire: boolean;
-  lastLosSweepMs: number;
+  lastSweepMs: number;
   audioSlot: number | null;
 }
 
@@ -39,11 +40,10 @@ export function spawnExpandingLethalBlast(
     expandMs,
     spawnedAtMs: performance.now(),
     killedActorIds: new Set<string>(),
-    blockedActorIds: new Set<string>(),
     sourceFaction,
     sourceActorId,
     friendlyFire,
-    lastLosSweepMs: 0,
+    lastSweepMs: 0,
     audioSlot: null
   };
 
@@ -78,11 +78,10 @@ export function tickExpandingLethalBlastEffect(
     center: blast.center,
     currentRadius,
     killedActorIds: blast.killedActorIds,
-    blockedActorIds: blast.blockedActorIds,
     friendlyFire: blast.friendlyFire,
-    lastLosSweepMs: blast.lastLosSweepMs
+    lastSweepMs: blast.lastSweepMs
   };
   tickExpandingLethalBlast(impactDeps, tick, nowMs);
-  blast.lastLosSweepMs = tick.lastLosSweepMs;
+  blast.lastSweepMs = tick.lastSweepMs;
   return progress >= 1;
 }

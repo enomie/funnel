@@ -1,4 +1,6 @@
-/** Full-screen match end overlay — outcome headline, summary stats, new match. */
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/match-result-screen.ts
+
+
 
 import { exitArenaPointerLock } from '../input/pointer-lock';
 
@@ -145,7 +147,7 @@ export class MatchResultScreen {
     this.#overlay.dataset.visible = 'false';
   }
 
-  /** Waits for New Match (click or Enter) — full page reload. */
+  
   waitForNewMatch(): Promise<never> {
     return new Promise(() => {
       const abort = new AbortController();

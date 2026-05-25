@@ -1,8 +1,10 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/personal-match-stats.ts
+
 import { areSameFaction } from './teams';
 import { LOCAL_PLAYER_ACTOR_ID } from './combat-actor';
 import type { ActorDiedEvent } from '../core/game-events';
 
-/** Local player frags and deaths for the current match. */
+
 export class PersonalMatchStats {
   #kills = 0;
   #deaths = 0;

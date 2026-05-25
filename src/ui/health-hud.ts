@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/health-hud.ts
+
 export interface HealthHudNodes {
   root: HTMLDivElement;
   shieldFill: HTMLDivElement;

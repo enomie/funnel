@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/create-renderer.ts
+
 import {
   ACESFilmicToneMapping,
   SRGBColorSpace,

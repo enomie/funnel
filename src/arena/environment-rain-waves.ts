@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/environment-rain-waves.ts
+
 import { ENVIRONMENT_CONFIG } from '../config/game-config';
 import type { DynamicPropSpec } from './environment-dynamic-shapes';
 import { RAIN_WAVE_CATALOG, type EnvironmentRainShapeId } from './environment-rain-catalog';

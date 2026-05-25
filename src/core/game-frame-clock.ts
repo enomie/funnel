@@ -1,10 +1,12 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/core/game-frame-clock.ts
+
 import { PHYSICS_CONFIG } from '../config/game-config';
 import { shouldAdvanceGameFrame } from '../platform/chrome-macos-arm-profile';
 
-/** Wall-clock delta clamp — tab resume / hitch recovery without spiral-of-death. */
+
 const MAX_FRAME_DELTA_S = 0.05;
 
-/** Max leftover physics debt after a saturated sub-step frame (≈2 ticks). */
+
 const MAX_PHYSICS_REMAINDER_MULTIPLIER = 2;
 
 export interface GameFrameTick {
@@ -29,7 +31,7 @@ type MutablePhysicsStepBatch = {
   fixedStep: number;
 };
 
-/** Adaptive sub-step ceiling — drops after heavy frames to break load feedback loops. */
+
 const FRAME_BUDGET_TIGHT_MS = 20;
 const FRAME_BUDGET_CRITICAL_MS = 28;
 
@@ -58,7 +60,7 @@ export class GameFrameClock {
     document.addEventListener('visibilitychange', this.#onVisibilityChange);
   }
 
-  /** @returns null when this rAF tick should be skipped (Hz cap / hidden tab). */
+  
   beginRenderFrame(nowMs: number): GameFrameTick | null {
     if (!shouldAdvanceGameFrame(nowMs, this.#lastTickMs)) {
       return null;
@@ -75,7 +77,7 @@ export class GameFrameClock {
     return this.#renderTick as GameFrameTick;
   }
 
-  /** Call at end of each processed render frame with wall time spent in the loop body. */
+  
   recordFrameWallMs(wallMs: number): void {
     if (wallMs >= FRAME_BUDGET_CRITICAL_MS) {
       this.#activeMaxSubSteps = Math.max(2, this.#physicsMaxSubSteps - 2);
@@ -90,7 +92,7 @@ export class GameFrameClock {
     this.#activeMaxSubSteps = this.#physicsMaxSubSteps;
   }
 
-  /** Queue render delta for fixed-step physics — debt capped to one saturated batch. */
+  
   accumulatePhysics(deltaSeconds: number): void {
     if (deltaSeconds <= 0) {
       return;
@@ -102,7 +104,7 @@ export class GameFrameClock {
     );
   }
 
-  /** Run up to active sub-step ceiling; remainder clamped, never zeroed. */
+  
   consumePhysicsSteps(onStep: (fixedStep: number) => void): PhysicsStepBatch {
     const { fixedStep } = PHYSICS_CONFIG;
     let subSteps = 0;

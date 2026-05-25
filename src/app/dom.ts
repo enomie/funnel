@@ -1,4 +1,7 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/app/dom.ts
+
 import { PICKUP_FIELD_CONFIG } from '../config/game-config';
+import { FUNNEL_GAME_BRAND_MARKUP } from '../ui/funnel-game-brand';
 
 export interface AppDom {
   preMatchHost: HTMLDivElement;
@@ -64,7 +67,9 @@ export function createAppDom(root: HTMLDivElement): AppDom {
       <span class="funnel-crosshair__line funnel-crosshair__line--bl"></span>
       <span class="funnel-crosshair__line funnel-crosshair__line--br"></span>
     </div>
-    <div class="funnel-team-scoreboard" aria-label="Team scores">
+    <div class="funnel-team-scoreboard-stack">
+      ${FUNNEL_GAME_BRAND_MARKUP}
+      <div class="funnel-team-scoreboard" aria-label="Team scores">
       <div class="funnel-team-badge funnel-team-badge--own" data-role="ally">
         <div class="funnel-team-badge__head">
           <span class="funnel-team-badge__label">Team Beta</span>
@@ -103,6 +108,7 @@ export function createAppDom(root: HTMLDivElement): AppDom {
           </div>
         </div>
       </div>
+    </div>
     </div>
     <div class="funnel-hud-panel funnel-health" aria-label="Player health and shield">
       <div class="funnel-hud-panel__head funnel-health__head">
@@ -171,7 +177,6 @@ export function createAppDom(root: HTMLDivElement): AppDom {
       <div class="funnel-fps-hud__body">
         <div class="funnel-fps-hud__metric">
           <span class="funnel-fps-hud__value">0</span>
-          <span class="funnel-fps-hud__metric-label">Live</span>
         </div>
         <canvas class="funnel-fps-hud__graph" width="128" height="28" aria-hidden="true"></canvas>
       </div>

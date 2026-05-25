@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/environment-rain-spawner.ts
+
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import { Euler, Quaternion } from 'three/webgpu';
 import { createDynamicEnvironmentProp } from './environment-dynamic-body';
@@ -5,7 +7,7 @@ import type { DynamicEnvironmentInstances, DynamicSyncedBody } from './environme
 import { randomCountdownRainSpawnCenter } from './environment-rain-bounds';
 import { resolveRainWaves, type RainWaveSpec } from './environment-rain-waves';
 
-/** Fast Tetris cadence — next piece without waiting for the previous to land. */
+
 const DROP_INTERVAL_S = 0.05;
 const SETTLE_SPEED_EPS = 0.05;
 const SETTLE_FRAMES_REQUIRED = 15;
@@ -39,7 +41,7 @@ function isBodySettled(body: RigidBody): boolean {
   return speedSq <= SETTLE_SPEED_EPS * SETTLE_SPEED_EPS;
 }
 
-/** Tetris rain — rapid sequential spawns; pickups wait until every piece has landed. */
+
 export class EnvironmentRainSpawner {
   readonly #deps: EnvironmentRainSpawnerDeps;
   readonly #spawnedBodies: DynamicSyncedBody[] = [];

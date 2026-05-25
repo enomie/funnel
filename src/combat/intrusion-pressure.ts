@@ -1,8 +1,10 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/intrusion-pressure.ts
+
 import { isInEnemyTerritory } from '../arena/funnel-zones';
 import type { ActorRegistry } from './actor-registry';
 import type { FactionTeam } from './teams';
 
-/** Living intruders per defended home zone (beta in alpha → `alpha`, alpha in beta → `beta`). */
+
 export interface IntrusionPressure {
   readonly alpha: number;
   readonly beta: number;
@@ -41,12 +43,12 @@ export function fillIntrusionPressure(
   return out;
 }
 
-/** @deprecated Use `fillIntrusionPressure`. */
+
 export function countIntrusionPressure(registry: ActorRegistry): IntrusionPressure {
   return fillIntrusionPressure(registry, { alpha: 0, beta: 0 });
 }
 
-/** Faction color for the fight orb when their home is under heavier intrusion; null = neutral / tied / empty. */
+
 export function resolveFightFocusFaction(pressure: IntrusionPressure): FactionTeam | null {
   if (pressure.alpha === 0 && pressure.beta === 0) {
     return null;

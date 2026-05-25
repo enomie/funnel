@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-body-probe.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import { PLAYER_CONFIG } from '../config/game-config';
@@ -5,15 +7,15 @@ import { ACTOR_RAY_QUERY_GROUPS } from '../physics/collision-groups';
 import { stanceHalfHeight } from '../player/player-stance';
 import { BOT_STAND_HEADROOM_M } from './bot-route-clearance';
 
-/** Short sweep — jump timing (m). */
+
 export const JUMP_CAST_MAX_M = 1.05;
-/** Re-arm vault after the path is this clear (m). */
+
 export const JUMP_ARM_CLEAR_M = 1.02;
-/** Jump only inside this band — just before contact, after autostep (~0.55 m). */
+
 export const JUMP_WINDOW_MIN_M = 0.52;
 export const JUMP_WINDOW_MAX_M = 0.92;
 
-/** Steer fan when forward path is tight (rad) — includes wide peel for slanted debris. */
+
 export const STEER_FAN_ANGLES_RAD: readonly number[] = [
   (-68 * Math.PI) / 180,
   (-48 * Math.PI) / 180,
@@ -25,12 +27,12 @@ export const STEER_FAN_ANGLES_RAD: readonly number[] = [
   (68 * Math.PI) / 180
 ];
 
-/** Longer sweep for route steering (m). */
+
 export const STEER_CAST_MAX_M = 1.55;
 
-/** Preferred gap between capsule shell and obstacles while walking (m). */
+
 export const BOT_OBSTACLE_STANDOFF_M = 0.5;
-/** Center clearance matching shell standoff — steer/nav share this threshold. */
+
 export const BOT_OBSTACLE_STANDOFF_CENTER_M = BOT_OBSTACLE_STANDOFF_M + PLAYER_CONFIG.radius;
 
 const VAULT_LANDING_SAMPLE_M = 1.15;
@@ -38,7 +40,7 @@ const GROUND_FIND_TOP_PAD_M = 2.5;
 const GROUND_FIND_DOWN_M = 5;
 const GROUND_RAY_PAD_M = 0.08;
 const OVERHEAD_RAY_MAX_M = 12;
-/** Nearly flat floor — CC / autostep handles, not steer/jump. */
+
 const HORIZONTAL_FLOOR_NORMAL_Y = 0.82;
 
 const CAPSULE_HALF = stanceHalfHeight(false);
@@ -53,13 +55,13 @@ let _probeRay: RAPIER.Ray | null = null;
 export interface BodyCastAheadResult {
   readonly clearanceM: number;
   readonly hasHit: boolean;
-  /** World normal on the hit collider (XZ useful for peel). */
+  
   readonly hitNormalX: number;
   readonly hitNormalY: number;
   readonly hitNormalZ: number;
-  /** Capsule path is tight and not a flat floor — steer/jump should react. */
+  
   readonly pathBlocked: boolean;
-  /** Solid hit in the jump window (includes slanted crate faces). */
+  
   readonly vaultObstacle: boolean;
 }
 
@@ -111,7 +113,7 @@ function isVaultObstacleHit(
   return !isHorizontalFloorHit(hit);
 }
 
-/** 0–1 clearance comfort for steer/nav scoring (0 = at/below standoff, 1 = max probe). */
+
 export function botClearanceComfortT(clearanceM: number, maxM: number): number {
   if (clearanceM >= maxM) {
     return 1;
@@ -124,7 +126,7 @@ export function botClearanceComfortT(clearanceM: number, maxM: number): number {
   return (clearanceM - BOT_OBSTACLE_STANDOFF_CENTER_M) / (maxM - BOT_OBSTACLE_STANDOFF_CENTER_M);
 }
 
-/** Walk path blocked — vault band stays open so bots may close to jump. */
+
 export function botWalkPathBlocked(
   clearanceM: number,
   floorLike: boolean,
@@ -169,7 +171,7 @@ function buildCastResult(
   };
 }
 
-/** Standing capsule swept along XZ — handles tilted rain debris (not horizontal slices). */
+
 export function probeBodyCastAhead(
   world: World,
   excludeBody: RigidBody,
@@ -197,7 +199,7 @@ export function probeBodyCastAhead(
   return buildCastResult(hit, maxDistance);
 }
 
-/** Slide bearings along a slanted face (XZ tangent to hit normal). Writes into `out`; returns count. */
+
 export function peelYawsInto(
   out: number[],
   offset: number,
@@ -231,10 +233,7 @@ export function peelYawsInto(
   return 2;
 }
 
-/**
- * Down-ray finds local floor, then up-ray measures standing headroom —
- * works on uneven crate piles (not flat footY from capsule center).
- */
+
 export function probeLocalStandingHeadroomM(
   world: World,
   excludeBody: RigidBody,

@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-grunts/audio-grunt-voice-presets.ts
+
 import type { HumanoidRigId } from '../../player/humanoid-rig';
 import type { GruntVoiceSettings } from './audio-grunt-synth';
 
@@ -62,7 +64,7 @@ export const GRUNT_VOICE_PRESETS: Record<GruntVoiceId, GruntVoiceDefinition> = {
   }
 };
 
-/** Y-Bot → lower male grunt voice; X-Bot → higher female grunt voice. */
+
 export const RIG_GRUNT_VOICE: Record<HumanoidRigId, GruntVoiceId> = {
   'y-bot': 'male',
   'x-bot': 'female'
@@ -79,7 +81,7 @@ export function gruntVoiceSettingsForId(voiceId: GruntVoiceId): GruntVoiceSettin
   return { pitch, breath, brightness, intensity };
 }
 
-/** Demo / debug phrase list from the original synth playground. */
+
 export const GRUNT_EXAMPLE_PHRASES: readonly string[] = [
   'A E I O U',
   'Wuhuu',

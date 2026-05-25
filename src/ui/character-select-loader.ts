@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/character-select-loader.ts
+
 import {
   AnimationAction,
   AnimationMixer,
@@ -37,7 +39,7 @@ async function loadUiClip(
     throw new Error(`[Character-Select] No animation in ${fileName}`);
   }
 
-  // Remap from animation DAE, then align track names to the preview rig skeleton.
+  
   let remapped = stripInPlaceRootMotion(
     remapAnimationClipToBoneNames(parsed.animations[0], parsed.scene),
     clipKey
@@ -80,7 +82,7 @@ export async function loadCharacterSelectPreview(
 }
 
 export async function loadAllCharacterSelectPreviews(
-  onProgress?: (loaded: number, total: number) => void
+  onProgress?: (loaded: number, total: number, rigId: HumanoidRigId) => void
 ): Promise<CharacterSelectPreview[]> {
   const previews: CharacterSelectPreview[] = [];
   let loaded = 0;
@@ -88,7 +90,7 @@ export async function loadAllCharacterSelectPreviews(
   for (const rigId of RIG_IDS) {
     previews.push(await loadCharacterSelectPreview(rigId));
     loaded += 1;
-    onProgress?.(loaded, RIG_IDS.length);
+    onProgress?.(loaded, RIG_IDS.length, rigId);
   }
 
   return previews;

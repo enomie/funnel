@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-mesh-foot-anchor.ts
+
 import {
   AnimationMixer,
   Bone,
@@ -20,7 +22,7 @@ const _footScratch = new Vector3();
 const _meshBoundsBox = new Box3();
 const _meshBoundsMin = new Vector3();
 
-/** Lowest foot Y in meters — same space as `character.position` under `visual.root`. */
+
 export function lowestFootYInCapsuleSpace(animRoot: Object3D, capsuleAnchor: Object3D): number {
   let minY = Infinity;
   capsuleAnchor.updateMatrixWorld(true);
@@ -40,7 +42,7 @@ export function lowestFootYInCapsuleSpace(animRoot: Object3D, capsuleAnchor: Obj
   return Number.isFinite(minY) ? minY : 0;
 }
 
-/** Bind-pose mannequins — foot bones sit above soles in T-pose; use mesh bounds instead. */
+
 export function lowestSkinnedMeshYInCapsuleSpace(
   model: Object3D,
   capsuleAnchor: Object3D
@@ -73,10 +75,7 @@ function measureClipFootBottomY(
   return lowestFootYInCapsuleSpace(animRoot, capsuleAnchor);
 }
 
-/**
- * Sample stand / crouch idle at t=0.
- * Model is parented like at runtime: capsule center → character offset → Y-Bot (0,0,0).
- */
+
 export function measureStanceMeshAnchors(
   model: Object3D,
   registry: AnimationClipRegistry
@@ -101,7 +100,7 @@ export function measureStanceMeshAnchors(
   return { standFootY, crouchFootY };
 }
 
-/** Live foot sample — jump/land/death (capsule mode matches caller). */
+
 export function anchorCharacterMeshFromAnimatedFeet(
   character: Object3D,
   capsuleRoot: Object3D,

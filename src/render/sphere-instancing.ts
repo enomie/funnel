@@ -1,4 +1,7 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/sphere-instancing.ts
+
 import {
+  AdditiveBlending,
   DoubleSide,
   InstancedMesh,
   Matrix4,
@@ -59,16 +62,16 @@ export interface InstancedImpactBurst {
   readonly x: number;
   readonly y: number;
   readonly z: number;
-  /** 0–1 timeline fraction when scale reaches `endScale`. Default 1. */
+  
   readonly expandPeakFraction?: number;
-  /** Expand easing — `cubic` snaps larger faster (explosions). Default `quad`. */
+  
   readonly expandEase?: 'quad' | 'cubic';
   readonly opacityFade?: number;
-  /** >1 keeps opacity longer before tail-out. Default 1. */
+  
   readonly opacityFadePower?: number;
-  /** After expand peak, scale shrinks to `endScale * this` (0–1). Omit to hold peak size. */
+  
   readonly contractEndScaleFraction?: number;
-  /** Peak opacity (0–1) before fade curve. Default 1. */
+  
   readonly opacityPeak?: number;
   readonly hotBurst?: boolean;
 }
@@ -85,6 +88,7 @@ function impactBurstMaterialForColor(color: number, hot = false): MeshBasicMater
     transparent: true,
     opacity: 1,
     depthWrite: false,
+    blending: AdditiveBlending,
     side: DoubleSide,
     toneMapped: false
   });

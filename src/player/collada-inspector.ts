@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/collada-inspector.ts
+
 import type { AnimationClip, Object3D } from 'three/webgpu';
 import type { ParsedColladaAsset } from './collada-asset-loader';
 import {

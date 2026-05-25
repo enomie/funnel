@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/footstep-controller.ts
+
 import {
   fillFootstepOriginFromCapsule,
   playFootstepStepAt

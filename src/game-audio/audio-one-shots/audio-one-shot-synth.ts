@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-one-shot-synth.ts
+
 import { getNoiseBuffer, type NoiseBufferKey } from '../audio-noise-buffer';
 
 const MIN_GAIN = 0.001;
@@ -52,7 +54,7 @@ export function playOscBurst(options: {
   return oscillator;
 }
 
-/** Percussive thump / body — pitch drops while gain decays (footstep, bullet impact). */
+
 export function playSweepOscBurst(options: {
   context: BaseAudioContext;
   destination: AudioNode;

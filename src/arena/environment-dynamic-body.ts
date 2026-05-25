@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/environment-dynamic-body.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import type { Quaternion } from 'three/webgpu';
@@ -11,7 +13,7 @@ import { clampRainDropX, clampRainDropZ, rainSpawnY } from './environment-rain-b
 
 type PropCenter = readonly [number, number, number];
 
-/** Production rain spawn — doc band above ceiling, clamped X/Z footprint. */
+
 export function computeRainSpawnCenter(x: number, z: number): PropCenter {
   return [clampRainDropX(x), rainSpawnY(), clampRainDropZ(z)];
 }

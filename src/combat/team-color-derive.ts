@@ -1,6 +1,9 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/team-color-derive.ts
+
 import { Color } from 'three/webgpu';
 
-/** One hex per viewer-relative role — all tints computed from this (intro §8). */
+
+/** Viewer-relative ally (blue) and enemy (red) — single source for 3D + HUD. */
 export const TEAM_BASE_HEX = {
   ally: 0x225dff,
   enemy: 0xd42b2b
@@ -10,21 +13,50 @@ export type RelativeTeamRole = keyof typeof TEAM_BASE_HEX;
 
 const HSL = { h: 0, s: 0, l: 0 };
 
-/** HSL multipliers from `TEAM_BASE_HEX` — tune only here. */
+
 const DERIVE = {
-  /** Suit albedo (identity). */
+  
   base: null,
-  /** Segment-Glow — kräftigere Teamfarbe, ohne aufzuhellen. */
+  
   emissiveDim: { satMul: 0.9, lightMul: 0.26 },
-  /** Gelenk-Glow — volle Sättigung, Helligkeit gedeckelt (nicht weiß). */
+  
   emissiveGlow: { satMul: 1, lightMul: 0.94, lightCap: 0.44 },
-  /** Badges, dezente UI. */
+  
   muted: { satMul: 0.5, lightMul: 0.22 },
-  /** Trim zwischen base und bright. */
+  
   trim: { satMul: 0.82, lightMul: 1.1, lightCap: 0.65 }
 } as const;
 
 export type DerivedTeamColorKind = keyof typeof DERIVE;
+
+type TeamUiHsl = { readonly hShift: number; readonly s: number; readonly l: number };
+
+function teamUiFromBase(role: RelativeTeamRole, nuance: TeamUiHsl): number {
+  const color = new Color(TEAM_BASE_HEX[role]);
+  color.getHSL(HSL);
+  let hue = HSL.h + nuance.hShift;
+  if (hue < 0) {
+    hue += 1;
+  } else if (hue > 1) {
+    hue -= 1;
+  }
+  color.setHSL(hue, nuance.s, nuance.l);
+  return color.getHex();
+}
+
+export const TEAM_UI_HEX = {
+  ally: {
+    muted: teamUiFromBase('ally', { hShift: -0.044, s: 1, l: 0.671 }),
+    soft: teamUiFromBase('ally', { hShift: -0.042, s: 1, l: 0.74 })
+  },
+  enemy: {
+    muted: teamUiFromBase('enemy', { hShift: 0, s: 1, l: 0.662 }),
+    soft: teamUiFromBase('enemy', { hShift: 0.007, s: 1, l: 0.554 }),
+    bright: teamUiFromBase('enemy', { hShift: 0.004, s: 1, l: 0.523 })
+  }
+} as const;
+
+export type TeamUiNuance = 'muted' | 'soft' | 'bright';
 
 export function deriveTeamHex(
   role: RelativeTeamRole,
@@ -45,4 +77,32 @@ export function deriveTeamHex(
     Math.min(lightCap, HSL.l * params.lightMul)
   );
   return color.getHex();
+}
+
+export function deriveTeamUiHex(role: RelativeTeamRole, nuance: TeamUiNuance): number {
+  if (role === 'ally') {
+    if (nuance === 'bright') {
+      return deriveTeamHex(role);
+    }
+    return TEAM_UI_HEX.ally[nuance];
+  }
+  return TEAM_UI_HEX.enemy[nuance];
+}
+
+export function teamHexToCssHex(hex: number): string {
+  return `#${hex.toString(16).padStart(6, '0')}`;
+}
+
+export function teamHexToRgb(hex: number): readonly [number, number, number] {
+  return [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255] as const;
+}
+
+export function teamHexToRgbString(hex: number): string {
+  const [r, g, b] = teamHexToRgb(hex);
+  return `${r.toString()}, ${g.toString()}, ${b.toString()}`;
+}
+
+export function teamRgbaCss(hex: number, alpha: number): string {
+  const [r, g, b] = teamHexToRgb(hex);
+  return `rgba(${r.toString()}, ${g.toString()}, ${b.toString()}, ${alpha.toString()})`;
 }

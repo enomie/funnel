@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/side-wall-ceiling-ramps.ts
+
 import type { World } from '@dimforge/rapier3d-simd-compat';
 import {
   FUNNEL_DIMENSIONS,
@@ -22,7 +24,7 @@ interface SideWallCeilingRampSlot {
   readonly rotationY: number;
 }
 
-/** One 100 m ramp per zone on each side wall — flipped 180° X to hang from the ceiling. */
+
 function sideWallCeilingRampSlots(): readonly SideWallCeilingRampSlot[] {
   const halfWidth = FUNNEL_DIMENSIONS.width * 0.5;
   const halfDepth = SIDE_WALL_RAMP_DEPTH_M * 0.5;
@@ -44,7 +46,7 @@ function sideWallCeilingRampSlots(): readonly SideWallCeilingRampSlot[] {
   return slots;
 }
 
-/** Fixed zone-colored ceiling ramps along left/right walls (alpha / neutral / beta). */
+
 export function createSideWallCeilingRamps(instances: ArenaStaticInstances, world: World): void {
   const centerY = FUNNEL_DIMENSIONS.height - SIDE_WALL_RAMP_HEIGHT_M * 0.5;
   const rampSize: [number, number, number] = [

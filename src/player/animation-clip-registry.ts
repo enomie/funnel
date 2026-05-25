@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/animation-clip-registry.ts
+
 import {
   AnimationAction,
   AnimationClip,
@@ -73,7 +75,7 @@ export class AnimationClipRegistry {
     return this.#clips.get(clipId);
   }
 
-  /** Independent mixer per cloned character (bots, hire previews). */
+  
   fork(mixer: AnimationMixer): AnimationClipRegistry {
     const forked = new AnimationClipRegistry(mixer);
     for (const clipId of this.getAllClipIds()) {

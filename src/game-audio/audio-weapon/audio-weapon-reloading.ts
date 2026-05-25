@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-weapon/audio-weapon-reloading.ts
+
 import type { Vector3 } from 'three/webgpu';
 import { getNoiseBuffer } from '../audio-noise-buffer';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
@@ -74,7 +76,7 @@ function fillReloadTimingForDuration(
   return out;
 }
 
-/** Weapon reload at muzzle — 20 m; steampunk valve/clockwork bed scaled to reload duration. */
+
 export class WeaponReloadAudio {
   #trackedReloadStartMs = 0;
   #active: ReloadVoiceNodes | null = null;
@@ -385,7 +387,7 @@ export class WeaponReloadAudio {
       try {
         node.disconnect();
       } catch {
-        /* already torn down */
+        // Node may already be disconnected.
       }
     }
 
@@ -398,7 +400,7 @@ export class WeaponReloadAudio {
       try {
         (node as OscillatorNode | AudioBufferSourceNode).stop(stopTime);
       } catch {
-        /* already stopped */
+        // Node may already be disconnected.
       }
     }
   }

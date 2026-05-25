@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-manager.ts
+
 import { WeaponAudio } from './audio-weapon/audio-weapon';
 import { warmWeaponBakes } from './audio-weapon/audio-weapon-bake';
 import { AudioContextEngine } from './audio-mixer';

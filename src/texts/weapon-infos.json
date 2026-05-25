@@ -1,0 +1,92 @@
+{
+  "1": {
+    "name": "Pistol",
+    "shortName": "Pistol",
+    "color": "#ffc35a",
+    "description": "Light semi-auto sidearm. Reloads when the magazine is empty.",
+    "lmbDescription": "Fire one accurate shot per click.",
+    "rmbDescription": "Three-round burst. Costs three rounds.",
+    "comboDescription": ""
+  },
+  "2": {
+    "name": "Shock Blaster",
+    "shortName": "Shock",
+    "color": "#6ff7ff",
+    "description": "Energy rifle with a hitscan beam and a slow plasma orb.",
+    "lmbDescription": "Instant energy beam out to long range.",
+    "rmbDescription": "Launch a floating plasma orb.",
+    "comboDescription": "Hit your orb with LMB before it lands for a much bigger blast."
+  },
+  "3": {
+    "name": "Rocket Launcher",
+    "shortName": "Rocket",
+    "color": "#ff5a1f",
+    "description": "Six rockets in a rotating magazine. Heavy splash damage.",
+    "lmbDescription": "Fire one rocket from the next barrel.",
+    "rmbDescription": "Hold to mark rockets, release to fire them all at once.",
+    "comboDescription": ""
+  },
+  "4": {
+    "name": "Ripper",
+    "shortName": "Ripper",
+    "color": "#ff4ecb",
+    "description": "Ricocheting discs that bounce off walls and floors.",
+    "lmbDescription": "Small fast disk. Bounces up to five times.",
+    "rmbDescription": "Larger disk. Costs two ammo per shot.",
+    "comboDescription": ""
+  },
+  "5": {
+    "name": "Flak Cannon",
+    "shortName": "Flak",
+    "color": "#ff8d3b",
+    "description": "Close-range shrapnel and arcing grenades.",
+    "lmbDescription": "Six pellets in a tight spread. Lethal splash on hit.",
+    "rmbDescription": "Lob a grenade. It splits into four shrapnel on impact.",
+    "comboDescription": ""
+  },
+  "6": {
+    "name": "Sniper Rifle",
+    "shortName": "Sniper",
+    "color": "#d9f6ff",
+    "description": "Slow, high-damage shots. Small magazine, long reload.",
+    "lmbDescription": "One powerful hitscan shot.",
+    "rmbDescription": "Hold to zoom in. Does not fire.",
+    "comboDescription": ""
+  },
+  "7": {
+    "name": "Gatling",
+    "shortName": "Gatling",
+    "color": "#b6ff57",
+    "description": "Full-auto bullet hose. Burns through a large magazine fast.",
+    "lmbDescription": "Hold to spray with tight spread.",
+    "rmbDescription": "Hold to spray with wider spread.",
+    "comboDescription": ""
+  },
+  "8": {
+    "name": "Pulse Lance",
+    "shortName": "Pulse",
+    "color": "#4dffad",
+    "description": "Plasma bolts and a short melt beam. Beam overheats if held too long.",
+    "lmbDescription": "Hold for steady plasma bolts.",
+    "rmbDescription": "Hold for a close-range beam until it overheats.",
+    "comboDescription": ""
+  },
+  "9": {
+    "name": "Bio Lobber",
+    "shortName": "Bio",
+    "color": "#8dff31",
+    "description": "Sticky bio globs. Charge a bigger blob at the muzzle.",
+    "lmbDescription": "Toss small arcing clumps that stick on impact.",
+    "rmbDescription": "Hold to grow a blob at the muzzle, release to throw it.",
+    "comboDescription": ""
+  },
+  "0": {
+    "name": "Redeemer Seed",
+    "shortName": "Redeemer",
+    "color": "#ffe66d",
+    "description": "One shot per reload. Massive expanding kill zone. Friendly fire included.",
+    "lmbDescription": "Fire a slow nuke straight ahead.",
+    "rmbDescription": "Launch a guided nuke. Camera follows; steer with the mouse.",
+    "comboDescription": ""
+  }
+}

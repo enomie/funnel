@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-mixer.ts
+
 import { AUDIO_MASTER_GAIN } from './audio-config';
 
 const SFX_LIMITER_THRESHOLD = -10;
@@ -5,7 +7,7 @@ const SFX_LIMITER_RATIO = 12;
 
 let shared: AudioContextEngine | null = null;
 
-/** Shared Web Audio graph — voices → sfx limiter → master → destination. */
+
 export class AudioContextEngine {
   readonly #context: AudioContext;
   readonly #masterGain: GainNode;

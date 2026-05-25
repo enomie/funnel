@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/personal-stats-hud.ts
+
 import type { PersonalMatchStats } from '../combat/personal-match-stats';
 
 export interface PersonalStatsHudNodes {

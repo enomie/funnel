@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-perception.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { RigidBody, World } from '@dimforge/rapier3d-simd-compat';
 import type { Vector3 } from 'three/webgpu';

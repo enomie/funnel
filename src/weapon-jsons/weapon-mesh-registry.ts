@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/weapon-jsons/weapon-mesh-registry.ts
+
 import type { ProjectileVisualKind } from '../combat/weapon-definitions';
 import type { WeaponMeshDefinition } from './weapon-mesh-types';
 import bioMesh from './weapon-bio.json';

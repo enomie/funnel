@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/crosshair-hud.ts
+
 const CROSSHAIR_HIT_FLASH_MS = 130;
 const CROSSHAIR_KILL_FLASH_MS = 240;
 
@@ -17,7 +19,7 @@ export class CrosshairHud {
     this.#setFlash(false, CROSSHAIR_HIT_FLASH_MS);
   }
 
-  /** Stronger spread + red flash — any local-player kill, including off-screen. */
+  
   flashKill(): void {
     this.#setFlash(true, CROSSHAIR_KILL_FLASH_MS);
   }

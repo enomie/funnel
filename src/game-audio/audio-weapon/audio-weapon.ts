@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-weapon/audio-weapon.ts
+
 import type { Vector3 } from 'three/webgpu';
 import type { FireProfile, ImpactProfile, WeaponDefinition } from '../../combat/weapon-definitions';
 import { IMPACT_GAIN_RICOCHET } from '../audio-config';
@@ -24,7 +26,7 @@ import { scheduleFirePhrase } from '../audio-one-shots/audio-fire-phrase';
 
 export type { ReloadMechanicsState, ChargeHoldMechanicsState };
 
-/** Combat-facing weapon audio — fire, fly, impact, reload, dry-fire. */
+
 export class WeaponAudio {
   readonly #flyby = getAudioFlybyVoice();
   readonly #redeemerImpact = getAudioRedeemerImpact();

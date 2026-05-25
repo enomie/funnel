@@ -1,12 +1,15 @@
-/** In-game pre-match UI: loader → character select → countdown. Home lives in index.html. */
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/match-flow-screen.ts
+
+
 
 import type { HumanoidRigId } from '../player/humanoid-rig';
+import { createFunnelGameBrandElement } from './funnel-game-brand';
 
 export const MATCH_COUNTDOWN_SECONDS = 10;
 
 export type MatchFlowPhase = 'character-select' | 'countdown' | 'playing' | 'ended';
 
-export type PreMatchPhase = 'character-select' | 'game-loading';
+export type PreMatchPhase = 'boot-loading' | 'character-select' | 'game-loading';
 
 export interface MatchFlowScreenMount {
   preMatchHost: HTMLElement;
@@ -68,7 +71,7 @@ export class MatchFlowScreen {
   setPreMatchPhase(phase: PreMatchPhase): void {
     this.#preMatchHost.dataset.matchPhase = phase;
     if (this.#loadingPanel !== null) {
-      this.#loadingPanel.hidden = phase !== 'game-loading';
+      this.#loadingPanel.hidden = phase !== 'boot-loading' && phase !== 'game-loading';
     }
   }
 
@@ -78,11 +81,14 @@ export class MatchFlowScreen {
     }
 
     const loadingPanel = document.createElement('div');
-    loadingPanel.className = 'funnel-prematch-screen__panel';
+    loadingPanel.className = 'funnel-prematch-screen__panel funnel-prematch-screen__panel--loader';
     loadingPanel.dataset.panel = 'loading';
     loadingPanel.innerHTML = `
-      <h1 class="funnel-prematch-screen__brand funnel-prematch-screen__brand--loader">FUNNEL</h1>
-      <div class="funnel-prematch-screen__card funnel-prematch-screen__card--loader funnel-prematch-screen__card--loader-minimal">
+      <div class="funnel-prematch-screen__loader-brand">
+        <p class="funnel-prematch-screen__welcome">Welcome to the</p>
+        <h1 class="funnel-prematch-screen__brand">FUNNEL</h1>
+      </div>
+      <div class="funnel-prematch-screen__loader-progress">
         <p class="funnel-prematch-screen__progress-label">Preparing…</p>
         <div class="funnel-prematch-screen__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100">
           <div class="funnel-prematch-screen__progress-fill"></div>
@@ -104,10 +110,17 @@ export class MatchFlowScreen {
     this.#preMatchScreen.append(loadingPanel);
   }
 
-  /** Called when game.html boots after home Start Match navigation. */
+  
   beginFromHomeNavigation(): void {
-    this.#preMatchHost.hidden = true;
     this.#shell.hidden = true;
+  }
+
+  beginBootLoading(): void {
+    this.#ensureLoadingPanel();
+    this.#shell.hidden = true;
+    this.#preMatchHost.hidden = false;
+    this.setPreMatchPhase('boot-loading');
+    this.setLoadingProgress(0, 'Preparing…');
   }
 
   showCharacterSelectOverlay(): void {
@@ -150,13 +163,25 @@ export class MatchFlowScreen {
 
     const overlay = document.createElement('div');
     overlay.className = 'funnel-character-select-overlay';
-    overlay.innerHTML = `
-      <p class="funnel-character-select-overlay__title">Select your fighter</p>
-      <div class="funnel-character-select-overlay__roster" aria-label="Fighters">
+
+    const head = document.createElement('div');
+    head.className = 'funnel-character-select-overlay__head';
+    head.append(createFunnelGameBrandElement());
+
+    const title = document.createElement('p');
+    title.className = 'funnel-character-select-overlay__title';
+    title.textContent = 'Select your fighter';
+    head.append(title);
+
+    const roster = document.createElement('div');
+    roster.className = 'funnel-character-select-overlay__roster';
+    roster.setAttribute('aria-label', 'Fighters');
+    roster.innerHTML = `
         <span class="funnel-character-select-overlay__name" data-rig="y-bot">Y-Bot</span>
         <span class="funnel-character-select-overlay__name" data-rig="x-bot">X-Bot</span>
-      </div>
     `;
+
+    overlay.append(head, roster);
 
     this.#characterSelectOverlay = overlay;
     this.#shell.append(overlay);
@@ -185,7 +210,7 @@ export class MatchFlowScreen {
     }
   }
 
-  /** Show WebGPU shell — call `primeArenaFrame()` then `runCountdown()`. */
+  
   revealMap(): void {
     this.#preMatchHost.hidden = true;
     this.#shell.hidden = false;

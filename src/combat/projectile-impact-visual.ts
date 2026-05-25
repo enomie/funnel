@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/projectile-impact-visual.ts
+
 import type { ImpactProfile, WeaponDefinition } from './weapon-definitions';
 import type { InstancedImpactBurst, SphereInstancingService } from '../render/sphere-instancing';
 import {
@@ -9,6 +11,20 @@ import {
 export { brightenImpactColor } from '../render/sphere-vfx-tuning';
 
 const RICOCHET_VFX_RADIUS_SCALE = 0.52;
+const SMALL_ARMS_VFX_RADIUS_FLOOR: Partial<Record<WeaponDefinition['visualKind'], number>> = {
+  pistol: 0.44,
+  gatling: 0.36,
+  pulse: 0.48
+};
+const SMALL_ARMS_VFX_START_SCALE_FRACTION = 0.28;
+const SMALL_ARMS_IMPACT_EXPAND_PEAK_FRACTION = 0.48;
+const SMALL_ARMS_IMPACT_OPACITY_FADE = 0.72;
+const SMALL_ARMS_IMPACT_OPACITY_FADE_POWER = 2.1;
+const SMALL_ARMS_IMPACT_START_SCALE_MIN = 0.05;
+
+function isSmallArmsVisualKind(kind: WeaponDefinition['visualKind']): boolean {
+  return SMALL_ARMS_VFX_RADIUS_FLOOR[kind] !== undefined;
+}
 const FLAK_IMPACT_START_SCALE_FRACTION = 0.22;
 const FLAK_IMPACT_EXPAND_PEAK_FRACTION = 0.32;
 const FLAK_IMPACT_OPACITY_FADE = 2.6;
@@ -33,9 +49,9 @@ export type ImpactBurstKind = 'hit' | 'ricochet';
 
 export type ImpactBurst = InstancedImpactBurst;
 
-/** Max sphere radius (m) for the expanding impact VFX. */
+
 export function resolveImpactVfxRadius(
-  _weapon: WeaponDefinition,
+  weapon: WeaponDefinition,
   impact: ImpactProfile,
   kind: ImpactBurstKind,
   radiusOverride?: number
@@ -44,7 +60,14 @@ export function resolveImpactVfxRadius(
   if (base <= 0) {
     return 0;
   }
-  return kind === 'ricochet' ? base * RICOCHET_VFX_RADIUS_SCALE : base;
+
+  const scaled = kind === 'ricochet' ? base * RICOCHET_VFX_RADIUS_SCALE : base;
+  const floor = SMALL_ARMS_VFX_RADIUS_FLOOR[weapon.visualKind];
+  if (floor === undefined) {
+    return scaled;
+  }
+
+  return Math.max(scaled, floor);
 }
 
 function resolveImpactBurstDuration(weapon: WeaponDefinition, impact: ImpactProfile): number {
@@ -53,6 +76,9 @@ function resolveImpactBurstDuration(weapon: WeaponDefinition, impact: ImpactProf
   }
   if (weapon.visualKind === 'rocket') {
     return ROCKET_IMPACT_BURST_DURATION_MS;
+  }
+  if (isSmallArmsVisualKind(weapon.visualKind) && impact.impactExpandMs > 0) {
+    return impact.impactExpandMs;
   }
   return IMPACT_BURST_DURATION_MS;
 }
@@ -103,6 +129,16 @@ function resolveImpactBurstProfile(
     };
   }
 
+  if (isSmallArmsVisualKind(weapon.visualKind)) {
+    return {
+      expandPeakFraction: SMALL_ARMS_IMPACT_EXPAND_PEAK_FRACTION,
+      expandEase: 'cubic',
+      opacityFade: SMALL_ARMS_IMPACT_OPACITY_FADE,
+      opacityFadePower: SMALL_ARMS_IMPACT_OPACITY_FADE_POWER,
+      hotBurst: true
+    };
+  }
+
   return {};
 }
 
@@ -112,6 +148,9 @@ function resolveImpactBurstStartScale(weapon: WeaponDefinition, endScale: number
   }
   if (weapon.visualKind === 'flak') {
     return Math.max(IMPACT_BURST_START_SCALE, endScale * FLAK_IMPACT_START_SCALE_FRACTION);
+  }
+  if (isSmallArmsVisualKind(weapon.visualKind)) {
+    return Math.max(SMALL_ARMS_IMPACT_START_SCALE_MIN, endScale * SMALL_ARMS_VFX_START_SCALE_FRACTION);
   }
   return IMPACT_BURST_START_SCALE;
 }

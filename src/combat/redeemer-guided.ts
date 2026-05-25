@@ -1,7 +1,9 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/redeemer-guided.ts
+
 import { Vector3 } from 'three/webgpu';
 import type { WorldProjectileSim } from './world-projectile-sim';
 
-/** Must match `projectileTags` on Redeemer RMB in `weapon-definitions.ts`. */
+
 export const REDEEMER_GUIDED_PROJECTILE_TAG = 'redeemer-guided';
 
 const GUIDED_MAX_FLIGHT_MS = 14_000;

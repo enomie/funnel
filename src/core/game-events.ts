@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/core/game-events.ts
+
 import type { FactionTeam } from '../combat/teams';
 
 export interface ActorDamagedEvent {
@@ -12,7 +14,7 @@ export interface ActorDamagedEvent {
 export interface ActorDiedEvent {
   readonly actorId: string;
   readonly faction: FactionTeam;
-  /** Faction that dealt the killing blow (cross-faction only). */
+  
   readonly sourceFaction: FactionTeam;
   readonly sourceActorId?: string;
 }
@@ -22,10 +24,25 @@ export interface ActorRespawnedEvent {
   readonly faction: FactionTeam;
 }
 
+export interface ActorRevivedEvent {
+  readonly actorId: string;
+  readonly faction: FactionTeam;
+  readonly reviverId: string;
+}
+
+export interface ActorHiredEvent {
+  readonly actorId: string;
+  readonly previousFaction: FactionTeam;
+  readonly newFaction: FactionTeam;
+  readonly hirerId: string;
+}
+
 export interface GameEventMap {
   'actor-damaged': ActorDamagedEvent;
   'actor-died': ActorDiedEvent;
   'actor-respawned': ActorRespawnedEvent;
+  'actor-revived': ActorRevivedEvent;
+  'actor-hired': ActorHiredEvent;
 }
 
 export type GameEventName = keyof GameEventMap;

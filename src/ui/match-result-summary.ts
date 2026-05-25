@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/match-result-summary.ts
+
 import type { PersonalMatchStats } from '../combat/personal-match-stats';
 import type { TeamKillScore } from '../combat/team-kill-score';
 import type { TeamMatchPoints } from '../combat/team-match-points';

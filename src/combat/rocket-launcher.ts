@@ -1,12 +1,14 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/rocket-launcher.ts
+
 import { Vector3 } from 'three/webgpu';
 
-/** Minimum hold before the first RMB mark — short tap fires nothing. */
+
 const MARK_INTERVAL_MS = 280;
-/** Ring radius around muzzle center for the six barrel spawn sockets (meters). */
+
 const BARREL_RING_RADIUS_M = 0.042;
-/** Per-rocket fan step for charged volley — parallel rays, wider spacing (radians). */
+
 const ROCKET_VOLLEY_FAN_STEP_RAD = 0.032;
-/** Delay between individual rockets on RMB release (ms). */
+
 export const ROCKET_VOLLEY_SHOT_INTERVAL_MS = 105;
 
 const _worldUp = new Vector3(0, 1, 0);
@@ -57,7 +59,7 @@ export class RocketLauncherMagazine {
     this.#markedCount = 0;
   }
 
-  /** Returns `true` when a new rocket was marked this tick. */
+  
   tickMarkWhileHeld(nowMs: number, ammoAvailable: number): boolean {
     if (ammoAvailable <= this.#markedCount) {
       return false;
@@ -76,7 +78,7 @@ export class RocketLauncherMagazine {
     return true;
   }
 
-  /** Barrel index for the next LMB shot, or `-1` when inactive. */
+  
   consumePrimaryRound(): number {
     if (this.#barrelCount <= 0) {
       return -1;
@@ -87,7 +89,7 @@ export class RocketLauncherMagazine {
     return barrelIndex;
   }
 
-  /** Rockets to fire on RMB release (capped by remaining ammo). */
+  
   peekVolleyCount(ammoAvailable: number): number {
     return Math.min(this.#markedCount, ammoAvailable);
   }
@@ -138,10 +140,7 @@ export function resolveRocketBarrelSpawn(
   return out.copy(muzzlePosition).add(_offset);
 }
 
-/**
- * Charged RMB volley — full aim pitch, symmetric horizontal fan.
- * Each rocket keeps a fixed tilt (parallel paths, not stacked on one line).
- */
+
 export function resolveRocketVolleyDirection(
   aimDirection: Vector3,
   shotIndex: number,

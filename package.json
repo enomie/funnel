@@ -16,7 +16,8 @@
     "check:stride-sync": "node _Scripts/check-stride-sync.mjs",
     "measure:locomotion-stride": "node _Scripts/measure-locomotion-stride.mjs",
     "backup": "node _Scripts/_BACKUP/backup.mjs",
-    "structure:write": "node _Scripts/_BACKUP/backup.mjs --structure-only"
+    "structure:write": "node _Scripts/_BACKUP/backup.mjs --structure-only",
+    "export:online": "node _Scripts/export-online.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-simd-compat": "^0.19.3",

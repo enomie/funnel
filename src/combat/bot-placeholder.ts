@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/bot-placeholder.ts
+
 import {
   AnimationMixer,
   BoxGeometry,

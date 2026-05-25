@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-target-focus.ts
+
 import type { RigidBody } from '@dimforge/rapier3d-simd-compat';
 import type { FactionTeam } from '../combat/teams';
 import { areSameFaction } from '../combat/teams';
@@ -10,7 +12,7 @@ import {
 
 const BOT_SIGHT_RANGE_SQ = BOT_SIGHT_RANGE_M * BOT_SIGHT_RANGE_M;
 
-/** New hostile must be this much closer (linear) to steal focus — reduces target flicker. */
+
 const TARGET_STEAL_LINEAR_RATIO = 0.55;
 const TARGET_STEAL_DIST_SQ = TARGET_STEAL_LINEAR_RATIO * TARGET_STEAL_LINEAR_RATIO;
 
@@ -31,7 +33,7 @@ function fillTargetFromSnapshot(
   return out;
 }
 
-/** Sticky hostile selection — nearest only wins when clearly closer or focus is lost. */
+
 export class BotTargetFocus {
   #bodyHandle: number | null = null;
   readonly #targetScratch: MutableBotBrainTarget = {

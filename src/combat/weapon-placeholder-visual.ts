@@ -1,23 +1,25 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/combat/weapon-placeholder-visual.ts
+
 import { Group, Vector3 } from 'three/webgpu';
 import { detachSceneObject } from '../render/dispose-three';
 import { createWeaponMesh } from '../weapon-jsons/weapon-mesh-builder';
 import type { WeaponDefinition } from './weapon-definitions';
 
-/** Local offsets from capsule-center root; player yaw faces +Z. */
+
 export const THIRD_PERSON_WEAPON_SOCKET_POSITION = new Vector3(-0.16, 0.42, 0.2);
 
-/** FPS viewmodel rig (local after camera `lookAt`, forward = −Z). */
+
 export const FIRST_PERSON_WEAPON_SOCKET_POSITION = new Vector3(0.32, -0.05, -0.38);
 
-/** Meters beyond barrel tip along bore axis (weapon-local). */
+
 const MUZZLE_BEYOND_BARREL_M = 0.05;
 
-/** Third-person bore +Z: mesh tip at z = length; muzzle centered on weapon cross-section. */
+
 export function thirdPersonMuzzleSocketPosition(weapon: WeaponDefinition): Vector3 {
   return new Vector3(0, 0, weapon.length + MUZZLE_BEYOND_BARREL_M);
 }
 
-/** FPS viewmodel bore −Z (camera forward). */
+
 export function firstPersonMuzzleSocketPosition(weapon: WeaponDefinition): Vector3 {
   return new Vector3(0, 0, -(weapon.length + MUZZLE_BEYOND_BARREL_M));
 }
@@ -81,7 +83,7 @@ export function findBotMuzzleSocket(root: Group): Group | null {
   return muzzle instanceof Group ? muzzle : null;
 }
 
-/** Drop weapon placeholder meshes before socket rebuild — avoids GPU leaks on equip. */
+
 export function disposeWeaponPlaceholderSocket(socket: Group): void {
   for (let index = socket.children.length - 1; index >= 0; index -= 1) {
     const child = socket.children[index];

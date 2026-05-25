@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/character-select-scene.ts
+
 import {
   AmbientLight,
   Color,
@@ -16,6 +18,7 @@ import {
   type WebGPURenderer
 } from 'three/webgpu';
 import { JOINT_HIT_FLASH_EMISSIVE_INTENSITY } from '../combat/damage-feedback';
+import { deriveTeamHex, deriveTeamUiHex } from '../combat/team-color-derive';
 import { enterArenaDisplayMode } from '../platform/browser-fullscreen';
 import { exitArenaPointerLock } from '../input/pointer-lock';
 import {
@@ -41,12 +44,12 @@ import { CharacterSelectHoverTts } from './character-select-hover-tts';
 const HOVER_BLEND_LERP_SPEED = 3.2;
 const SELECT_JOINT_GLOW_IDLE = 0.42;
 const SELECT_JOINT_GLOW_HOVER = JOINT_HIT_FLASH_EMISSIVE_INTENSITY;
-/** Shoulder-to-shoulder spacing — both rigs visible without a wide gap. */
+
 const FIGURE_SPACING_X = 0.68;
 const SELECT_STAGE_WIDTH = 60;
 const SELECT_BACK_WALL_Z = -28;
 const SELECT_BACK_WALL_H = 22;
-/** Framing: both mannequins fully in view with browser-edge margin. */
+
 const CAMERA_FOV = 36;
 const CAMERA_EYE_Y = 1.08;
 const CAMERA_Z = 4.2;
@@ -100,14 +103,14 @@ function createCharacterSelectLighting(scene: Scene): CharacterSelectLighting {
   scene.add(key);
   scene.add(key.target);
 
-  const fill = new DirectionalLight(0x9ec8ff, 0.22);
+  const fill = new DirectionalLight(deriveTeamUiHex('ally', 'muted'), 0.22);
   fill.position.set(-3, 2, 2);
   fill.target.position.set(0, LOOK_AT_Y, 0);
   fill.castShadow = false;
   scene.add(fill);
   scene.add(fill.target);
 
-  const rim = new DirectionalLight(0x225dff, 0.18);
+  const rim = new DirectionalLight(deriveTeamHex('ally'), 0.18);
   rim.position.set(0, 3, -4);
   rim.target.position.set(0, LOOK_AT_Y, 0);
   rim.castShadow = false;
@@ -156,7 +159,7 @@ function isHumanoidGlowMesh(mesh: { name: string; material: Material | Material[
   return false;
 }
 
-/** Clone pooled joint/eye materials so per-figure emissive lerp does not touch the pool. */
+
 function cloneHumanoidGlowMaterials(model: Object3D): void {
   model.traverse((object) => {
     if (!(object instanceof Mesh) || !isHumanoidGlowMesh(object)) {
@@ -221,7 +224,7 @@ function mountFigure(preview: CharacterSelectPreview, slotX: number): SelectFigu
   const root = new Group();
   root.name = `${preview.rigId}-select-root`;
   root.position.set(slotX, 0, 0);
-  // Mixamo T-pose faces +Z — camera sits at +Z, no yaw flip.
+  
 
   const model = preview.model;
   enableHumanoidCastShadows(model);
@@ -446,13 +449,16 @@ class CharacterSelectSession {
   }
 }
 
-export async function runCharacterSelect(mount: CharacterSelectMount): Promise<HumanoidRigId> {
+export async function runCharacterSelect(
+  mount: CharacterSelectMount,
+  previews?: CharacterSelectPreview[]
+): Promise<HumanoidRigId> {
   if (activeSession !== null) {
     throw new Error('Character select session is already active.');
   }
 
-  const previews = await loadAllCharacterSelectPreviews();
-  const session = new CharacterSelectSession(mount, previews);
+  const resolvedPreviews = previews ?? (await loadAllCharacterSelectPreviews());
+  const session = new CharacterSelectSession(mount, resolvedPreviews);
   activeSession = session;
 
   try {

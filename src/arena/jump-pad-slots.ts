@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/jump-pad-slots.ts
+
 import type { FactionTeam } from '../combat/teams';
 import { TEAM_ZONE_PODIUM_HEIGHT_M, teamZonePodiumSlots } from './team-zone-podiums';
 
@@ -5,7 +7,7 @@ export const JUMP_PAD_SIZE_M = 3;
 export const JUMP_PAD_HEIGHT_M = 1;
 export const JUMP_PAD_HALF_M = JUMP_PAD_SIZE_M * 0.5;
 export const JUMP_PAD_HALF_HEIGHT = JUMP_PAD_HEIGHT_M * 0.5;
-/** Resting on podium top (y = 1) — pad center y = 1.5. */
+
 export const JUMP_PAD_CENTER_Y = TEAM_ZONE_PODIUM_HEIGHT_M + JUMP_PAD_HALF_HEIGHT;
 
 export interface JumpPadSlot {

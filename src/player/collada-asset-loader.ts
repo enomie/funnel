@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/collada-asset-loader.ts
+
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import type { AnimationClip, Object3D } from 'three/webgpu';
 import { disposeObject3DMeshes } from '../render/dispose-three';

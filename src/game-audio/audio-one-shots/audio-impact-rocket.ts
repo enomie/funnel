@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-impact-rocket.ts
+
 import type { AudioOneShotVoice } from '../audio-spatial-voice';
 import { scheduleAttackHoldRelease } from './audio-one-shot-synth';
 import { getNoiseBuffer } from '../audio-noise-buffer';

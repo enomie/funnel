@@ -1,6 +1,8 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/collada-strip-root-motion.ts
+
 import type { AnimationClip } from 'three/webgpu';
 
-/** Mixamo locomotion clips move the hips in world space — strip for in-place playback. */
+
 const STRIP_POSITION_TRACK_PREFIXES = ['mixamorig_Hips'];
 
 export function stripInPlaceRootMotion(clip: AnimationClip, _clipId?: string): AnimationClip {

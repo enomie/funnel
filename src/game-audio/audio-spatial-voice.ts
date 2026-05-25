@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-spatial-voice.ts
+
 import type { Vector3 } from 'three/webgpu';
 import {
   FOOTSTEP_VOICE_CAP,
@@ -119,7 +121,7 @@ function wireMixBus(lease: OneShotLease): void {
   try {
     lease.panner.disconnect();
   } catch {
-    /* first use */
+    // Panner may already be disconnected.
   }
   lease.panner.connect(AudioContextEngine.get().sfxInput);
 }
@@ -208,14 +210,14 @@ function stopAndDisconnect(node: AudioNode): void {
     try {
       node.stop();
     } catch {
-      /* already stopped */
+      // Source may already be stopped.
     }
   }
 
   try {
     node.disconnect();
   } catch {
-    /* already torn down */
+    // Panner may already be disconnected.
   }
 }
 

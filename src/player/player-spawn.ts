@@ -1,8 +1,7 @@
-import {
-  nearestSpawnShieldGapX,
-  teamMatchStartDropExtentZ,
-  teamSpawnPocketCenterZ
-} from '../arena/spawn-shield-cubes';
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-spawn.ts
+
+import { teamSpawnPocketCenterZ } from '../arena/spawn-shield-cubes';
+import { playerMatchStartSpawnSlot } from '../combat/match-roster';
 import {
   RAIN_COUNTDOWN_SPAWN_Y_MAX,
   RAIN_COUNTDOWN_SPAWN_Y_MIN
@@ -16,12 +15,12 @@ export interface PlayerSpawnTranslation {
   readonly z: number;
 }
 
-/** Countdown-visible air band for match-start intro drop (humanoid capsule center). */
+
 export function matchStartDropCenterY(): number {
   return (RAIN_COUNTDOWN_SPAWN_Y_MIN + RAIN_COUNTDOWN_SPAWN_Y_MAX) * 0.5;
 }
 
-/** Team spawn pocket center — death respawn + dev faction flip (0…15 m from bulkhead). */
+
 export function playerFactionSpawnPosition(faction: FactionTeam): PlayerSpawnTranslation {
   return {
     x: PLAYER_CONFIG.spawn.x,
@@ -30,15 +29,10 @@ export function playerFactionSpawnPosition(faction: FactionTeam): PlayerSpawnTra
   };
 }
 
-/** Match-start intro drop — air spawn in front of shield cubes (30…45 m from bulkhead). */
-export function playerMatchStartDropPosition(faction: FactionTeam): PlayerSpawnTranslation {
-  const { minZ, maxZ } = teamMatchStartDropExtentZ(faction);
 
-  return {
-    x: nearestSpawnShieldGapX('front', PLAYER_CONFIG.spawn.x),
-    y: matchStartDropCenterY(),
-    z: (minZ + maxZ) * 0.5
-  };
+export function playerMatchStartDropPosition(faction: FactionTeam): PlayerSpawnTranslation {
+  const slot = playerMatchStartSpawnSlot(faction);
+  return { x: slot.x, y: slot.y, z: slot.z };
 }
 
 export function defaultPlayerSpawnPosition(): PlayerSpawnTranslation {

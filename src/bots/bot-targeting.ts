@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-targeting.ts
+
 import type { RigidBody } from '@dimforge/rapier3d-simd-compat';
 import type { FactionTeam } from '../combat/teams';
 import { areSameFaction } from '../combat/teams';
@@ -21,7 +23,7 @@ export type MutableBotBrainTarget = {
   body: RigidBody;
 };
 
-/** @returns `true` when a hostile was written to `out`. */
+
 export function fillNearestHostileTarget(
   botX: number,
   botZ: number,
@@ -60,7 +62,7 @@ export function fillNearestHostileTarget(
   return found;
 }
 
-/** @deprecated Use `fillNearestHostileTarget`. */
+
 export function resolveNearestHostileTarget(
   botX: number,
   botZ: number,

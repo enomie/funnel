@@ -1,10 +1,12 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/environment-physics-material.ts
+
 import type { ColliderDesc } from '@dimforge/rapier3d-simd-compat';
 import {
   ENVIRONMENT_COLLISION_GROUPS,
   PICKUP_COLLISION_GROUPS
 } from '../physics/collision-groups';
 
-/** kg/m³ — mass from collider volume only (no setMass on rain props). */
+
 export const ENVIRONMENT_PHYSICS_DENSITY = 900;
 
 export const ENVIRONMENT_PHYSICS_FRICTION = 1.1;

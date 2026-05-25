@@ -1,0 +1,16 @@
+# Deny leftover legacy counter file if it still exists in the web root
+<Files "visits.txt">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Deny from all
+    </IfModule>
+</Files>
+
+# Never serve PHP source if misconfigured
+<FilesMatch "\.php$">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+</FilesMatch>

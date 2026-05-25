@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/arena/environment-dynamic-shapes.ts
+
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import type { ColliderDesc } from '@dimforge/rapier3d-simd-compat';
 import {
@@ -9,7 +11,7 @@ import {
   IcosahedronGeometry
 } from 'three/webgpu';
 
-/** Octagonal prism — industrial barrel / pipe look; never more round than this for rain. */
+
 export const OCT_PRISM_RADIAL_SIDES = 8;
 
 export type DynamicBoxSize = readonly [number, number, number];
@@ -21,7 +23,7 @@ export type DynamicPropSpec =
   | { readonly kind: 'icosahedron'; readonly radius: number }
   | { readonly kind: 'dodecahedron'; readonly radius: number };
 
-/** Phase 2 gib spawner — few faces, still reads round / chunky when tumbling. */
+
 export const GIB_SHAPE_PRESETS = {
   octPeg: { kind: 'octCylinder', radius: 0.2, height: 0.4 },
   icosaShard: { kind: 'icosahedron', radius: 0.25 },
@@ -57,13 +59,13 @@ export function dynamicPropVerticalExtent(spec: DynamicPropSpec): number {
   }
 }
 
-/** Right triangle in YZ (legs = height × depth), extruded along X (width). Origin-centered. */
+
 export function createRampGeometry(width: number, height: number, depth: number): BufferGeometry {
   const halfWidth = width * 0.5;
   const halfHeight = height * 0.5;
   const halfDepth = depth * 0.5;
 
-  // A = right angle (y−, z−), B = y+ leg, C = z+ leg; 0 = x−, 1 = x+.
+  
   const ax0 = -halfWidth;
   const ax1 = halfWidth;
   const ayA = -halfHeight;
@@ -102,17 +104,17 @@ export function createRampGeometry(width: number, height: number, depth: number)
     }
   };
 
-  // Front cap (−X): A → C → B
+  
   pushFlatTriangle(ax0, ayA, azA, ax0, ayA, azC, ax0, ayB, azA);
-  // Back cap (+X): A → B → C
+  
   pushFlatTriangle(ax1, ayA, azA, ax1, ayB, azA, ax1, ayA, azC);
-  // Y-leg wall (−Z): A′ → A → B → B′
+  
   pushFlatTriangle(ax1, ayA, azA, ax0, ayA, azA, ax0, ayB, azA);
   pushFlatTriangle(ax1, ayA, azA, ax0, ayB, azA, ax1, ayB, azA);
-  // Z-leg floor (−Y): A → C′ → C → A′
+  
   pushFlatTriangle(ax0, ayA, azA, ax1, ayA, azC, ax0, ayA, azC);
   pushFlatTriangle(ax0, ayA, azA, ax1, ayA, azA, ax1, ayA, azC);
-  // Slope (+Y/+Z): B → C → C′ → B′
+  
   pushFlatTriangle(ax0, ayB, azA, ax0, ayA, azC, ax1, ayA, azC);
   pushFlatTriangle(ax0, ayB, azA, ax1, ayA, azC, ax1, ayB, azA);
 

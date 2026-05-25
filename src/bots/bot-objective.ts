@@ -1,9 +1,11 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-objective.ts
+
 import type { RigidBody } from '@dimforge/rapier3d-simd-compat';
 import { isInEnemyTerritory } from '../arena/funnel-zones';
 import { funnelZoneExtentZ } from '../config/game-config';
 import { oppositeFaction, TEAM_DEFINITIONS, type FactionTeam } from '../combat/teams';
 
-/** Max planar range (m) to spot a hostile — beyond this, push into enemy territory. */
+
 export const BOT_SIGHT_RANGE_M = 150;
 
 export interface BotBrainTarget {
@@ -13,7 +15,7 @@ export interface BotBrainTarget {
   readonly body: RigidBody;
 }
 
-/** FIGHT > HUNT > PUSH — one mode per think step. */
+
 export type BotObjectiveMode = 'push' | 'hunt' | 'fight';
 
 export interface BotObjectiveInput {
@@ -45,9 +47,9 @@ export type MutableBotObjective = {
   wantsFire: boolean;
 };
 
-/** Keep advancing while already in enemy home (m). */
+
 const PUSH_OVERSHOOT_M = 28;
-/** Ignore a hostile behind us beyond this planar gap (m) — keep pushing. */
+
 const RETREAT_TARGET_GAP_M = 2;
 
 const _pushGoalScratch = { x: 0, z: 0 };
@@ -162,7 +164,7 @@ export function fillBotObjective(input: BotObjectiveInput, out: MutableBotObject
   out.wantsFire = false;
 }
 
-/** @deprecated Use `fillBotObjective`. */
+
 export function resolveBotObjective(input: BotObjectiveInput): BotObjective {
   const scratch: MutableBotObjective = {
     mode: 'push',

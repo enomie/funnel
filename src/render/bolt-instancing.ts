@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/bolt-instancing.ts
+
 import {
   BoxGeometry,
   InstancedMesh,
@@ -45,7 +47,7 @@ function getUnitBoltGeometry(): BoxGeometry {
   return unitBoltGeometry;
 }
 
-/** Instanced elongated boxes for Sniper / Shock LMB bolts — one draw call per weapon color. */
+
 export class BoltInstancingService {
   readonly #scene: Scene;
   readonly #layers = new Map<number, InstancedBoltLayer>();

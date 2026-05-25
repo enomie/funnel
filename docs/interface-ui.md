@@ -2,7 +2,7 @@
 
 Spec für **In-Match-HUD** und zugehörige Runtime-Module. DOM-Wurzel: `createAppDom()` / `.funnel-hud` in `src/app/dom.ts`; Wiring: `src/app/funnel-app.ts`.
 
-**Referenz:** `docs/weapons.md`, `docs/introduction.md` §7, `docs/team-design.md`, geplant: `docs/revive-hire.md` (Revive/Hire-Channel-Panel).
+**Referenz:** `docs/weapons.md`, `docs/introduction.md` §7, `docs/team-design.md`, `docs/revive-hire.md` (Channel-Panel §5, Architektur §11).
 
 ---
 
@@ -18,7 +18,7 @@ Spec für **In-Match-HUD** und zugehörige Runtime-Module. DOM-Wurzel: `createAp
 | Status-Toast | `status-toast.ts` | unten (`funnel-status`) | ✅ |
 | Pre-Match / Countdown | `match-flow-screen.ts` | Vollbild über Shell | ✅ |
 | Death / Auto-Respawn | `death-respawn-hud.ts` | Vollbild über Shell (`z-index: 30`) | ✅ WASTED + 5…1 |
-| Revive/Hire-Channel | — | geplant | ⬜ `docs/revive-hire.md` §5 |
+| Revive/Hire-Channel | `revive-hire-hud.ts` | Mitte (`top: 54%`, `z-index: 31`) | ✅ `docs/revive-hire.md` §5 |
 
 Während **`data-aiming='true'`** (FP-Zielmodus): Crosshair sichtbar; Ammo-HUD ausgeblendet (`style.css`).
 
@@ -43,9 +43,9 @@ Vertikal gestapelt (`.funnel-team-badge`):
 
 ### 1.2 Mitgliederzahl — Regeln
 
-- Quelle: `countTeamRosterMembers(actorRegistry)` in `src/combat/team-roster-count.ts`.
-- Zählt **lebende** Combat-Actors (`!health.isDead`) pro Fraktion (`alpha` / `beta`).
-- Tote zählen nicht (Vorbereitung Revive/Hire — `docs/revive-hire.md` §7).
+- Quelle: `TeamRosterCounter.counts` in `src/combat/team-roster-count.ts` (inkrementell via `onDeath` / `onRevive` / `onHired`).
+- Zählt **lebende** Combat-Actors pro Fraktion (`alpha` / `beta`).
+- Tote zählen nicht; Revive/Hire aktualisiert sofort — siehe `docs/revive-hire.md` §7.
 - Own-Badge = `viewerFaction`; Enemy-Badge = Gegner-Fraktion.
 
 ### 1.3 Kills ✅
@@ -204,16 +204,19 @@ Einheit für `applyImpact`. Zielwerte für Balance; Code in `FireProfile.damage`
 
 ---
 
-## 7. Geplant — Revive/Hire-Channel-Panel ⬜
+## 7. Revive/Hire-Channel-Panel ✅
 
-Siehe **`docs/revive-hire.md` §5**:
+Siehe **`docs/revive-hire.md` §5** — Modul `src/ui/revive-hire-hud.ts`.
 
-- Eigenes Panel während **`R`-Hold** in Nähe eines Toten.
-- Label **Reanimieren** (1 s) vs **Anheuern** (2 s).
-- Fortschrittsbalken **0 % → 100 %** (linear); Abbruch → Balken reset.
-- Sichtbar für Channelnden und Toten.
+| Element | Verhalten |
+|---------|-----------|
+| Sichtbarkeit | Nur während aktivem Channel (`R`-Hold, ≤ 1,5 m XZ zum Toten) |
+| Label | **`REVIVE`** (1 s) / **`HIRE`** (2 s) |
+| Fortschritt | Balken **0 % → 100 %** + Prozent-Ziffer; Abbruch → reset |
+| Zielgruppe | Channelnder (lebend) **und** toter lokaler Spectator |
+| Position | Bildschirmmitte (`top: 54%`), über WASTED (`z-index: 31`) |
 
-Stilistisch an Reload-Balken (§4) anlehnen — kompakt, `pointer-events: none`.
+Stilistisch an Reload-Balken (§4) — kompakt, `pointer-events: none`.
 
 ---
 
@@ -266,10 +269,10 @@ Vollbild über der Shell während der lokale Spieler tot ist (`death-respawn-hud
 | Label | `.funnel-death-overlay__kicker` | **Respawn in** |
 | Countdown | `.funnel-death-overlay__value` | **5 → 4 → 3 → 2 → 1** (tabular-nums) |
 
-- Sichtbar ab Tod bis Auto-Respawn (`PLAYER_AUTO_RESPAWN_SECONDS` = 5).
-- Timer-Quelle: `player.deathSnapshot.diedAtMs` + `player-auto-respawn.ts`.
+- Sichtbar ab Tod bis Auto-Respawn (`PLAYER_AUTO_RESPAWN_SECONDS` = 5); Countdown **pausiert** während fremder Revive/Hire-Channel auf der Leiche.
+- Timer-Quelle: `effectiveRespawnElapsedMs()` + `player-auto-respawn.ts`.
 - Bei **0** → `PlayerController.respawnAtFaction()` — Overlay aus, Spieler lebt am Team-Spawn.
-- Revive/Hire-Channel-UI kommt später (§5 in `revive-hire.md`); **`R`** ist dafür reserviert, kein Sofort-Respawn mehr.
+- Revive/Hire-Channel-Panel parallel sichtbar wenn jemand channelt — §7 / `docs/revive-hire.md` §5. **`R`** = Channel-Hold, kein Sofort-Respawn.
 
 ---
 
@@ -282,4 +285,4 @@ Vollbild über der Shell während der lokale Spieler tot ist (`death-respawn-hud
 
 ---
 
-*Stand: 2026-05-24 — Death-Overlay WASTED + 5-s-Countdown ✅; Revive/Hire-UI in `revive-hire.md`.*
+*Stand: 2026-05-25 — Death-Overlay ✅; Revive/Hire-Channel-Panel ✅ (`revive-hire-hud.ts`, `docs/revive-hire.md`).*

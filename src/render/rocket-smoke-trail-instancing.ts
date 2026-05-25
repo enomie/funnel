@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/rocket-smoke-trail-instancing.ts
+
 import {
   InstancedMesh,
   Matrix4,
@@ -98,7 +100,7 @@ function buildTrailLateralFrame(dirX: number, dirY: number, dirZ: number): void 
   _binormal.crossVectors(_direction, _side).normalize();
 }
 
-/** Pooled instanced smoke puffs for rocket trails — TSL billboards, capped at 96. */
+
 export class RocketSmokeTrailInstancingService {
   readonly #scene: Scene;
   readonly #camera: PerspectiveCamera;

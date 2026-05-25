@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/humanoid-visual.ts
+
 import { Group, type Mesh, type Object3D, type Scene } from 'three/webgpu';
 import { detachSceneObject } from '../render/dispose-three';
 import { syncHumanoidVisualMesh, createFootAnchorState } from './actor-death';
@@ -26,7 +28,7 @@ import {
 
 const FALLBACK_MESH_ANCHORS: StanceMeshAnchors = { standFootY: 0, crouchFootY: 0 };
 
-/** Shared capsule-root visual — locomotion, mesh anchor, fallback box. */
+
 export class HumanoidVisual {
   readonly root = new Group();
   #character: Object3D | null = null;
@@ -73,18 +75,18 @@ export class HumanoidVisual {
     deltaSeconds: number,
     input: LocomotionAnimInput,
     nowMs?: number,
-    skipAnimation = false
+    visualReduced = false
   ): void {
     const flashNowMs = nowMs ?? performance.now();
 
-    if (!skipAnimation) {
-      this.#locomotion?.update(deltaSeconds, input);
+    this.#locomotion?.update(deltaSeconds, input);
 
-      if (this.#locomotion?.deathPoseSettled) {
-        this.#tickJointFlash(flashNowMs, input.isDead);
-        return;
-      }
+    if (this.#locomotion?.deathPoseSettled) {
+      this.#tickJointFlash(flashNowMs, input.isDead);
+      return;
+    }
 
+    if (!visualReduced) {
       this.#syncMesh(input.isDead, input.crouch || input.sliding);
       if (
         this.#character !== null &&
@@ -151,7 +153,7 @@ export class HumanoidVisual {
     this.root.rotation.y = yaw;
   }
 
-  /** GPU + scene detach — bots on roster clear; skips pooled team materials. */
+  
   dispose(): void {
     this.#clearJointFlash();
     if (this.#character !== null) {

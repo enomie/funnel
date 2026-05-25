@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/player/player-movement-speed.ts
+
 import { PLAYER_CONFIG } from '../config/game-config';
 import type { InputSnapshot } from '../input/input-state';
 
@@ -8,7 +10,7 @@ export interface MovementSpeedOptions {
   crouch: boolean;
 }
 
-/** Planar speed (m/s) from current input — matches `PlayerController` movement math. */
+
 export function planarSpeedFromInput(
   movement: MovementKeys,
   options: MovementSpeedOptions
@@ -19,7 +21,7 @@ export function planarSpeedFromInput(
 
 const _planarVelocityScratch = { x: 0, z: 0 };
 
-/** World-space XZ velocity from WASD relative to yaw (m/s). */
+
 export function fillPlanarVelocityFromInput(
   movement: MovementKeys,
   options: MovementSpeedOptions,
@@ -79,7 +81,7 @@ export function fillPlanarVelocityFromInput(
   return out;
 }
 
-/** @deprecated Use `fillPlanarVelocityFromInput`. */
+
 export function planarVelocityFromInput(
   movement: MovementKeys,
   options: MovementSpeedOptions,

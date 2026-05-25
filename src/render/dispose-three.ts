@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/render/dispose-three.ts
+
 import { Material, Mesh, type Object3D, type Scene } from 'three/webgpu';
 
 export type MaterialDisposePredicate = (material: Material) => boolean;
@@ -15,9 +17,9 @@ export function disposeMaterials(
 }
 
 export interface DisposeMeshResourcesOptions {
-  /** Default true — false for shared unit geometry (low-poly sphere, ripper torus). */
+  
   geometry?: boolean;
-  /** Default true — false for module material caches / team pools. */
+  
   materials?: boolean;
   shouldDisposeMaterial?: MaterialDisposePredicate;
 }
@@ -38,11 +40,11 @@ export function disposeMeshResources(object: Object3D, options: DisposeMeshResou
 
 export interface DetachSceneObjectOptions extends DisposeMeshResourcesOptions {
   scene?: Scene;
-  /** Traverse subtree and dispose mesh GPU resources after detach. */
+  
   disposeSubtree?: boolean;
 }
 
-/** Remove from scene/parent — optional subtree dispose (shared caches: geometry/materials false). */
+
 export function detachSceneObject(
   object: Object3D | null,
   options: DetachSceneObjectOptions = {}
@@ -64,7 +66,7 @@ export function detachSceneObject(
   });
 }
 
-/** Collada / unique mesh hierarchies — geometry + all materials. */
+
 export function disposeObject3DMeshes(root: Object3D): void {
   root.traverse((node) => {
     disposeMeshResources(node);

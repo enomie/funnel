@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-no-ammo-phrase.ts
+
 import { getNoiseBuffer } from '../audio-noise-buffer';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
 import { scheduleExponentialDecay } from './audio-one-shot-synth';

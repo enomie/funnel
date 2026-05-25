@@ -263,7 +263,7 @@ Matches consist of two teams of **15**. In single-player/hybrid modes, the game 
 * **Revive:** Teammates can interact with the fallen body to revive them back into their original team.
 * **The "Hire" Twist:** Enemies can approach a fallen player and "hire" (recruit) them. The character revives instantly but permanently **switches sides**, turning the match into a volatile, tug-of-war battle for manpower.
 * [ ] Implement bot AI behavior tree capable of navigation, combat decision-making, and tracking downed actors.
-* [ ] Set up interactive "Revive" and "Hire" casting timers on downed character collision objects.
+* [x] Revive/Hire channel on downed actors — `R` hold, 1 s / 2 s, 1,5 m, timer pause (`docs/revive-hire.md`). MVP: **local player** channels; bot AI hire/revive (Phase K) offen.
 
 ---
 
@@ -357,8 +357,8 @@ When a fallen body is successfully "hired" and switches teams, its emissive suit
 * [x] Dev `T` key flips local faction (`PlayerTeam.flip`) — same code path future **Hire** will call with `reason: 'hire'`; placeholder bots re-tint via `BotPlaceholderRoster.refreshViewerColors()`.
 * [x] Styling bots: cloned Y-Bots with idle pose, viewer-relative blue/red (`src/combat/bot-placeholder*.ts`, `src/player/shooter-pack-clone.ts`). Design spec: `docs/team-design.md`.
 * [ ] Segment vs. joint emissive layers and per-instance material clones (see `team-design.md` §4).
-* [ ] Create uniform-controlled PBR shaders exposing dynamic emissive team color swaps (instance attributes for many bots).
-* [ ] Wire team swap on hire/revive for simulated actors (Rapier ragdoll + timers).
+* [x] Wire team swap on hire/revive for simulated actors — `reviveInPlace` / `hireInPlace`, `actor-revived` / `actor-hired`, roster `onHired` (`docs/revive-hire.md`). Ragdoll = pinned crouch capsule, not full ragdoll.
+* [ ] Instance-attribute emissive swap at scale (many bots, one draw call) — MVP uses material tint.
 
 ---
 

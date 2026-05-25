@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-impact-redeemer.ts
+
 import { Vector3 } from 'three/webgpu';
 import { REDEEMER_IMPACT_EXPAND_MS } from '../../combat/weapon-definitions';
 import { getNoiseBuffer } from '../audio-noise-buffer';
@@ -213,7 +215,7 @@ function stopNode(node: OscillatorNode | AudioBufferSourceNode, stopTime: number
   try {
     node.stop(stopTime);
   } catch {
-    /* already stopped */
+    // Node may already be disconnected.
   }
 }
 

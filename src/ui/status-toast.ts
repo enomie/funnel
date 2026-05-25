@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/ui/status-toast.ts
+
 export class StatusToast {
   readonly #element: HTMLDivElement;
   #timeoutId = 0;

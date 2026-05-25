@@ -1,3 +1,5 @@
+// Path: /Users/johann/MyBrew/funnel-real/src/bots/bot-target-snapshots.ts
+
 import type { RigidBody } from '@dimforge/rapier3d-simd-compat';
 import type { FactionTeam } from '../combat/teams';
 import type { BotActor } from './bot-actor';
@@ -29,51 +31,59 @@ export class BotTargetSnapshotCache {
   }
 
   syncFromRoster(player: BotTargetPlayerSnapshot, bots: readonly BotActor[]): void {
-    if (!this.#structureMatches(player, bots)) {
-      this.#rebuild(player, bots);
+    if (this.#tryPatchPositions(player, bots)) {
       return;
     }
 
-    this.#patchPositions(player, bots);
+    this.#rebuild(player, bots);
   }
 
-  #structureMatches(
+  
+  #tryPatchPositions(
     player: BotTargetPlayerSnapshot,
     bots: readonly BotActor[]
   ): boolean {
-    let expectedCount = player.isDead ? 0 : 1;
-    for (let index = 0; index < bots.length; index += 1) {
-      if (!bots[index].controller.health.isDead) {
-        expectedCount += 1;
-      }
-    }
-
-    if (expectedCount !== this.#snapshots.length) {
-      return false;
-    }
-
-    let snapshotIndex = 0;
+    let index = 0;
 
     if (!player.isDead) {
-      if (this.#snapshots[snapshotIndex].body.handle !== player.body.handle) {
+      if (index >= this.#snapshots.length) {
         return false;
       }
-      snapshotIndex += 1;
+
+      const entry = this.#snapshots[index];
+      if (entry.body.handle !== player.body.handle) {
+        return false;
+      }
+
+      entry.x = player.x;
+      entry.y = player.y;
+      entry.z = player.z;
+      index += 1;
     }
 
-    for (let index = 0; index < bots.length; index += 1) {
-      const bot = bots[index];
+    for (let botIndex = 0; botIndex < bots.length; botIndex += 1) {
+      const bot = bots[botIndex];
       if (bot.controller.health.isDead) {
         continue;
       }
 
-      if (this.#snapshots[snapshotIndex].body.handle !== bot.controller.body.handle) {
+      if (index >= this.#snapshots.length) {
         return false;
       }
-      snapshotIndex += 1;
+
+      const entry = this.#snapshots[index];
+      if (entry.body.handle !== bot.controller.body.handle) {
+        return false;
+      }
+
+      const translation = bot.controller.body.translation();
+      entry.x = translation.x;
+      entry.y = translation.y;
+      entry.z = translation.z;
+      index += 1;
     }
 
-    return true;
+    return index === this.#snapshots.length;
   }
 
   #rebuild(player: BotTargetPlayerSnapshot, bots: readonly BotActor[]): void {
@@ -104,35 +114,6 @@ export class BotTargetSnapshotCache {
         body: bot.controller.body,
         isDead: false
       });
-    }
-  }
-
-  #patchPositions(player: BotTargetPlayerSnapshot, bots: readonly BotActor[]): void {
-    let index = 0;
-
-    if (!player.isDead && index < this.#snapshots.length) {
-      const entry = this.#snapshots[index];
-      entry.x = player.x;
-      entry.y = player.y;
-      entry.z = player.z;
-      index += 1;
-    }
-
-    for (const bot of bots) {
-      if (bot.controller.health.isDead) {
-        continue;
-      }
-
-      if (index >= this.#snapshots.length) {
-        break;
-      }
-
-      const entry = this.#snapshots[index];
-      const translation = bot.controller.body.translation();
-      entry.x = translation.x;
-      entry.y = translation.y;
-      entry.z = translation.z;
-      index += 1;
     }
   }
 }
