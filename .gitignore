@@ -3,6 +3,13 @@ node_modules/
 .backups/
 dist/
 
+# Local-only (not for git)
+_Scripts/
+.cursor/
+.cursorignore
+_deleted/
+AGENTS.md
+
 # Environment & OS
 .env
 .env.*
