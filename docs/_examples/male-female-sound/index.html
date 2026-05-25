@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Sound Synth</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <h1>Voice Sound Synth</h1>
+      <p class="intro">
+        Type simple phonetic sounds and test them across voices.
+      </p>
+    </header>
+
+    <section class="phonetic-guide" aria-labelledby="phonetic-guide-title">
+      <div>
+        <h2 id="phonetic-guide-title">Simple Lautschrift</h2>
+        <p>
+          Write sounds the way they should be spoken. The engine folds common spellings and optional IPA-like
+          symbols into the same internal sound blocks, so you can combine them freely for screams, grunts,
+          monster noises, combat barks, or rough speech.
+        </p>
+      </div>
+      <div class="sound-cheats">
+        <span><strong>sh</strong> = <strong>ʃ</strong></span>
+        <span><strong>zh</strong> = <strong>ʒ</strong></span>
+        <span><strong>ng</strong> = <strong>ŋ</strong></span>
+        <span><strong>ny</strong> = <strong>ɲ</strong></span>
+        <span><strong>dzh</strong> = <strong>dʒ</strong></span>
+        <span><strong>aa uu uh</strong> stretch vowels</span>
+      </div>
+      <div class="sound-examples">
+        <button type="button" class="ghost" data-guide-example="wuhuu">wuhuu</button>
+        <button type="button" class="ghost" data-guide-example="aa-rgh">aa-rgh</button>
+        <button type="button" class="ghost" data-guide-example="khra">khra</button>
+        <button type="button" class="ghost" data-guide-example="ʃaa">ʃaa</button>
+        <button type="button" class="ghost" data-guide-example="ʒaa">ʒaa</button>
+        <button type="button" class="ghost" data-guide-example="ŋa-raa">ŋa-raa</button>
+        <button type="button" class="ghost" data-guide-example="dʒai">dʒai</button>
+      </div>
+    </section>
+
+    <section class="voice-grid" id="voice-grid">
+      <article class="voice-card">
+        <h2>Loading...</h2>
+        <p>If nothing appears here, open the browser console.</p>
+      </article>
+    </section>
+  </main>
+
+  <script src="./js/voice-presets.js" defer></script>
+  <script src="./js/audio-engine.js" defer></script>
+  <script src="./js/app.js" defer></script>
+</body>
+</html>
