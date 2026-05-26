@@ -210,7 +210,7 @@ export class HitscanWeapon {
       );
       if (orbHit !== null) {
         shockCombo.onComboHit(orbHit);
-        this.#hitPoint.copy(orbHit.point);
+        this.#hitPoint.set(orbHit.x, orbHit.y, orbHit.z);
         this.#spawnTracer(muzzlePosition, this.#hitPoint, weapon.color, WEAPON_CONFIG.tracerDurationMs, nowMs);
         return;
       }

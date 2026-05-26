@@ -121,12 +121,16 @@ function writeShockOrbTarget(
   if (index < _shockOrbScratch.length) {
     const entry = _shockOrbScratch[index];
     entry.projectileId = projectileId;
-    entry.position = position;
+    entry.position.copy(position);
     entry.hitRadius = hitRadius;
     return;
   }
 
-  _shockOrbScratch.push({ projectileId, position, hitRadius });
+  _shockOrbScratch.push({
+    projectileId,
+    position: new Vector3().copy(position),
+    hitRadius
+  });
 }
 const DEFAULT_PROJECTILE_MAX_FLIGHT_MS = 12_000;
 const PROJECTILE_OOB_MARGIN_M = 12;
@@ -165,6 +169,7 @@ function releaseProjectileVector(vector: Vector3): void {
   _projectileVectorPool.push(vector);
 }
 
+/** Returns pooled vectors to the module pool — never retain projectile.position refs outside this file. */
 function releaseProjectileVectors(projectile: WorldProjectile): void {
   releaseProjectileVector(projectile.position);
   releaseProjectileVector(projectile.direction);
@@ -203,7 +208,7 @@ export interface ProjectileSpawnLimits {
   maxLifetimeMs: number;
 }
 
-export interface WorldProjectile {
+interface WorldProjectile {
   readonly id: number;
   readonly ownerId: string;
   weapon: WeaponDefinition;
@@ -341,6 +346,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
     this.#ownerAim.set(ownerId, aim);
   }
 
+  /** Ephemeral scratch — orb positions are snapshots, not live projectile vectors. */
   listShockOrbs(ownerId?: string): readonly ShockOrbTarget[] {
     let count = 0;
     for (const projectile of this.#projectiles) {
@@ -375,17 +381,18 @@ export class WorldProjectileSim implements WorldEffectsSource {
     return resolveGuidedRedeemerCamera(projectile.position, projectile.direction, out);
   }
 
-  removeById(id: number): WorldProjectile | null {
+  removeShockOrbWeapon(id: number): WeaponDefinition | null {
     const projectile = this.#projectileById.get(id);
     if (projectile === undefined) {
       return null;
     }
+    const weapon = projectile.weapon;
     const index = this.#projectiles.indexOf(projectile);
     if (index < 0) {
       return null;
     }
     this.#removeProjectileAt(index);
-    return projectile;
+    return weapon;
   }
 
   spawnImpactBurst(
@@ -673,7 +680,8 @@ export class WorldProjectileSim implements WorldEffectsSource {
             comboHit !== null &&
             (hit === null || comboHit.distance <= hit.distance)
           ) {
-            this.#spawnTrail(projectile, previousPosition, comboHit.point, true);
+            _projectileHitPoint.set(comboHit.x, comboHit.y, comboHit.z);
+            this.#spawnTrail(projectile, previousPosition, _projectileHitPoint, true);
             this.#bridgeFor(projectile)?.resolveShockCombo?.(comboHit);
             shouldRemove = true;
             break;

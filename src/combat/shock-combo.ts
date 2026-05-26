@@ -20,7 +20,7 @@ export const SHOCK_ORB_COMBO_EXPAND_MS = 960;
 const SHOCK_ORB_HIT_RADIUS_FACTOR = 1.1;
 
 const _offset = new Vector3();
-const _orbHitPoint = new Vector3();
+const _listTargetPositionScratch: Vector3[] = [];
 
 export function shockOrbVisualRadius(visualScale: number): number {
   return projectileCoreRadius('shock') * visualScale;
@@ -36,13 +36,17 @@ export function shockOrbComboKillRadiusM(visualScale: number): number {
 
 export interface ShockOrbTarget {
   projectileId: number;
-  position: Vector3;
+  /** Snapshot — not tied to pooled projectile vectors. */
+  readonly position: Vector3;
   hitRadius: number;
 }
 
+/** Hit point is plain coordinates so callers never hold pooled Vector3 refs. */
 export interface ShockOrbRayHit {
   projectileId: number;
-  point: Vector3;
+  x: number;
+  y: number;
+  z: number;
   distance: number;
 }
 
@@ -70,9 +74,18 @@ export function listShockOrbTargets(
       continue;
     }
 
+    let position: Vector3;
+    if (targets.length >= _listTargetPositionScratch.length) {
+      position = new Vector3();
+      _listTargetPositionScratch.push(position);
+    } else {
+      position = _listTargetPositionScratch[targets.length];
+    }
+    position.copy(projectile.position);
+
     targets.push({
       projectileId: projectile.id,
-      position: projectile.position,
+      position,
       hitRadius: shockOrbHitRadius(projectile.visualScale)
     });
   }
@@ -105,10 +118,14 @@ export function findFirstShockOrbAlongRay(
     }
 
     if (best === null || distance < best.distance) {
-      _orbHitPoint.copy(origin).addScaledVector(direction, distance);
+      const hitX = origin.x + direction.x * distance;
+      const hitY = origin.y + direction.y * distance;
+      const hitZ = origin.z + direction.z * distance;
       best = {
         projectileId: orb.projectileId,
-        point: _orbHitPoint,
+        x: hitX,
+        y: hitY,
+        z: hitZ,
         distance
       };
     }

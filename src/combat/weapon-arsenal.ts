@@ -84,6 +84,7 @@ export interface WeaponArsenalBudget {
 }
 
 const _lobDirectionScratch = new Vector3();
+const _shockComboImpactPoint = new Vector3();
 
 export const WEAPON_ARSENAL_PLAYER_BUDGET: WeaponArsenalBudget = {
   maxActiveProjectiles: 96
@@ -1039,23 +1040,23 @@ export class WeaponArsenal implements WorldEffectsSource {
   }
 
   #resolveShockCombo(hit: ShockOrbRayHit): void {
-    const orb = this.#projectileSim.removeById(hit.projectileId);
-    if (orb === null) {
+    const weapon = this.#projectileSim.removeShockOrbWeapon(hit.projectileId);
+    if (weapon === null) {
       return;
     }
 
-    const weapon = orb.weapon;
     const comboImpact = weapon.comboImpact;
     if (comboImpact === undefined) {
       return;
     }
 
-    this.#audio.playImpact(weapon, hit.point, SHOCK_COMBO_IMPACT_GAIN, comboImpact);
+    _shockComboImpactPoint.set(hit.x, hit.y, hit.z);
+    this.#audio.playImpact(weapon, _shockComboImpactPoint, SHOCK_COMBO_IMPACT_GAIN, comboImpact);
     this.#projectileSim.spawnOwnerLethalDetonation(
       this.#sourceActorId,
       weapon,
       comboImpact,
-      hit.point,
+      _shockComboImpactPoint,
       this.#combatNowMs,
       SHOCK_COMBO_IMPACT_GAIN
     );

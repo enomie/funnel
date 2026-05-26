@@ -244,7 +244,7 @@ Weapons are high-impact, offering distinct tactical utility and dual firing mode
 * **Secondary Fire:** Every weapon features a mandatory alternative firing mode to completely change its behavior (e.g., single rocket vs. loaded volley/grenades).
 * **Kinetic Momentum:** Gunfire directly transfers energy to the environment. Shooting structures shatters them, dynamically altering cover and sightlines.
 
-The active implementation now lives in `src/combat/weapon-definitions.ts`, `src/combat/weapon-arsenal.ts`, `src/combat/projectile-visuals.ts`, and `src/combat/projectile-impact-visual.ts`. It provides selectable prototype versions of all planned weapon slots, but currently only the primary fire channel is wired. Each weapon definition owns its display color and placeholder dimensions (`width` X, `length` Z, `height` Y), and the same color drives projectile meshes, trails, impact bursts, fake glows, and the capped projectile light pool. Impacts use a shared expanding-sphere burst scaled by `impactRadius`; Ripper ricochets reflect velocity off Rapier normals (up to three wall bounces). Projectiles are ray-stepped through Rapier to avoid tunneling and removed on final hit.
+The active implementation now lives in `src/combat/weapon-definitions.ts`, `src/combat/weapon-arsenal.ts`, `src/combat/fire-intent.ts`, `src/combat/apply-impact.ts`, `src/combat/world-projectile-sim.ts`, `src/combat/projectile-visuals.ts`, and `src/combat/projectile-impact-visual.ts`. All ten slots are selectable; **LMB and RMB** route through `fire-intent.ts` (instant `tryFire` vs. hold-secondary for Rocket/Bio). Each weapon definition owns its display color and placeholder dimensions (`width` X, `length` Z, `height` Y), and the same color drives projectile meshes, trails, impact bursts, fake glows, and the capped projectile light pool. Gameplay hits share one `CombatImpactSink` → `applyImpact` (direct + splash on `CombatActor`, faction rules, lethal splash where defined). VFX uses a shared expanding-sphere burst scaled by `impactRadius`; Ripper ricochets reflect velocity off Rapier normals (up to three wall bounces). Projectiles are ray-stepped through Rapier to avoid tunneling and removed on final hit.
 
 * [x] Code first weapon definition layer for slots `1` through `0`.
 * [x] Implement primary-fire projectile spawning, spread handling, trails, unified impact bursts, and spatial procedural audio cues.
@@ -321,7 +321,7 @@ The sandbox features a highly specialized, combat-tested arsenal directly paying
 
 * **Traditional Arsenal:** Includes the **Sniper Rifle** (hitscan, lethal headshot multipliers), **Shotgun/Flak** (unforgiving close-range spread with bouncing shrapnel), **Gatling / Heavy MG** (sustained, high-rate-of-fire suppression), and a reliable, precise **Pistol** fallback.
 
-The prototype arsenal already includes Pistol, Shock Blaster, Rocket Launcher, Ripper, Flak Cannon, Sniper Rifle, Gatling, Pulse Lance, Bio Lobber, and Redeemer Seed definitions. Their visuals use lightweight Three.js primitives with weapon-specific projectile silhouettes. **LMB/RMB** are differentiated per slot (hitscan, combo, magazine rockets, ricochet, flak grenade, zoom, charge blob, guided nuke, etc.) — see `docs/weapons.md`. Impacts are still **Audio/VFX only** until `applyImpact` lands.
+The prototype arsenal already includes Pistol, Shock Blaster, Rocket Launcher, Ripper, Flak Cannon, Sniper Rifle, Gatling, Pulse Lance, Bio Lobber, and Redeemer Seed definitions. Their visuals use lightweight Three.js primitives with weapon-specific projectile silhouettes. **LMB/RMB** are differentiated per slot (hitscan, combo, magazine rockets, ricochet, flak grenade, zoom, charge blob, guided nuke, etc.) — see `docs/weapons.md`. Impacts run **VFX/SFX and gameplay damage** through the same pipeline (`apply-impact.ts` via `WeaponArsenal` / `WorldProjectileSim`).
 
 * [x] Build selectable first-pass arsenal covering all 10 number-key weapon slots.
 * [x] Build projectile visual primitives for pistol, shock, rocket, ripper, flak, sniper, gatling, pulse, bio, and redeemer shots.
@@ -436,7 +436,7 @@ Priorität für Implementation:
 1. ~~Input-Modell erweitern~~ ✅
 2. ~~`primary` / `secondary` Fire-Profile~~ ✅
 3. ~~Einfache + komplexe RMBs (Pistol … Redeemer guided)~~ ✅
-4. **`applyImpact`** — VFX/SFX → Rapier-Schaden, Build-HP, Bots (nächster Sprint).
+4. ~~**`applyImpact`** — VFX/SFX → Rapier-Schaden auf `CombatActor` (Spieler/Bots), Splash/LOS~~ ✅ · offen: Headshot-Multiplikatoren, Kinetic-Impuls, Build-HP-Abgleich, per-Waffe Impact-Polish (Tabelle unten).
 
 Ja. Für Projectile-Impact würde ich pro Waffe eigene Trefferwirkung definieren, getrennt von LMB/RMB.
 

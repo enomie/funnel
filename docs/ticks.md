@@ -1,141 +1,185 @@
-# Analyse: sporadische Freezes / unsaubere Ticks
+# Tick-Architektur — Ist-Stand
 
-Das Problem passt zum aktuellen Loop-Design: **ein Frame kann mehrere Physics-Substeps ausführen**, und mehrere schwere Systeme laufen **synchron auf dem Main Thread**. Wenn ein Frame zu lang wird, folgt oft der nächste Hänger — nicht immer ein klassischer „Spiral of Death“, aber sichtbare Ruckler.
+Referenz für den Main-Thread-Loop in FUNNEL: Orchestrator, Physics-Substeps, Humanoid-Render-Tick, Combat/VFX und HUD. Abnahme-Bar: **15v15 Pro-Roster** (29 Bots + Player) @ max refresh ohne Stutter.
 
-## Wie der Loop heute tickt
+**Code-Einstieg:** `src/app/funnel-app.ts` · **Frame-Clock:** `src/core/game-frame-clock.ts`
 
-```222:265:src/app/funnel-app.ts
-  void renderer.setAnimationLoop(() => {
-    const now = performance.now();
-    const deltaSeconds = Math.min((now - lastFrameAt) / 1000, 0.05);
-    lastFrameAt = now;
-    // ... input, HUD, Waffen ...
-    accumulator += deltaSeconds;
-    let subSteps = 0;
-    while (accumulator >= PHYSICS_CONFIG.fixedStep && subSteps < PHYSICS_CONFIG.maxSubSteps) {
-      player.fixedUpdate(PHYSICS_CONFIG.fixedStep, snapshot);
-      botRoster.fixedUpdate(PHYSICS_CONFIG.fixedStep, { /* ... */ });
+---
+
+## Loop-Ablauf (pro Render-Frame)
+
+```637:872:src/app/funnel-app.ts
+  void renderer.setAnimationLoop((now) => {
+    const renderTick = frameClock.beginRenderFrame(now);
+    // ...
+    beginNavRayBudgetFrame();
+    // Rain, Input, player.beginFrame
+    frameClock.accumulatePhysics(deltaSeconds);
+    const physicsBatch = frameClock.consumePhysicsSteps((step) => {
+      player.fixedUpdate(step, snapshot);
+      botRoster.fixedUpdate(step, frameNowMs, botContextBase);
       world.step(eventQueue);
-      accumulator -= PHYSICS_CONFIG.fixedStep;
-      subSteps += 1;
-    }
-    if (subSteps === PHYSICS_CONFIG.maxSubSteps) {
-      accumulator = 0;
-    }
+      player.capturePhysicsInterpolation();
+      botRoster.capturePhysicsInterpolation();
+      arena.dynamicInstances.capturePhysicsInterpolation();
+    });
+    botRoster.preparePhysicsFrame(..., physicsBatch.loadShedNonCritical);
+    // Interpolation-Blend → Player + Bots + Dynamic Instances
+    player.afterPhysics();
+    botRoster.afterPhysics();
+    const frame = player.finishFrame(...);          // tickHumanoidRenderFrame
+    botRoster.update(...);                          // 29× tickHumanoidRenderFrame + Combat
+    tickMatchLiveReviveHire(...);
+    matchLiveUi.tick(...);
+    // Fire intent, tickFrameHousekeeping, render
+  });
 ```
-
-| Parameter | Wert | Bedeutung |
-|-----------|------|-----------|
-| `fixedStep` | 10 ms | Physics-Tick |
-| `maxSubSteps` | 6 | max. **60 ms Physics pro Render-Frame** |
-| Delta-Clamp | 50 ms | lange Pausen (Tab-Wechsel) werden abgeschnitten |
 
 ```mermaid
 flowchart TD
-  RAF[requestAnimationFrame] --> Delta[delta clamp 50ms]
-  Delta --> Rain[Rain Spawner]
-  Delta --> SubLoop{bis 6× Physics}
-  SubLoop --> Player[Player fixedUpdate]
-  SubLoop --> Bots[29× Bot fixedUpdate]
-  SubLoop --> Rapier[world.step]
-  SubLoop --> SubLoop
-  SubLoop --> Render[WebGPU render 512 shadow]
+  RAF[setAnimationLoop] --> Clock[GameFrameClock.beginRenderFrame]
+  Clock --> Rain[EnvironmentRainSpawner optional]
+  Clock --> Input[Input + Player beginFrame]
+  Clock --> Phys["Physics 1–3× Substep\n(load-shed aware)"]
+  Phys --> PFix[player.fixedUpdate]
+  Phys --> BFix["29× bot.fixedUpdate"]
+  Phys --> Rapier[world.step]
+  Phys --> CapInterp[capturePhysicsInterpolation]
+  CapInterp --> Blend[renderInterpolationBlend]
+  Blend --> BotsPrep["botRoster.preparePhysicsFrame\nBrain 2 Hz + Nav-Budget"]
+  BotsPrep --> Humanoid["30× tickHumanoidRenderFrame"]
+  Humanoid --> Combat[Fire intent + Bot #tickCombat]
+  Combat --> UI[match-live-ui-tick + Arena fields]
+  UI --> HK[tickFrameHousekeeping]
+  HK --> GPU[renderer.render WebGPU]
 ```
 
-**Kein Render-Interpolation** zwischen Physics-States (laut Skill/Roadmap geplant) — bei Substep-Bursts wirkt Bewegung zusätzlich ruckelig, auch wenn die FPS-Zahl noch halbwegs ok aussieht.
+| Phase | Modul | Frequenz |
+|-------|--------|----------|
+| Frame-Clock | `game-frame-clock.ts` | 1× / rAF (ggf. gedrosselt via `maxRenderHz`) |
+| Physics-Substep | Player + Bots + Rapier | 1–3× / Frame (`physicsMaxSubSteps`) |
+| Bot-Brain | `bot-brain.ts` | **2 Hz** (`botBrainTickHz`) |
+| Bot-Navigation-Refresh | `bot-navigation-cache.ts` | budgetiert, max **3 Refreshes/Frame** |
+| Humanoid-Render | `humanoid-actor-tick.ts` | 30× / Frame (Player + 29 Bots) |
+| Team-Presence-Score | `team-presence-scoring.ts` | 1 Hz |
+| World-Effects | `world-effects-registry.ts` | 1× / Frame, nur aktive Sources |
+| HUD | `match-live-ui-tick.ts` | 1× / Frame, DOM dirty-gated |
 
 ---
 
-## Hauptverdächtige (nach Wahrscheinlichkeit)
+## Parameter
 
-### 1. Bot-Navigation: Raycast-Stürme (sehr wahrscheinlich)
+| Parameter | Wert | Quelle |
+|-----------|------|--------|
+| `fixedStep` | 10 ms | `PHYSICS_CONFIG.fixedStep` |
+| `maxSubSteps` (Config-Fallback) | 6 | `PHYSICS_CONFIG.maxSubSteps` |
+| **Runtime `physicsMaxSubSteps`** | **3** | `chrome-macos-arm-profile.ts` → `GameFrameClock` |
+| Delta-Clamp | 50 ms | `GameFrameClock` (`MAX_FRAME_DELTA_S`) |
+| Adaptives Substep-Budget | −1 bei ≥20 ms Frame, −2 bei ≥28 ms | `GameFrameClock.recordFrameWallMs` |
+| Bot-Brain | **2 Hz** | `botBrainTickHz` |
+| Nav-Ray-Budget | **3/Frame** | `navRayBudgetPerFrame` |
+| Route-Steer-Fan-Budget | **10/Frame** | `routeSteerFanBudgetPerFrame` |
+| Shadows (Runtime) | **aus** | `shadowsEnabled: false`, Map 512 Fallback |
+| Rain-Stückzahl | ×**0.35** | `rainWaveCountScale` |
+| Rain-Spawn-Intervall | ×**2** (Basis 50 ms) | `rainDropIntervalScale` + `BASE_DROP_INTERVAL_S` |
+| Pro-Roster | **15 + 15 = 29 Bots** | `playersPerTeam: 15` |
 
-Dev-Roster: **14 + 15 = 29 Bots** (`match-roster.ts` ← `playersPerTeam: 15`, alle Profile).
+Load-Shedding (`physicsBatch.loadShedNonCritical`): bei Physics-Backlog oder engem Frame-Budget werden **nicht-kritische** Bot-Pfade übersprungen (`preparePhysicsFrame`: kein Brain/Nav-Refresh/Jump-Probe) und World-Effects dürfen Spawn/Sync drosseln — Lifecycle-Ticks (Impact-TTL, Flash-Sweep) laufen weiter (`frame-housekeeping.ts`).
 
-Pro Nav-Refresh im `seek`-Modus:
-- **11 Richtungs-Probes** × pro Richtung **5 Boden-Raycasts + 5 Overhead-Raycasts** ≈ **~110 `castRay`-Aufrufe pro Bot**
+---
 
-Refresh-Rate: ~12 Hz (`BOT_BRAIN_STEP_S`). Theoretisch **~25.000 Raycasts/Sekunde** wenn alle gleichzeitig unterwegs sind.
+## Tick-Module (Dateien)
 
-**Thundering-Herd:** Alle Bots spawnen zusammen → `navigation.reset()` zur gleichen Zeit → **Accumulator phasengleich**. Alle 29 (Pro) können im **selben Physics-Substep** refreshen:
+| Datei | Aufgabe |
+|-------|---------|
+| `src/app/funnel-app.ts` | Loop-Orchestrator |
+| `src/core/game-frame-clock.ts` | Delta, Substeps, Interpolation-Blend, Load-Shed-Flag |
+| `src/core/frame-housekeeping.ts` | Audio + Segment-Lines + `tickAllWorldEffects` |
+| `src/combat/humanoid-actor-tick.ts` | Gemeinsamer Render-Tick Player + Bots |
+| `src/app/match-live-ui-tick.ts` | HUD, Scoring, Death-Respawn, Revive/Hire |
+| `src/combat/team-presence-scoring.ts` | 1 Hz Territory-Punkte |
+| `src/bots/bot-nav-ray-budget.ts` | Nav-/Route-Steer-Budget pro Frame |
+| `src/bots/bot-navigation-cache.ts` | Nav-Accumulator, Phase-Offset, Budget-Gate |
+| `src/bots/bot-roster.ts` | Bot-Loops (fixed, prepare, update, jump pads) |
+| `src/combat/world-effects-registry.ts` | Zentraler VFX/Combat-Tick (`needsWorldTick`) |
+| `src/combat/world-projectile-sim.ts` | Shared Projektil-Sim (1 Source) |
+| `src/combat/weapon-arsenal.ts` | Pro Actor 1 Source (Hitscan, Bursts, Ammo) |
 
-> **29 × 110 ≈ 3.190 Raycasts in einem 10-ms-Tick**
+**World-Effects-Sources:** 1× `WorldProjectileSim` + 30× `WeaponArsenal` (Player + 29 Bots). Idle-Sources werden via `needsWorldTick()` übersprungen.
 
-Das erklärt **„ab und zu“** gut: Freeze alle ~80–120 ms, verstärkt wenn viele Bots **PUSH/HUNT** fahren (nicht FIGHT/stehen).
+---
 
-Zusätzlich: **pro Substep pro Bot** ein LoS-Raycast in `#buildBrainInput` → weitere **~29 Raycasts/Substep** wenn Gegner da sind.
+## Bereits umgesetzte Optimierungen
 
-### 2. Physics-Substep-Multiplikator bei Hängern
+### Frame-Clock & Physics
 
-Ein langsamer Frame (z. B. durch Nav-Burst) triggert bis zu **6×**:
-- Player + 29 Bots `fixedUpdate` (Brain, Waffen, Drive)
-- `world.step` auf wachsender Collider-Menge
+- `GameFrameClock` statt inline Accumulator in `funnel-app.ts`
+- Runtime-Substeps **3** statt Config-6; adaptives Herunterfahren bei schweren Frames
+- **Render-Interpolation** zwischen Physics-States (`physics-interpolation.ts`, `capturePhysicsInterpolation` + Blend auf Player, Bots, Rain-Bodies)
+- Accumulator-Cap (`MAX_PHYSICS_REMAINDER_MULTIPLIER`) statt hartem Reset auf 0
 
-Der Accumulator-Reset bei `maxSubSteps` verhindert Endlosschleifen, **bügelt aber nicht die Kosten eines einzelnen Frames glatt** — der Frame bleibt schwer.
+### Bot-AI & Navigation
 
-### 3. Rain-Spawner am Match-Start (~2 s kritisch)
+- **Phase-Offset** pro Bot bei `BotNavigationCache.reset(slot, slotCount)` — kein Thundering-Herd mehr beim Spawn
+- **Nav-Ray-Budget:** max 3 `fillBotNavigationGoal`-Refreshes pro Frame (`tryAcquireNavRayRefresh`)
+- Route-Steer-Fan budgetiert (`tryAcquireRouteSteerFanRefresh`)
+- Brain @ **2 Hz** statt ~12 Hz
+- LoS-Raycast nur beim Brain-Step (~2 Hz/Bot), nicht pro Physics-Substep
+- **`RAPIER.Ray`-Reuse** in `bot-navigation.ts` und `bot-perception.ts` (Modul-Scratch)
 
-```9:9:src/arena/environment-rain-spawner.ts
-const DROP_INTERVAL_S = 0.02;
+### GC / Hot Path
+
+- Kein `projectile.position.clone()` mehr im Projektil-Tick
+- Rain-Spawn: Modul-Scratch `_spawnEuler` / `_spawnQuaternion`
+- Target-Snapshots: `BotTargetSnapshotCache` patcht Positionen in-place statt pro Frame neu zu allokieren
+- HUD: Health/Ammo/Weapon-Bar mit Revision/State-Keys
+- Intrusion-Pressure: `IntrusionPressureCache` einmal pro `renderFrameId`
+- Muzzle-Scratch in `funnel-app.ts` (`_muzzlePosition`)
+
+### Combat / VFX
+
+- `tickAllWorldEffects` mit `needsWorldTick()`-Gate
+- `loadShedNonCritical` an Projektil-Spawn/Sync (nicht an Lifecycle)
+- Instancing + gepoolte Lights/Trails (siehe `docs/Instancing.md`)
+
+### Rain
+
+- Wellen-Stückzahl ×0.35, Spawn-Intervall ×2 (Runtime-Profil)
+- `dynamicInstances.sync()` überspringt sleeping Bodies
+
+---
+
+## Bekannte verbleibende Hebel (priorisiert)
+
+| Priorität | Thema | Detail |
+|-----------|--------|--------|
+| **Mittel** | Distant-Bot-Anim-LOD | `#visualReducedLod` (>46 m) skippt Mesh/Eye/Aim-Spine, **Mixer tickt trotzdem** @ vollem Refresh — größter verbleibender CPU-Block im Humanoid-Pfad unter vollem Roster |
+| Niedrig | Footsteps aller Bots | `#tickFootsteps` ohne Distanz-LOD |
+| Niedrig | World-Effects Fan-out | 30× `WeaponArsenal` in Registry — funktional ok, DRY-Refactor möglich (ein Roster-Pass) |
+| Niedrig | `player.position()` | allokiert `Vector3`, kein Hot-Path-Caller |
+| Roadmap | GPU-Particles / Clustered Lights | off hot path (Skill) |
+
+Unter **Chrome + M1 + Pro-Roster** ist der Loop heute stabil; die Tabelle oben sind Feintuning-Kandidaten, keine akuten Freeze-Ursachen.
+
+---
+
+## Stress-Checkliste (Abnahme)
+
+1. Volles Pro-Roster (**15v15**) + sustained fire aller Waffen
+2. Sprint + Jump + Crouch gleichzeitig
+3. Erste Rain-Phase nach Map-Reveal (gedrosselt, aber noch spürbar)
+4. Tab-Wechsel zurück (Delta-Clamp → bis 3 Substeps)
+5. Performance Panel: kein GC-Sägezahn im Humanoid-/Nav-Pfad; p99 Frame Time stabil
+
+```bash
+npm run lint && npm run build
+# Browser: http://localhost:3011/
 ```
 
-**105 Teile** in ~2,1 s → **50 neue Rapier-Bodies/Sekunde**, plus `castShadow: true` auf InstancedMeshes. Rain startet schon **vor** dem Countdown (`rainSpawner.start()` direkt nach `revealMap()`).
-
-Typisches Muster: Ruckler **gleich nach Map-Reveal / Countdown**, dann etwas ruhiger — bis Bots aktiv navigieren und schießen.
-
-### 4. GC-Micro-Spikes (verstärkend, selten allein Ursache)
-
-Hot-Path-Allokationen trotz Performance-Regeln:
-
-| Stelle | Problem |
-|--------|---------|
-| `bot-perception.ts` | `new Vector3()` in `botEyePosition` / `botAimPoint` — **jeder Bot, jeder Physics-Step** |
-| `bot-navigation.ts` | `new RAPIER.Ray(...)` pro Probe |
-| `weapon-arsenal.ts` | `projectile.position.clone()` pro Projektil pro Frame |
-| `environment-rain-spawner.ts` | `new Quaternion()` + `new Euler()` pro Drop |
-
-Allein selten freeze-würdig; **zusammen mit Raycast-Bursts** → GC-Pause genau im falschen Moment.
-
-### 5. 20× WeaponArsenal im Render-Pfad
-
-Player + 29 Bots: `tickHumanoidRenderFrame` → `weapon.tickWorld` wenn Projektile/VFX aktiv. Bot-Budget ist klein (8 Projektile), Player bis 96 — bei Feuergefecht summiert sich `#updateProjectiles` mit Ray-Marches.
-
-### 6. GPU: konstant schwer, nicht intermittent
-
-**512×512 Shadow Map** (Fallback-Profil; M1-Target: shadows off), jedes Frame neu fokussiert auf Spieler-Position. Kostet FPS, erklärt aber eher **dauerhaft niedrige Basis-FPS**, nicht sporadische 200-ms-Freezes.
-
-### 7. Grunt-TTS (eher Mikroruckler)
-
-`playText()` baut synchron viele AudioNodes auf dem Main Thread — bei Jump/Land-Grunts spürbar, aber kein typischer 100-ms-Freeze.
-
 ---
 
-## Wann es am ehesten passiert
+## Historische Analyse
 
-| Situation | Warum |
-|-----------|--------|
-| **Erste ~5 s nach Map-Reveal** | Rain spawnt 105 Bodies |
-| **Countdown → Match live** | Input + 29 Bots (Pro) + Rain-Kollisionen gleichzeitig |
-| **Alle Bots laufen (PUSH/HUNT)** | Nav-Raycast-Herd alle ~80 ms |
-| **Feuergefecht + Bewegung** | Projektile + Substeps + Raycasts |
-| **Tab-Wechsel zurück** | Delta-Clamp → 6 Substeps auf einmal |
+Frühere sporadische Freezes (Nav-Ray-Herd @ ~12 Hz Brain, 6 Substeps, fehlende Interpolation, ungebremster Rain) sind durch die oben genannten Maßnahmen adressiert. Alte Hypothesen (z. B. `new Vector3` in `bot-perception`, `new RAPIER.Ray` pro Probe, Team-HUD als Spike-Ursache) gelten **nicht mehr** für den aktuellen Code.
 
----
-
-## Was es wahrscheinlich *nicht* ist
-
-- **Team-HUD** — schreibt jedes Frame DOM, aber trivial im Vergleich zu 2000 Raycasts
-- **Reines Render-Limit** — wäre eher konstant, nicht rhythmisch
-- **AudioContext resume** — einmalig beim Start
-
----
-
-## Nächste Schritte (priorisiert)
-
-1. **Instrumentieren** — im Loop Substep-Zähler, Framezeit, Nav-Refresh-Zähler, Raycast-Zähler (1 kleines Modul, nur Dev-Build)
-2. **Nav-Refresh entphasen** — pro Bot zufälliger Phase-Offset in `BotNavigationCache.reset()` (minimaler Fix, große Wirkung)
-3. **Ray-Reuse** — `RAPIER.Ray` + `Vector3` scratch statt `new` in `bot-navigation` / `bot-perception`
-4. **Dev-Bot-Count reduzieren** — zum Isolieren von Nav-Kosten temporär `playersPerTeam` in `chrome-macos-arm-profile.ts` senken; Abnahme bleibt **15v15**
-5. **Rain an Countdown koppeln + Spawn-Rate drosseln** — laut `docs/environment-dynamic.md` ohnehin geplant
-
-Wenn du willst, setze ich als Nächstes **(a)** ein leichtgewichtiges Tick-Profiler-Overlay oder **(b)** direkt den Nav-Phase-Offset + Ray-Scratch-Fix um — beides sind kleine, gezielte Diffs mit hoher Diagnose-/Fix-Wirkung.
+Offene Roadmap-Punkte siehe Abschnitt **Bekannte verbleibende Hebel**.
