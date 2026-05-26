@@ -83,9 +83,9 @@ export class HumanoidVisual {
   ): void {
     const flashNowMs = nowMs;
 
-    if (!visualReduced) {
-      this.#locomotion?.update(deltaSeconds, input);
-    }
+    // Mixer must tick every frame — locomotion drives death/revive/clip transitions.
+    // visualReduced only skips mesh/eye sync (see bots-verbesserungen-rules.md).
+    this.#locomotion?.update(deltaSeconds, input);
 
     if (this.#locomotion?.deathPoseSettled) {
       this.#tickJointFlash(flashNowMs, input.isDead);
