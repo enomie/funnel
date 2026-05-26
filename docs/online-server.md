@@ -94,6 +94,7 @@ Da Vite bei Code-Änderungen neue Dateinamen in `assets/` generiert (z. B. `inde
 > **Was hochgeladen werden MUSS:**
 > 1. Der **`assets/`** Ordner (enthält den neuen Code/Styles).
 > 2. Die Dateien **`index.html`** und **`game.html`** (damit der Server auf die neuen Dateinamen in `assets/` verweist).
+> 3. Der Ordner **`icons/`**, wenn sich SVG-Logos oder Plattform-Icons geändert haben (Pfade sind relativ — funktionieren nur, wenn die Dateien im gleichen Deploy-Ordner liegen).
 
 > [!WARNING]
 > **Was du NICHT erneut hochladen solltest:**

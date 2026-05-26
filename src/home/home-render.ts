@@ -1,5 +1,7 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/home/home-render.ts
 
+import { assetUrl } from '../utils/asset-url';
+
 interface WeaponInfo {
   name: string;
   shortName: string;
@@ -188,7 +190,7 @@ function platformChip(chip: PlatformChip): HTMLElement {
   const span = el('span', 'home-hero-cta__platform-chip');
   const img = document.createElement('img');
   img.className = 'home-hero-cta__platform-icon';
-  img.src = chip.icon;
+  img.src = assetUrl(chip.icon);
   img.width = 12;
   img.height = 12;
   img.alt = '';

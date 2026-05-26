@@ -24,8 +24,8 @@
     "Stop playing if you feel unwell or uncomfortable."
   ],
   "platforms": [
-    { "icon": "./icons/platform-apple.svg", "label": "macOS M1+" },
-    { "icon": "./icons/platform-chrome.svg", "label": "Google Chrome" }
+    { "icon": "icons/platform-apple.svg", "label": "macOS M1+" },
+    { "icon": "icons/platform-chrome.svg", "label": "Google Chrome" }
   ],
   "matchGoal": "First team to 1000 points wins the tunnel."
 }

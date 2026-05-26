@@ -3,110 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#141b24" />
+    <meta name="theme-color" content="#070c13" />
     <meta name="color-scheme" content="dark" />
     <meta
       name="description"
-      content="FUNNEL — high-speed browser arena shooter inspired by Unreal Tournament 99."
+      content="FUNNEL — high-speed browser arena FPS inspired by Unreal Tournament 99."
     />
-    <title>FUNNEL</title>
-    <script type="module" crossorigin src="./assets/index-EadyT8Sx.js"></script>
+    <title>FUNNEL — Arena FPS Shooter</title>
+    <script type="module" crossorigin src="./assets/index-_V14uX3i.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/boot-gate-BcNifjoE.js">
-    <link rel="modulepreload" crossorigin href="./assets/chrome-macos-arm-profile-OLQPPRSK.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-DQWajBiF.css">
+    <link rel="modulepreload" crossorigin href="./assets/asset-url-aPudv8WI.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-CMhs2dXf.css">
   </head>
-  <body class="funnel-home">
-    <div class="funnel-home__background" aria-hidden="true"></div>
+  <body class="home">
+    <nav class="home-nav" aria-label="Main">
+      <div class="home-nav__brand">
+        <span class="home-nav__logo">FUNNEL</span>
+        <span class="home-nav__subtitle">Arena FPS Shooter</span>
+      </div>
+      <button type="button" class="home-start home-nav__start">Start Match</button>
+    </nav>
 
-    <main class="funnel-home__main">
-      <header class="funnel-home__hero" aria-labelledby="funnel-home-brand">
-        <p class="funnel-home__kicker">Arena shooter</p>
-        <h1 class="funnel-home__brand" id="funnel-home-brand">FUNNEL</h1>
-        <p class="funnel-home__tagline">Have fun in the tunnel</p>
+    <main class="home-intro">
+      <header class="home-hero" aria-labelledby="home-brand">
+        <h1 class="home-hero__brand" id="home-brand">
+          <img
+            class="home-hero__logo"
+            src="./icons/logo.svg"
+            alt="FUNNEL"
+            decoding="async"
+          />
+        </h1>
+        <p class="home-hero__blurb" id="home-hero-blurb"></p>
+        <p class="home-hero__tagline">Fun in the tunnel</p>
       </header>
 
-      <div class="funnel-home__lore" aria-label="Game Information">
-        <h2 class="funnel-home__lore-title" style="color: var(--funnel-home-orange-soft);">First to 1000 points wins.</h2>
-        <div class="funnel-home__lore-body">
-          <p>
-            Push into enemy territory. Hold the line. First team to one thousand points owns the
-            tunnel.
-          </p>
-          <p>
-            Each enemy kill is +1. Every second an ally stands in the
-            enemy home zone is +1 per fighter.
-          </p>
-        </div>
-
-        <h2 class="funnel-home__lore-title" style="margin-top: 8px;">Controls</h2>
-        <div class="funnel-home__lore-body">
-          <dl class="funnel-home__controls">
-            <dt>Move</dt>
-            <dd>WASD, Shift sprint, Space jump</dd>
-            <dt>Stance</dt>
-            <dd>hold C crouch</dd>
-            <dt>Weapon</dt>
-            <dd>1-0 select, LMB primary, RMB alt-fire, V or MMB aim (FPS)</dd>
-            <dt>Pointer</dt>
-            <dd>Click the arena or press P</dd>
-            <dt>Team</dt>
-            <dd>T dev flip (hire prep)</dd>
-            <dt>Dev</dt>
-            <dd>K kill self — auto-respawn after 5 s</dd>
-          </dl>
-        </div>
-
-        <h2 class="funnel-home__lore-title" style="margin-top: 8px;">Information</h2>
-        <div class="funnel-home__lore-body">
-          <p>
-            Tactical FPS Arena Shooter inspired by the legendary UT99 Funnel Mod Maps from 2001 and old Star Wars battles. Made with Love by
-            <a href="https://anomie.at" target="_blank" rel="noopener noreferrer">anomie.at</a>
-            — published at
-            <a href="https://unzine.net" target="_blank" rel="noopener noreferrer">unzine.net</a>.
-          </p>
-          <p>V 0.0.1 2026-05-25 TypeScript Three.js WebGPU Rapier SIMD</p>
-          <p class="visitor-counter-wrapper">
-            <span class="visitor-dot"></span>
-            <span>Visitors: <strong id="visitor-count">...</strong></span>
-          </p>
-        </div>
-      </div>
-
-      <div class="funnel-home__bottom">
-        <p class="funnel-home__warning">
-          <strong>Warning:</strong> Contains flashing lights and rapid visual effects. Stop playing if you feel unwell or uncomfortable.
-        </p>
-        <button type="button" class="funnel-btn funnel-home__start">Start Match</button>
-
-        <footer class="funnel-home__footer">
-          <p class="funnel-home__platform-note">
-            <span class="funnel-home__platform-note-part">Optimized for</span>
-            <span class="funnel-home__platform-chip">
-              <img
-                class="funnel-home__platform-icon"
-                src="./icons/platform-apple.svg"
-                width="12"
-                height="12"
-                alt=""
-                aria-hidden="true"
-              />
-              <span>macOS M1+ </span>
-            </span>
-            <span class="funnel-home__platform-chip">
-              <img
-                class="funnel-home__platform-icon"
-                src="./icons/platform-chrome.svg"
-                width="12"
-                height="12"
-                alt=""
-                aria-hidden="true"
-              />
-              <span>Chrome browser</span>
-            </span>
-          </p>
-        </footer>
-      </div>
+      <div id="home-hero-cta-root" class="home-hero-cta"></div>
     </main>
+
+    <section id="home-sliders" class="home-sliders" aria-label="Weapons, tips, and pickups"></section>
+    <div id="home-keys-root"></div>
+    <div id="home-footer-root"></div>
 
   </body>
 </html>

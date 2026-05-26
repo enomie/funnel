@@ -2,11 +2,13 @@
 
 
 
+import { assetUrl } from '../utils/asset-url';
+
 export const PLATFORM_TARGET_NOTE =
   'Optimized for macOS + M1 and latest Chrome browser';
 
-const PLATFORM_APPLE_ICON = '/icons/platform-apple.svg';
-const PLATFORM_CHROME_ICON = '/icons/platform-chrome.svg';
+const PLATFORM_APPLE_ICON = assetUrl('icons/platform-apple.svg');
+const PLATFORM_CHROME_ICON = assetUrl('icons/platform-chrome.svg');
 
 
 export function renderPlatformTargetNoteHtml(): string {

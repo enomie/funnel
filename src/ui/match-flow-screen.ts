@@ -3,6 +3,7 @@
 
 
 import type { HumanoidRigId } from '../player/humanoid-rig';
+import { assetUrl } from '../utils/asset-url';
 import { createFunnelGameBrandElement } from './funnel-game-brand';
 
 export const MATCH_COUNTDOWN_SECONDS = 10;
@@ -89,7 +90,7 @@ export class MatchFlowScreen {
         <h1 class="funnel-prematch-screen__brand funnel-prematch-screen__brand--loader">
           <img
             class="funnel-prematch-screen__logo"
-            src="/icons/logo-standalone.svg"
+            src="${assetUrl('icons/logo-standalone.svg')}"
             alt="FUNNEL"
             decoding="async"
           />
