@@ -119,6 +119,8 @@ export class BotActor {
     weaponBodyPosition: Vector3;
     suspendState: HumanoidCombatSuspendState;
     afterDeathSync?: (nowMs: number) => void;
+    pinBeforeRender?: () => void;
+    afterLocomotion?: () => void;
   };
   readonly #locomotionScratch: LocomotionAnimInput = {
     movement: { forward: false, back: false, left: false, right: false },
@@ -217,12 +219,14 @@ export class BotActor {
       nowMs: 0,
       deltaSeconds: 0,
       syncDeathState: this.#syncDeathStateBound,
+      pinBeforeRender: this.#pinReviveBeforeRenderBound,
       syncVisualFromBody: this.#syncVisualFromBodyBound,
       updateLocomotion: this.#updateLocomotionBound,
       weapon: this.weapon,
       weaponAim: this.#weaponAimScratch,
       weaponBodyPosition: _weaponBodyPosition,
-      suspendState: this.#combatSuspend
+      suspendState: this.#combatSuspend,
+      afterLocomotion: this.#finishReviveStandUpIfDoneBound
     };
 
     syncHumanoidVisualRootAt(
@@ -394,7 +398,6 @@ export class BotActor {
     this.#weaponAimScratch.pitch = this.controller.aimPitch;
 
     tickHumanoidRenderFrame(tickContext as HumanoidRenderTickContext, this.#locomotionScratch);
-    this.controller.tickReviveStandUpIfDone(this.visual.standingUpActive);
     this.#tickFootsteps(landing);
 
     if (!this.controller.health.isDead && !this.controller.reviveStandUpPending) {
@@ -402,12 +405,22 @@ export class BotActor {
     }
 
     this.weapon.prepareWorldTickContext(
-      this.controller.health.isDead ? undefined : this.#weaponAimScratch
+      this.controller.health.isDead || this.controller.reviveStandUpPending
+        ? undefined
+        : this.#weaponAimScratch
     );
   }
 
   readonly #syncDeathStateBound = (): void => {
     this.controller.syncDeathState(this.#humanoidTickContext.nowMs);
+  };
+
+  readonly #pinReviveBeforeRenderBound = (): void => {
+    this.controller.maintainReviveStandUpIfPending();
+  };
+
+  readonly #finishReviveStandUpIfDoneBound = (): void => {
+    this.controller.finishReviveStandUpIfDone(this.visual.standingUpActive);
   };
 
   readonly #syncVisualFromBodyBound = (): void => {

@@ -812,7 +812,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
       redeemerPickup.tick(frameNowMs, deltaSeconds);
     }
 
-    if (matchLive && !frame.isDead && !reviveHireChannel.isChanneling) {
+    if (matchLive && !frame.isDead && !player.reviveStandUpPending && !reviveHireChannel.isChanneling) {
       if (snapshot.weaponSlotSelect !== null && weapon.selectSlot(snapshot.weaponSlotSelect)) {
         visual.setWeapon(weapon.selectedWeapon);
         toast.show(`Selected ${weapon.selectedWeaponLabel}.`, 900);

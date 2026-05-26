@@ -13,6 +13,7 @@ export interface HumanoidRenderTickContext {
   readonly nowMs: number;
   readonly deltaSeconds: number;
   readonly syncDeathState: () => void;
+  readonly pinBeforeRender?: () => void;
   readonly syncVisualFromBody: () => void;
   readonly updateLocomotion: (deltaSeconds: number, input: LocomotionAnimInput, nowMs: number) => void;
   readonly weapon: WeaponArsenal;
@@ -20,6 +21,7 @@ export interface HumanoidRenderTickContext {
   readonly weaponBodyPosition: Vector3;
   readonly suspendState: HumanoidCombatSuspendState;
   readonly afterDeathSync?: (nowMs: number) => void;
+  readonly afterLocomotion?: () => void;
   readonly onRevive?: () => void;
 }
 
@@ -42,11 +44,12 @@ export function tickHumanoidRenderFrame(
     suspendState.active = false;
   }
 
+  context.pinBeforeRender?.();
   context.syncDeathState();
   context.afterDeathSync?.(nowMs);
 
-  context.syncVisualFromBody();
-
   locomotionInput.fireStarted = weapon.consumeFireStarted();
   context.updateLocomotion(deltaSeconds, locomotionInput, nowMs);
+  context.afterLocomotion?.();
+  context.syncVisualFromBody();
 }

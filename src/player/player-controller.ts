@@ -47,7 +47,8 @@ import {
   maintainReviveStandUpPhysics,
   resetActorDeathPhysics,
   syncActorDeathState,
-  type ActorDeathSnapshot
+  type ActorDeathSnapshot,
+  type HumanoidGroundAnchor
 } from './actor-death';
 import { defaultPlayerSpawnPosition, playerFactionSpawnPosition, playerMatchStartDropPosition } from './player-spawn';
 import {
@@ -95,7 +96,7 @@ export class PlayerController {
   #isSliding = false;
   #pinnedGroundY: number | null = null;
   #movementLocked = false;
-  #reviveGroundY: number | null = null;
+  #reviveAnchor: HumanoidGroundAnchor | null = null;
   #frameNow = 0;
   #lastJumpStyle: JumpStyle = 'idle';
   #jumpAirThrust: JumpAirThrustState | null = null;
@@ -124,12 +125,14 @@ export class PlayerController {
     nowMs: number;
     deltaSeconds: number;
     syncDeathState: () => void;
+    pinBeforeRender?: () => void;
     syncVisualFromBody: () => void;
     updateLocomotion: (deltaSeconds: number, input: LocomotionAnimInput, nowMs: number) => void;
     weapon: WeaponArsenal;
     weaponAim: { yaw: number; pitch: number };
     weaponBodyPosition: Vector3;
     suspendState: HumanoidCombatSuspendState;
+    afterLocomotion?: () => void;
     onRevive?: () => void;
   };
   readonly #locomotionScratch: LocomotionAnimInput = {
@@ -185,17 +188,23 @@ export class PlayerController {
       nowMs: 0,
       deltaSeconds: 0,
       syncDeathState: this.#syncDeathStateBound,
+      pinBeforeRender: this.#pinReviveBeforeRenderBound,
       syncVisualFromBody: this.#syncVisualFromBodyBound,
       updateLocomotion: this.#updateLocomotionBound,
       weapon: null as unknown as WeaponArsenal,
       weaponAim: this.#weaponAimScratch,
       weaponBodyPosition: this.#weaponBodyPosition,
-      suspendState: this.#combatSuspend
+      suspendState: this.#combatSuspend,
+      afterLocomotion: this.#finishReviveStandUpIfDoneBound
     };
   }
 
   get deathSnapshot(): ActorDeathSnapshot {
     return this.#death;
+  }
+
+  get reviveStandUpPending(): boolean {
+    return this.#reviveAnchor !== null;
   }
 
   applyDeathCommit(nowMs: number): void {
@@ -207,7 +216,7 @@ export class PlayerController {
   }
 
   capturePhysicsInterpolation(): void {
-    if (this.health.isDead) {
+    if (this.health.isDead || this.#reviveAnchor !== null) {
       return;
     }
 
@@ -228,7 +237,7 @@ export class PlayerController {
       return;
     }
 
-    if (this.#reviveGroundY !== null) {
+    if (this.#reviveAnchor !== null) {
       return;
     }
 
@@ -239,7 +248,7 @@ export class PlayerController {
 
   
   fixedUpdate(fixedStep: number, input: InputSnapshot): void {
-    if (this.health.isDead || this.#reviveGroundY !== null) {
+    if (this.health.isDead || this.#reviveAnchor !== null) {
       return;
     }
 
@@ -252,7 +261,7 @@ export class PlayerController {
       return;
     }
 
-    if (this.#reviveGroundY !== null) {
+    if (this.#reviveAnchor !== null) {
       return;
     }
 
@@ -285,10 +294,6 @@ export class PlayerController {
     this.#weaponBodyPosition.set(translation.x, translation.y, translation.z);
     this.#fillLocomotionInput(input, landedFromAir, this.#locomotionScratch);
 
-    if (this.#reviveGroundY !== null) {
-      maintainReviveStandUpPhysics(this.body, this.#reviveGroundY);
-    }
-
     const tickContext = this.#humanoidTickContext;
     tickContext.isDead = this.health.isDead;
     tickContext.nowMs = now;
@@ -298,13 +303,12 @@ export class PlayerController {
     tickContext.weaponAim.pitch = input.pitch;
     tickContext.onRevive = onRevive;
     tickHumanoidRenderFrame(tickContext as HumanoidRenderTickContext, this.#locomotionScratch);
-    this.#finishReviveStandUpIfDone();
 
     fillHumanoidRenderTranslation(
       this.#translationInterp,
       this.#renderInterpolationBlend,
       this.body,
-      this.health.isDead,
+      this.#skipRenderInterpolation(),
       this.#renderTranslationScratch
     );
 
@@ -330,7 +334,7 @@ export class PlayerController {
       this.#renderTranslationScratch.y,
       this.#renderTranslationScratch.z
     );
-    if (this.health.isDead) {
+    if (this.health.isDead || this.#reviveAnchor !== null) {
       weapon.prepareWorldTickContext(undefined);
     } else {
       this.#weaponAimScratch.yaw = input.yaw;
@@ -376,7 +380,7 @@ export class PlayerController {
 
   
   launchFromJumpPad(impulse: JumpImpulseResult, nowMs: number): void {
-    if (this.health.isDead || this.#movementLocked) {
+    if (this.health.isDead || this.#movementLocked || this.#reviveAnchor !== null) {
       return;
     }
 
@@ -429,6 +433,7 @@ export class PlayerController {
 
   
   prepareMatchRestart(faction: FactionTeam): void {
+    this.#reviveAnchor = null;
     this.health.respawn();
     if (this.#death.applied) {
       resetActorDeathPhysics(this.body, this.collider, this.#death);
@@ -444,6 +449,7 @@ export class PlayerController {
       return;
     }
 
+    this.#reviveAnchor = null;
     this.health.respawn();
     resetActorDeathPhysics(this.body, this.collider, this.#death);
     this.#standFromCrouch();
@@ -457,18 +463,40 @@ export class PlayerController {
     }
 
     this.health.respawn();
-    this.#reviveGroundY = beginReviveInPlacePhysics(this.body, this.collider, this.#death);
+    this.#reviveAnchor = beginReviveInPlacePhysics(this.body, this.collider, this.#death);
+    this.#resetLocomotionStateAfterRevive();
+    this.reseedPhysicsInterpolation();
     this.visual.reviveLocomotion(true);
   }
 
+  readonly #finishReviveStandUpIfDoneBound = (): void => {
+    this.#finishReviveStandUpIfDone();
+  };
+
   #finishReviveStandUpIfDone(): void {
-    if (this.#reviveGroundY === null || this.visual.standingUpActive) {
+    if (this.#reviveAnchor === null || this.visual.standingUpActive) {
       return;
     }
 
-    finishReviveInPlacePhysics(this.body, this.collider, this.#reviveGroundY);
-    this.#reviveGroundY = null;
+    finishReviveInPlacePhysics(this.body, this.collider, this.#reviveAnchor);
+    this.#reviveAnchor = null;
     this.reseedPhysicsInterpolation();
+  }
+
+  #skipRenderInterpolation(): boolean {
+    return this.health.isDead || this.#reviveAnchor !== null;
+  }
+
+  #resetLocomotionStateAfterRevive(): void {
+    this.#isJump = false;
+    this.#isCrouch = false;
+    this.#isSliding = false;
+    this.#pinnedGroundY = null;
+    this.#jumpAirThrust = null;
+    this.#grounded = true;
+    this.#wasAirbornePrev = false;
+    this.#leftAirborneVoluntarily = false;
+    this.#jumpGraceUntil = 0;
   }
 
   #applyJumpImpulse(now: number, input: InputSnapshot): void {
@@ -646,12 +674,18 @@ export class PlayerController {
     this.#syncDeathState(this.#lastInputSnapshot, this.#frameNow);
   };
 
+  readonly #pinReviveBeforeRenderBound = (): void => {
+    if (this.#reviveAnchor !== null) {
+      maintainReviveStandUpPhysics(this.body, this.#reviveAnchor);
+    }
+  };
+
   readonly #syncVisualFromBodyBound = (): void => {
     fillHumanoidRenderTranslation(
       this.#translationInterp,
       this.#renderInterpolationBlend,
       this.body,
-      this.health.isDead,
+      this.#skipRenderInterpolation(),
       this.#renderTranslationScratch
     );
     syncHumanoidVisualRootAt(
@@ -699,7 +733,7 @@ export class PlayerController {
   }
 
   #applyKeyEdges(input: InputSnapshot, now: number): void {
-    if (this.health.isDead || this.#reviveGroundY !== null) {
+    if (this.health.isDead || this.#reviveAnchor !== null) {
       return;
     }
 

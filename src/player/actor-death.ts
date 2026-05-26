@@ -9,8 +9,8 @@ import {
   inferCapsuleModeFromCollider,
   inferGroundYFromBody,
   meshUsesCrouchCapsule,
-  pinBodyCapsuleToGround,
-  transitionCapsuleOnGround
+  pinBodyCapsuleAt,
+  transitionCapsuleAt
 } from './humanoid-capsule-sync';
 import {
   anchorCharacterMeshFromAnimatedFeet,
@@ -29,10 +29,18 @@ export const HUMANOID_JUMP_FOOT_CLIP_IDS = new Set<string>([
 
 export type ReviveHireChannelMode = 'revive' | 'hire';
 
+export interface HumanoidGroundAnchor {
+  groundY: number;
+  x: number;
+  z: number;
+}
+
 export interface ActorDeathSnapshot {
   applied: boolean;
   diedAtMs: number;
   frozenYaw: number;
+  frozenX: number;
+  frozenZ: number;
   groundY: number | null;
   respawnPauseAccumMs: number;
   respawnPauseStartedMs: number;
@@ -46,6 +54,8 @@ export function createActorDeathSnapshot(): ActorDeathSnapshot {
     applied: false,
     diedAtMs: 0,
     frozenYaw: 0,
+    frozenX: 0,
+    frozenZ: 0,
     groundY: null,
     respawnPauseAccumMs: 0,
     respawnPauseStartedMs: 0,
@@ -58,6 +68,9 @@ export function createActorDeathSnapshot(): ActorDeathSnapshot {
 export function clearActorDeathSnapshot(snapshot: ActorDeathSnapshot): void {
   snapshot.applied = false;
   snapshot.diedAtMs = 0;
+  snapshot.frozenYaw = 0;
+  snapshot.frozenX = 0;
+  snapshot.frozenZ = 0;
   snapshot.groundY = null;
   snapshot.respawnPauseAccumMs = 0;
   snapshot.respawnPauseStartedMs = 0;
@@ -67,6 +80,10 @@ export function clearActorDeathSnapshot(snapshot: ActorDeathSnapshot): void {
 }
 
 export function effectiveRespawnElapsedMs(nowMs: number, snapshot: ActorDeathSnapshot): number {
+  if (snapshot.diedAtMs <= 0) {
+    return 0;
+  }
+
   let pauseMs = snapshot.respawnPauseAccumMs;
   if (snapshot.respawnPauseStartedMs > 0) {
     pauseMs += nowMs - snapshot.respawnPauseStartedMs;
@@ -113,15 +130,24 @@ export function syncActorDeathState(
   }
 
   if (!snapshot.applied) {
+    const translation = body.translation();
     snapshot.applied = true;
     snapshot.diedAtMs = nowMs;
     snapshot.frozenYaw = yaw;
+    snapshot.frozenX = translation.x;
+    snapshot.frozenZ = translation.z;
     snapshot.groundY = inferGroundYFromBody(body, inferCapsuleModeFromCollider(collider));
     applyCapsuleMode(collider, 'crouch');
   }
 
   freezeBodyOnGround(body);
-  pinBodyCapsuleToGround(body, snapshot.groundY ?? 0, 'crouch');
+  pinBodyCapsuleAt(
+    body,
+    snapshot.groundY ?? 0,
+    snapshot.frozenX,
+    snapshot.frozenZ,
+    'crouch'
+  );
 }
 
 export function resetActorDeathPhysics(
@@ -138,34 +164,44 @@ export function beginReviveInPlacePhysics(
   body: RigidBody,
   collider: Collider,
   snapshot: ActorDeathSnapshot
-): number {
-  const groundY =
-    snapshot.groundY ??
-    inferGroundYFromBody(body, inferCapsuleModeFromCollider(collider));
+): HumanoidGroundAnchor {
+  const translation = body.translation();
+  const anchor: HumanoidGroundAnchor = {
+    groundY:
+      snapshot.groundY ??
+      inferGroundYFromBody(body, inferCapsuleModeFromCollider(collider)),
+    x: snapshot.applied ? snapshot.frozenX : translation.x,
+    z: snapshot.applied ? snapshot.frozenZ : translation.z
+  };
   clearActorDeathSnapshot(snapshot);
   applyCapsuleMode(collider, 'crouch');
-  pinBodyCapsuleToGround(body, groundY, 'crouch');
+  pinBodyCapsuleAt(body, anchor.groundY, anchor.x, anchor.z, 'crouch');
   freezeBodyOnGround(body);
-  return groundY;
+  return anchor;
 }
 
 export function finishReviveInPlacePhysics(
   body: RigidBody,
   collider: Collider,
-  groundY: number
+  anchor: HumanoidGroundAnchor
 ): void {
-  transitionCapsuleOnGround({
+  transitionCapsuleAt({
     collider,
     body,
     toMode: 'stand',
-    groundY
+    groundY: anchor.groundY,
+    x: anchor.x,
+    z: anchor.z
   });
   freezeBodyOnGround(body);
 }
 
-export function maintainReviveStandUpPhysics(body: RigidBody, groundY: number): void {
+export function maintainReviveStandUpPhysics(
+  body: RigidBody,
+  anchor: HumanoidGroundAnchor
+): void {
   freezeBodyOnGround(body);
-  pinBodyCapsuleToGround(body, groundY, 'crouch');
+  pinBodyCapsuleAt(body, anchor.groundY, anchor.x, anchor.z, 'crouch');
 }
 
 export function actorVisualYaw(snapshot: ActorDeathSnapshot, liveYaw: number): number {

@@ -98,10 +98,10 @@ export function fillHumanoidRenderTranslation(
   interpolator: PhysicsTranslationInterpolator,
   blend: number,
   body: RigidBody,
-  isDead: boolean,
+  skipInterpolation: boolean,
   out: PhysicsTranslationSnapshot = _interpolatedScratch
 ): PhysicsTranslationSnapshot {
-  if (isDead) {
+  if (skipInterpolation) {
     return writeBodyTranslationSnapshot(body, out);
   }
 

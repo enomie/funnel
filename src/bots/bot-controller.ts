@@ -24,7 +24,8 @@ import {
   maintainReviveStandUpPhysics,
   resetActorDeathPhysics,
   syncActorDeathState,
-  type ActorDeathSnapshot
+  type ActorDeathSnapshot,
+  type HumanoidGroundAnchor
 } from '../player/actor-death';
 import {
   fillHumanoidRenderTranslation,
@@ -78,7 +79,7 @@ export class BotController {
   #grounded = true;
   #wasGrounded = true;
   readonly #death = createActorDeathSnapshot();
-  #reviveGroundY: number | null = null;
+  #reviveAnchor: HumanoidGroundAnchor | null = null;
   #lastDrive: BotDriveCommand | null = null;
   #stuckFrames = 0;
   #lastJumpAtMs = 0;
@@ -159,7 +160,7 @@ export class BotController {
   }
 
   capturePhysicsInterpolation(): void {
-    if (this.health.isDead) {
+    if (this.health.isDead || this.#reviveAnchor !== null) {
       return;
     }
 
@@ -175,7 +176,7 @@ export class BotController {
       this.#translationInterp,
       this.#renderInterpolationBlend,
       this.body,
-      this.health.isDead,
+      this.#skipRenderInterpolation(),
       out
     );
   }
@@ -197,22 +198,28 @@ export class BotController {
   }
 
   get reviveStandUpPending(): boolean {
-    return this.#reviveGroundY !== null;
+    return this.#reviveAnchor !== null;
   }
 
-  tickReviveStandUpIfDone(standingUpActive: boolean): void {
-    if (this.#reviveGroundY === null) {
+  maintainReviveStandUpIfPending(): void {
+    if (this.#reviveAnchor === null) {
       return;
     }
 
-    maintainReviveStandUpPhysics(this.body, this.#reviveGroundY);
+    maintainReviveStandUpPhysics(this.body, this.#reviveAnchor);
+  }
+
+  finishReviveStandUpIfDone(standingUpActive: boolean): void {
+    if (this.#reviveAnchor === null) {
+      return;
+    }
 
     if (standingUpActive) {
       return;
     }
 
-    finishReviveInPlacePhysics(this.body, this.collider, this.#reviveGroundY);
-    this.#reviveGroundY = null;
+    finishReviveInPlacePhysics(this.body, this.collider, this.#reviveAnchor);
+    this.#reviveAnchor = null;
     this.reseedPhysicsInterpolation();
   }
 
@@ -230,7 +237,7 @@ export class BotController {
 
   
   launchFromJumpPad(impulse: JumpImpulseResult, nowMs: number): void {
-    if (this.health.isDead) {
+    if (this.health.isDead || this.#reviveAnchor !== null) {
       return;
     }
 
@@ -336,7 +343,7 @@ export class BotController {
 
   
   afterPhysics(): void {
-    if (this.health.isDead || this.#reviveGroundY !== null) {
+    if (this.health.isDead || this.#reviveAnchor !== null) {
       return;
     }
 
@@ -351,7 +358,7 @@ export class BotController {
     aimTarget: { readonly yaw: number; readonly pitch: number } | null,
     nowMs: number
   ): void {
-    if (this.health.isDead || this.#reviveGroundY !== null) {
+    if (this.health.isDead || this.#reviveAnchor !== null) {
       return;
     }
 
@@ -393,6 +400,7 @@ export class BotController {
   }
 
   respawnAt(slot: BotSpawnSlot): void {
+    this.#reviveAnchor = null;
     this.health.respawn();
     resetActorDeathPhysics(this.body, this.collider, this.#death);
     this.#resetLocomotionState(slot.x, slot.z, slot.yaw);
@@ -409,9 +417,14 @@ export class BotController {
     }
 
     this.health.respawn();
-    this.#reviveGroundY = beginReviveInPlacePhysics(this.body, this.collider, this.#death);
+    this.#reviveAnchor = beginReviveInPlacePhysics(this.body, this.collider, this.#death);
+    this.reseedPhysicsInterpolation();
     const translation = this.body.translation();
     this.#resetLocomotionState(translation.x, translation.z, this.#yaw);
+  }
+
+  #skipRenderInterpolation(): boolean {
+    return this.health.isDead || this.#reviveAnchor !== null;
   }
 
   #resetLocomotionState(anchorX: number, anchorZ: number, yaw: number): void {
@@ -439,6 +452,7 @@ export class BotController {
   }
 
   beginMatchStartDrop(slot: BotSpawnSlot): void {
+    this.#reviveAnchor = null;
     this.health.respawn();
     if (this.#death.applied) {
       resetActorDeathPhysics(this.body, this.collider, this.#death);

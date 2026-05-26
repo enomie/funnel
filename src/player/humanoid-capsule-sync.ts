@@ -49,15 +49,27 @@ export function pinBodyCapsuleToGround(
   mode: HumanoidCapsuleMode
 ): void {
   const translation = body.translation();
+  pinBodyCapsuleAt(body, groundY, translation.x, translation.z, mode);
+}
+
+export function pinBodyCapsuleAt(
+  body: RigidBody,
+  groundY: number,
+  x: number,
+  z: number,
+  mode: HumanoidCapsuleMode
+): void {
+  const translation = body.translation();
   const targetY = capsuleCenterYOnGround(groundY, mode === CROUCH_MODE);
-  if (Math.abs(translation.y - targetY) <= 1e-5) {
+  if (
+    Math.abs(translation.x - x) <= 1e-5 &&
+    Math.abs(translation.y - targetY) <= 1e-5 &&
+    Math.abs(translation.z - z) <= 1e-5
+  ) {
     return;
   }
 
-  body.setTranslation(
-    { x: translation.x, y: targetY, z: translation.z },
-    true
-  );
+  body.setTranslation({ x, y: targetY, z }, true);
 }
 
 
@@ -69,6 +81,18 @@ export function transitionCapsuleOnGround(params: {
 }): void {
   applyCapsuleMode(params.collider, params.toMode);
   pinBodyCapsuleToGround(params.body, params.groundY, params.toMode);
+}
+
+export function transitionCapsuleAt(params: {
+  readonly collider: Collider;
+  readonly body: RigidBody;
+  readonly toMode: HumanoidCapsuleMode;
+  readonly groundY: number;
+  readonly x: number;
+  readonly z: number;
+}): void {
+  applyCapsuleMode(params.collider, params.toMode);
+  pinBodyCapsuleAt(params.body, params.groundY, params.x, params.z, params.toMode);
 }
 
 export function freezeBodyOnGround(body: RigidBody): void {
