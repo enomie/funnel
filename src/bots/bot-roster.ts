@@ -196,8 +196,21 @@ export class BotRoster {
     }
   }
 
-  capturePhysicsInterpolation(): void {
-    for (const bot of this.#bots) {
+  runFixedPhysicsSubStep(
+    fixedStep: number,
+    nowMs: number,
+    context: Omit<BotCombatContext, 'targets'>
+  ): void {
+    if (!context.matchLive) {
+      return;
+    }
+
+    const combatContext = this.#bindCombatContext(context);
+    const bots = this.#bots;
+
+    for (let index = 0; index < bots.length; index += 1) {
+      const bot = bots[index];
+      bot.fixedUpdate(fixedStep, nowMs, combatContext);
       bot.controller.capturePhysicsInterpolation();
     }
   }
@@ -228,19 +241,15 @@ export class BotRoster {
   }
 
   
-  afterPhysics(): void {
-    for (const bot of this.#bots) {
-      if (!bot.controller.health.isDead) {
-        bot.controller.afterPhysics();
-      }
-    }
-  }
-
   tickJumpPads(jumpPadField: JumpPadField, nowMs: number): void {
     const bots = this.#bots;
     const scratch = this.#jumpPadBotScratch;
     for (let index = 0; index < bots.length; index += 1) {
-      scratch[index] = bots[index].controller;
+      const controller = bots[index].controller;
+      if (!controller.health.isDead) {
+        controller.afterPhysics();
+      }
+      scratch[index] = controller;
     }
     scratch.length = bots.length;
     jumpPadField.tickBots(scratch, nowMs);
@@ -253,7 +262,12 @@ export class BotRoster {
     }
   }
 
-  update(deltaSeconds: number, nowMs: number, context: Omit<BotCombatContext, 'targets'>): void {
+  update(
+    deltaSeconds: number,
+    nowMs: number,
+    context: Omit<BotCombatContext, 'targets'>,
+    loadShedNonCritical = false
+  ): void {
     if (!context.matchLive) {
       return;
     }
@@ -264,7 +278,7 @@ export class BotRoster {
       if (!bot.controller.health.isDead) {
         bot.controller.health.tickRegen(nowMs, deltaSeconds);
       }
-      bot.update(deltaSeconds, nowMs, combatContext);
+      bot.update(deltaSeconds, nowMs, combatContext, loadShedNonCritical);
     }
   }
 

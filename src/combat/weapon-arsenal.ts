@@ -67,10 +67,11 @@ import {
 import { rollSpawnWeapon, spawnWeaponSlotIndex } from './spawn-weapon-roll';
 import { resolveWeaponEngageRangeM } from './weapon-aim';
 import {
-  registerWorldEffectsSource,
-  unregisterWorldEffectsSource,
-  type WorldEffectsSource
-} from './world-effects-registry';
+  registerWeaponArsenal,
+  scheduleWeaponArsenalWorldTick,
+  unscheduleWeaponArsenalWorldTick,
+  unregisterWeaponArsenal
+} from './weapon-arsenal-world-tick';
 
 const SHOCK_COMBO_IMPACT_GAIN = IMPACT_GAIN_NORMAL * 1.75;
 
@@ -94,7 +95,7 @@ export const WEAPON_ARSENAL_BOT_BUDGET: WeaponArsenalBudget = {
   maxActiveProjectiles: 8
 };
 
-export class WeaponArsenal implements WorldEffectsSource {
+export class WeaponArsenal {
   readonly #audio: WeaponAudio;
   readonly #projectileSim: WorldProjectileSim;
   readonly #hitscan: HitscanWeapon;
@@ -206,7 +207,10 @@ export class WeaponArsenal implements WorldEffectsSource {
       weaponAudio,
       this.#impactSink,
       sphereInstancing,
-      segmentLines
+      segmentLines,
+      () => {
+        scheduleWeaponArsenalWorldTick(this);
+      }
     );
     this.#ammo.selectWeapon(this.selectedWeapon);
     this.#projectileSim.registerBridge({
@@ -219,7 +223,22 @@ export class WeaponArsenal implements WorldEffectsSource {
         this.#resolveShockCombo(hit);
       }
     });
-    registerWorldEffectsSource(this);
+    registerWeaponArsenal(this);
+  }
+
+  #syncWorldTickSchedule(nowMs: number): void {
+    if (this.needsWorldTick(nowMs)) {
+      scheduleWeaponArsenalWorldTick(this);
+      return;
+    }
+
+    unscheduleWeaponArsenalWorldTick(this);
+  }
+
+  #withWorldTickSchedule<T>(nowMs: number, run: () => T): T {
+    const result = run();
+    this.#syncWorldTickSchedule(nowMs);
+    return result;
   }
 
   prepareWorldTickContext(aim?: { readonly yaw: number; readonly pitch: number }): void {
@@ -381,12 +400,13 @@ export class WeaponArsenal implements WorldEffectsSource {
     this.#redeemerGuided.end();
     this.#hitscan.releaseAllEffects();
     this.#projectileSim.releaseOwner(this.#sourceActorId);
+    unscheduleWeaponArsenalWorldTick(this);
   }
 
   releaseAllWorldEffects(): void {
     this.suspendCombat(this.#combatNowMs);
     this.#projectileSim.unregisterBridge(this.#sourceActorId);
-    unregisterWorldEffectsSource(this);
+    unregisterWeaponArsenal(this);
   }
 
   isBeamStreamSecondarySelected(): boolean {
@@ -409,6 +429,7 @@ export class WeaponArsenal implements WorldEffectsSource {
     }
 
     this.#hitscan.tickBeamStream(weapon, fire, weapon.secondaryImpact, muzzlePosition, direction, nowMs);
+    this.#syncWorldTickSchedule(nowMs);
   }
 
   isRedeemerGuidedActive(): boolean {
@@ -477,6 +498,7 @@ export class WeaponArsenal implements WorldEffectsSource {
     this.#ensureBioChargePreview(weapon);
     const charge = this.#bioCharge.snapshot(nowMs, weapon.secondary, weapon.secondaryImpact);
     this.#syncBioChargePreview(charge.projectileScale, firstPerson);
+    this.#syncWorldTickSchedule(nowMs);
   }
 
   tickBioCharge(nowMs: number, firstPerson: boolean): void {
@@ -491,9 +513,20 @@ export class WeaponArsenal implements WorldEffectsSource {
       bioChargeAmmoCost(charge.fraction, ammoMax, this.#ammo.current)
     );
     this.#syncBioChargePreview(charge.projectileScale, firstPerson);
+    this.#syncWorldTickSchedule(nowMs);
   }
 
   releaseBioCharge(
+    nowMs: number,
+    direction: Vector3,
+    muzzlePosition: Vector3
+  ): boolean {
+    return this.#withWorldTickSchedule(nowMs, () =>
+      this.#releaseBioChargeCore(nowMs, direction, muzzlePosition)
+    );
+  }
+
+  #releaseBioChargeCore(
     nowMs: number,
     direction: Vector3,
     muzzlePosition: Vector3
@@ -541,6 +574,7 @@ export class WeaponArsenal implements WorldEffectsSource {
     }
 
     this.#rocketMagazine.beginMarkHold(nowMs);
+    this.#syncWorldTickSchedule(nowMs);
   }
 
   tickRocketMarking(nowMs: number): void {
@@ -549,9 +583,20 @@ export class WeaponArsenal implements WorldEffectsSource {
     }
 
     this.#rocketMagazine.tickMarkWhileHeld(nowMs, this.#ammo.getRoundsAvailable());
+    this.#syncWorldTickSchedule(nowMs);
   }
 
   releaseRocketVolley(
+    nowMs: number,
+    direction: Vector3,
+    muzzlePosition: Vector3
+  ): boolean {
+    return this.#withWorldTickSchedule(nowMs, () =>
+      this.#releaseRocketVolleyCore(nowMs, direction, muzzlePosition)
+    );
+  }
+
+  #releaseRocketVolleyCore(
     nowMs: number,
     direction: Vector3,
     muzzlePosition: Vector3
@@ -598,9 +643,11 @@ export class WeaponArsenal implements WorldEffectsSource {
     return this.#burstShotsRemaining > 0;
   }
 
-  tickWorld(nowMs: number, _deltaSeconds: number, _shedNonCritical = false): void {
+  tickWorld(nowMs: number, _deltaSeconds: number, shedNonCritical = false): void {
     this.#combatNowMs = nowMs;
-    this.#hitscan.update(nowMs);
+    if (!shedNonCritical) {
+      this.#hitscan.update(nowMs);
+    }
     if (this.#ammo.tick(nowMs)) {
       this.releaseBeamStream(nowMs);
     }
@@ -616,9 +663,22 @@ export class WeaponArsenal implements WorldEffectsSource {
     if (this.#burstShotsRemaining > 0) {
       this.#tickPistolBurst(nowMs, this.#burstDirection, this.#burstMuzzle);
     }
+    this.#syncWorldTickSchedule(nowMs);
   }
 
   tryFire(
+    mode: WeaponFireMode,
+    nowMs: number,
+    muzzlePosition: Vector3,
+    direction: Vector3,
+    gates: WeaponFireGates
+  ): boolean {
+    return this.#withWorldTickSchedule(nowMs, () =>
+      this.#tryFireCore(mode, nowMs, muzzlePosition, direction, gates)
+    );
+  }
+
+  #tryFireCore(
     mode: WeaponFireMode,
     nowMs: number,
     muzzlePosition: Vector3,
@@ -1124,6 +1184,7 @@ export class WeaponArsenal implements WorldEffectsSource {
     const tags = fire.projectileTags ?? [];
     if (projectileIsGuidedRedeemer(tags)) {
       this.#redeemerGuided.begin(this.#projectileSim, id, nowMs);
+      this.#syncWorldTickSchedule(nowMs);
     }
   }
 }

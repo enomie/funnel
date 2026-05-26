@@ -278,6 +278,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
   #projectileTickNowMs = 0;
   #shedNonCriticalThisFrame = false;
   #flybySyncPhase = 0;
+  #visualSyncPhase = 0;
 
   constructor(
     scene: Scene,
@@ -633,6 +634,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
     this.#shedNonCriticalThisFrame = shedNonCritical;
     const flybySyncStride =
       shedNonCritical ? 0 : this.#projectiles.length > 14 ? 2 : 1;
+    const visualSyncStride = shedNonCritical ? 2 : 1;
     let index = this.#projectiles.length - 1;
     while (index >= 0) {
       if (index >= this.#projectiles.length) {
@@ -763,8 +765,13 @@ export class WorldProjectileSim implements WorldEffectsSource {
             );
           }
 
-          this.#syncProjectileVisual(projectile);
-          this.#syncRedeemerFlightLightFor(projectile);
+          const shouldSyncVisual =
+            visualSyncStride === 1 ||
+            ((projectile.id + this.#visualSyncPhase) & 1) === 0;
+          if (shouldSyncVisual) {
+            this.#syncProjectileVisual(projectile);
+            this.#syncRedeemerFlightLightFor(projectile);
+          }
         }
       }
 
@@ -778,6 +785,7 @@ export class WorldProjectileSim implements WorldEffectsSource {
       index -= 1;
     }
     this.#flybySyncPhase = (this.#flybySyncPhase + 1) & 1;
+    this.#visualSyncPhase = (this.#visualSyncPhase + 1) & 1;
   }
 
   #syncRedeemerFlightLightFor(projectile: WorldProjectile): void {

@@ -83,7 +83,9 @@ export class HumanoidVisual {
   ): void {
     const flashNowMs = nowMs;
 
-    this.#locomotion?.update(deltaSeconds, input);
+    if (!visualReduced) {
+      this.#locomotion?.update(deltaSeconds, input);
+    }
 
     if (this.#locomotion?.deathPoseSettled) {
       this.#tickJointFlash(flashNowMs, input.isDead);

@@ -65,14 +65,7 @@ export class PhysicsTranslationInterpolator {
 
 const _interpolatedScratch: PhysicsTranslationSnapshot = { x: 0, y: 0, z: 0 };
 
-export function computeRenderInterpolationBlend(
-  physicsAccumulator: number,
-  subSteps: number
-): number {
-  if (subSteps <= 0) {
-    return 1;
-  }
-
+export function computeRenderInterpolationBlend(physicsAccumulator: number): number {
   const { fixedStep } = PHYSICS_CONFIG;
   const alpha = physicsAccumulator / fixedStep;
   if (alpha <= 0) {

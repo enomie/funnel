@@ -671,6 +671,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     player.beginFrame(snapshot, frameNowMs);
 
     if (
+      matchLive &&
       player.health.isDead &&
       !player.deathSnapshot.applied &&
       snapshot.killPressed
@@ -690,29 +691,28 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
       toast.show(`Faction flip — now ${playerTeam.definition.label}.`, 1400);
     }
 
+    playerSnapshot.faction = playerTeam.faction;
+    playerSnapshot.isDead = player.health.isDead;
     frameClock.accumulatePhysics(deltaSeconds);
+    profileMark('funnel-physics-start');
+    const physicsBatch = frameClock.consumePhysicsSteps((step) => {
+      player.fixedUpdate(step, snapshot);
+      botRoster.runFixedPhysicsSubStep(step, frameNowMs, botContextBase);
+      world.step(eventQueue);
+      player.capturePhysicsInterpolation();
+      arena.dynamicInstances.capturePhysicsInterpolation();
+    });
     const playerTranslation = player.body.translation();
     playerSnapshot.x = playerTranslation.x;
     playerSnapshot.y = playerTranslation.y;
     playerSnapshot.z = playerTranslation.z;
-    playerSnapshot.faction = playerTeam.faction;
-    playerSnapshot.isDead = player.health.isDead;
-    profileMark('funnel-physics-start');
-    const physicsBatch = frameClock.consumePhysicsSteps((step) => {
-      player.fixedUpdate(step, snapshot);
-      botRoster.fixedUpdate(step, frameNowMs, botContextBase);
-      world.step(eventQueue);
-      player.capturePhysicsInterpolation();
-      botRoster.capturePhysicsInterpolation();
-      arena.dynamicInstances.capturePhysicsInterpolation();
-    });
     botRoster.preparePhysicsFrame(
       deltaSeconds,
       frameNowMs,
       botContextBase,
       physicsBatch.loadShedNonCritical
     );
-    const renderInterpolationBlend = frameClock.renderInterpolationBlend(physicsBatch.subSteps);
+    const renderInterpolationBlend = frameClock.renderInterpolationBlend();
     player.setRenderInterpolationBlend(renderInterpolationBlend);
     botRoster.setRenderInterpolationBlend(renderInterpolationBlend);
     arena.dynamicInstances.setRenderInterpolationBlend(renderInterpolationBlend);
@@ -724,7 +724,6 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     });
 
     player.afterPhysics();
-    botRoster.afterPhysics();
     if (!player.health.isDead) {
       jumpPadField.tickPlayer(player, snapshot, frameNowMs);
     }
@@ -742,7 +741,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     const frame = player.finishFrame(deltaSeconds, snapshot, weapon, () => {
       visual.setWeapon(weapon.equipSpawnWeapon());
     });
-    botRoster.update(deltaSeconds, frameNowMs, botContextBase);
+    botRoster.update(deltaSeconds, frameNowMs, botContextBase, physicsBatch.loadShedNonCritical);
     const reviveChannelHeld = input.reviveChannelHeldNow();
     if (matchLive) {
       tickMatchLiveReviveHire(

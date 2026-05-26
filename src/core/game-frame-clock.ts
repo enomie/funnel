@@ -154,8 +154,8 @@ export class GameFrameClock {
     return batch as PhysicsStepBatch;
   }
 
-  renderInterpolationBlend(subSteps: number): number {
-    return computeRenderInterpolationBlend(this.#physicsAccumulator, subSteps);
+  renderInterpolationBlend(): number {
+    return computeRenderInterpolationBlend(this.#physicsAccumulator);
   }
 
   setVisibilityResetHandler(handler: () => void): void {

@@ -27,6 +27,7 @@ export class ActorRegistry {
   readonly #byActorId = new Map<string, CombatActor>();
   readonly #actors = new Set<CombatActor>();
   readonly #spatialCells = new Map<number, CombatActor[]>();
+  readonly #actorCellKey = new Map<CombatActor, number>();
   #spatialFrameId = -1;
 
   register(actor: CombatActor): void {
@@ -39,6 +40,8 @@ export class ActorRegistry {
     for (const collider of actor.colliders) {
       this.#byColliderHandle.set(collider.handle, actor);
     }
+
+    this.#insertActorSpatial(actor);
   }
 
   unregister(actor: CombatActor): void {
@@ -46,6 +49,7 @@ export class ActorRegistry {
       return;
     }
 
+    this.#removeActorSpatial(actor);
     this.#actors.delete(actor);
     this.#byActorId.delete(actor.id);
     this.#byBodyHandle.delete(actor.body.handle);
@@ -75,23 +79,27 @@ export class ActorRegistry {
 
     this.#spatialFrameId = frameId;
 
-    for (const bucket of this.#spatialCells.values()) {
-      bucket.length = 0;
-    }
-
     for (const actor of this.#actors) {
       if (actor.health.isDead) {
+        if (this.#actorCellKey.has(actor)) {
+          this.#removeActorSpatial(actor);
+        }
         continue;
       }
 
       const translation = actor.body.translation();
       const key = spatialCellKey(translation.x, translation.z);
-      let bucket = this.#spatialCells.get(key);
-      if (bucket === undefined) {
-        bucket = [];
-        this.#spatialCells.set(key, bucket);
+      const previousKey = this.#actorCellKey.get(actor);
+      if (previousKey === key) {
+        continue;
       }
-      bucket.push(actor);
+
+      if (previousKey !== undefined) {
+        this.#removeFromCell(actor, previousKey);
+      }
+
+      this.#actorCellKey.set(actor, key);
+      this.#addToCell(actor, key);
     }
   }
 
@@ -143,6 +151,57 @@ export class ActorRegistry {
   forEachActor(callback: (actor: CombatActor) => void): void {
     for (const actor of this.#actors) {
       callback(actor);
+    }
+  }
+
+  #insertActorSpatial(actor: CombatActor): void {
+    if (actor.health.isDead) {
+      return;
+    }
+
+    const translation = actor.body.translation();
+    const key = spatialCellKey(translation.x, translation.z);
+    this.#actorCellKey.set(actor, key);
+    this.#addToCell(actor, key);
+  }
+
+  #removeActorSpatial(actor: CombatActor): void {
+    const key = this.#actorCellKey.get(actor);
+    if (key === undefined) {
+      return;
+    }
+
+    this.#removeFromCell(actor, key);
+    this.#actorCellKey.delete(actor);
+  }
+
+  #addToCell(actor: CombatActor, key: number): void {
+    let bucket = this.#spatialCells.get(key);
+    if (bucket === undefined) {
+      bucket = [];
+      this.#spatialCells.set(key, bucket);
+    }
+
+    bucket.push(actor);
+  }
+
+  #removeFromCell(actor: CombatActor, key: number): void {
+    const bucket = this.#spatialCells.get(key);
+    if (bucket === undefined) {
+      return;
+    }
+
+    for (let index = 0; index < bucket.length; index += 1) {
+      if (bucket[index] !== actor) {
+        continue;
+      }
+
+      const lastIndex = bucket.length - 1;
+      if (index !== lastIndex) {
+        bucket[index] = bucket[lastIndex];
+      }
+      bucket.length = lastIndex;
+      return;
     }
   }
 }

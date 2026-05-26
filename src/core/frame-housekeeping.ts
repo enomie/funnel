@@ -1,6 +1,7 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/core/frame-housekeeping.ts
 
 import { tickAllWorldEffects } from '../combat/world-effects-registry';
+import { tickAllWeaponArsenalWorldTicks } from '../combat/weapon-arsenal-world-tick';
 import { tickGameAudio } from '../game-audio/audio-manager';
 import type { SegmentLineInstancingService } from '../render/segment-line-instancing';
 
@@ -24,5 +25,6 @@ export function tickFrameHousekeeping(
     deps.segmentLineInstancing.tick(frameNowMs);
   }
 
+  tickAllWeaponArsenalWorldTicks(frameNowMs, deltaSeconds, loadShedNonCritical);
   tickAllWorldEffects(frameNowMs, deltaSeconds, loadShedNonCritical);
 }

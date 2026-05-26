@@ -707,6 +707,10 @@ export class PlayerController {
   #lastInputSnapshot: InputSnapshot = IDLE_INPUT_SNAPSHOT;
 
   #applyDevLifeKeys(input: InputSnapshot): void {
+    if (this.#movementLocked) {
+      return;
+    }
+
     if (input.killPressed && !this.health.isDead) {
       this.health.kill();
     }

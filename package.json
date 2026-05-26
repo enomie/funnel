@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "inspect:shooter-pack": "node _Scripts/inspect-shooter-pack.mjs",
     "check:stride-sync": "node _Scripts/check-stride-sync.mjs",
+    "check:physics-interpolation": "node _Scripts/check-physics-interpolation.mjs",
     "measure:locomotion-stride": "node _Scripts/measure-locomotion-stride.mjs",
     "backup": "node _Scripts/_BACKUP/backup.mjs",
     "structure:write": "node _Scripts/_BACKUP/backup.mjs --structure-only",

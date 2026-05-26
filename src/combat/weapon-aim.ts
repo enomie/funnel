@@ -33,3 +33,13 @@ export function resolveMuzzleWorldPosition(socket: Object3D, out = new Vector3()
   socket.updateWorldMatrix(true, false);
   return socket.getWorldPosition(out);
 }
+
+/** One hierarchy update per actor — call after visual root sync, before muzzle read. */
+export function resolveMuzzleWorldPositionFromRoot(
+  root: Object3D,
+  socket: Object3D,
+  out: Vector3
+): Vector3 {
+  root.updateWorldMatrix(true, false);
+  return socket.getWorldPosition(out);
+}

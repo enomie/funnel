@@ -22,7 +22,7 @@ import { createCombatActor, type CombatActor } from '../combat/combat-actor';
 import type { BotSpawnSlot } from '../combat/match-roster';
 import type { FactionTeam } from '../combat/teams';
 import { rollSpawnWeapon, redeemerWeaponDefinition } from '../combat/spawn-weapon-roll';
-import { aimDirectionFromYawPitch, resolveMuzzleWorldPosition } from '../combat/weapon-aim';
+import { aimDirectionFromYawPitch, resolveMuzzleWorldPositionFromRoot } from '../combat/weapon-aim';
 import { WeaponArsenal, WEAPON_ARSENAL_BOT_BUDGET } from '../combat/weapon-arsenal';
 import type { WorldProjectileSim } from '../combat/world-projectile-sim';
 import type { ShooterPackCharacter } from '../player/shooter-pack-loader';
@@ -369,7 +369,12 @@ export class BotActor {
     );
   }
 
-  update(deltaSeconds: number, nowMs: number, context: BotCombatContext): void {
+  update(
+    deltaSeconds: number,
+    nowMs: number,
+    context: BotCombatContext,
+    loadShedNonCritical = false
+  ): void {
     const landing = this.controller.peekLandingFrame();
     const translation = this.controller.body.translation();
     _weaponBodyPosition.set(translation.x, translation.y, translation.z);
@@ -398,9 +403,15 @@ export class BotActor {
     this.#weaponAimScratch.pitch = this.controller.aimPitch;
 
     tickHumanoidRenderFrame(tickContext as HumanoidRenderTickContext, this.#locomotionScratch);
-    this.#tickFootsteps(landing);
+    if (!this.#visualReducedLod) {
+      this.#tickFootsteps(landing);
+    }
 
-    if (!this.controller.health.isDead && !this.controller.reviveStandUpPending) {
+    if (
+      !this.controller.health.isDead &&
+      !this.controller.reviveStandUpPending &&
+      (!loadShedNonCritical || !this.#visualReducedLod)
+    ) {
       this.#tickCombat(nowMs, context);
     }
 
@@ -464,7 +475,11 @@ export class BotActor {
       this.controller.aimPitch,
       this.#fireIntentScratch
     );
-    resolveMuzzleWorldPosition(this.visual.muzzleSocket, _muzzlePosition);
+    resolveMuzzleWorldPositionFromRoot(
+      this.visual.root,
+      this.visual.muzzleSocket,
+      _muzzlePosition
+    );
     this.weapon.trackMechanicsAudioOrigin(_muzzlePosition);
     aimDirectionFromYawPitch(fireIntent.aimYaw, fireIntent.aimPitch, _aimDirection);
 

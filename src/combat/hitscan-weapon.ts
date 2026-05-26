@@ -72,6 +72,7 @@ export class HitscanWeapon {
   readonly #impactSink: CombatImpactSink | null;
   readonly #sphereInstancing: SphereInstancingService | null;
   readonly #segmentLines: SegmentLineInstancingService | null;
+  readonly #onWorldTickNeeded: (() => void) | null;
   readonly #impactScratch: CombatImpactRequest;
 
   constructor(
@@ -81,7 +82,8 @@ export class HitscanWeapon {
     weaponAudio: WeaponAudio,
     impactSink: CombatImpactSink | null = null,
     sphereInstancing: SphereInstancingService | null = null,
-    segmentLines: SegmentLineInstancingService | null = null
+    segmentLines: SegmentLineInstancingService | null = null,
+    onWorldTickNeeded: (() => void) | null = null
   ) {
     this.#scene = scene;
     this.#world = world;
@@ -90,6 +92,7 @@ export class HitscanWeapon {
     this.#impactSink = impactSink;
     this.#sphereInstancing = sphereInstancing;
     this.#segmentLines = segmentLines;
+    this.#onWorldTickNeeded = onWorldTickNeeded;
     this.#impactScratch = {
       impact: {
         directDamage: 0,
@@ -292,6 +295,7 @@ export class HitscanWeapon {
       this.releaseBeamStream();
       this.#beamStream = createBeamStreamVisual(this.#scene, color);
       this.#beamStreamColor = color;
+      this.#onWorldTickNeeded?.();
     }
 
     updateBeamStreamVisual(this.#beamStream, start, end, nowMs);
@@ -334,6 +338,7 @@ export class HitscanWeapon {
     );
     if (burst !== null) {
       this.#impactBursts.push(burst);
+      this.#onWorldTickNeeded?.();
     }
   }
 }

@@ -15,12 +15,19 @@ interface MutableTargetSnapshot {
 }
 
 export interface BotTargetPlayerSnapshot {
-  readonly x: number;
-  readonly y: number;
-  readonly z: number;
   readonly faction: FactionTeam;
   readonly isDead: boolean;
   readonly body: RigidBody;
+}
+
+function writeRigidBodyTranslation(
+  body: RigidBody,
+  out: { x: number; y: number; z: number }
+): void {
+  const translation = body.translation();
+  out.x = translation.x;
+  out.y = translation.y;
+  out.z = translation.z;
 }
 
 export class BotTargetSnapshotCache {
@@ -55,9 +62,7 @@ export class BotTargetSnapshotCache {
         return false;
       }
 
-      entry.x = player.x;
-      entry.y = player.y;
-      entry.z = player.z;
+      writeRigidBodyTranslation(player.body, entry);
       index += 1;
     }
 
@@ -90,14 +95,16 @@ export class BotTargetSnapshotCache {
     this.#snapshots.length = 0;
 
     if (!player.isDead) {
-      this.#snapshots.push({
-        x: player.x,
-        y: player.y,
-        z: player.z,
+      const entry: MutableTargetSnapshot = {
+        x: 0,
+        y: 0,
+        z: 0,
         faction: player.faction,
         body: player.body,
         isDead: false
-      });
+      };
+      writeRigidBodyTranslation(player.body, entry);
+      this.#snapshots.push(entry);
     }
 
     for (const bot of bots) {

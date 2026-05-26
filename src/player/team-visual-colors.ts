@@ -17,7 +17,7 @@ const MANNEQUIN_SURFACE = {
 
 const SEGMENT_EMISSIVE_INTENSITY = 0.18;
 
-const JOINT_EMISSIVE_INTENSITY = 0.42;
+const JOINT_EMISSIVE_INTENSITY = 0.5;
 
 function isJointMesh(mesh: { name: string; material: Material | Material[] }): boolean {
   const meshName = mesh.name.toLowerCase();

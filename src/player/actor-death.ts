@@ -211,11 +211,14 @@ export function actorVisualYaw(snapshot: ActorDeathSnapshot, liveYaw: number): n
 export interface FootAnchorState {
   lastClipId: string;
   liveFeetActive: boolean;
+  liveFeetTick: number;
 }
 
 export function createFootAnchorState(): FootAnchorState {
-  return { lastClipId: '', liveFeetActive: false };
+  return { lastClipId: '', liveFeetActive: false, liveFeetTick: 0 };
 }
+
+const LIVE_FEET_ANCHOR_INTERVAL = 2;
 
 
 export function syncHumanoidVisualMesh(
@@ -234,13 +237,19 @@ export function syncHumanoidVisualMesh(
   footAnchor.lastClipId = locomotionClipId;
 
   if (needsLiveFeet) {
-    if (clipChanged || footAnchor.liveFeetActive) {
+    footAnchor.liveFeetTick += 1;
+    const shouldRefreshLiveFeet =
+      clipChanged ||
+      !footAnchor.liveFeetActive ||
+      footAnchor.liveFeetTick % LIVE_FEET_ANCHOR_INTERVAL === 0;
+    if (shouldRefreshLiveFeet) {
       footAnchor.liveFeetActive = true;
       anchorCharacterMeshFromAnimatedFeet(character, capsuleRoot, lowCapsule);
     }
     return;
   }
 
+  footAnchor.liveFeetTick = 0;
   footAnchor.liveFeetActive = false;
   anchorCharacterMeshToStance(character, anchors, crouching);
 }
