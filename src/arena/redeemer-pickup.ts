@@ -16,8 +16,6 @@ const REDEEMER_PICKUP_BOB_AMPLITUDE_M = 0.14;
 const REDEEMER_PICKUP_BOB_RAD_S = 2.6;
 const REDEEMER_PICKUP_DISPLAY_SCALE = 1.18;
 
-const REDEEMER_PICKUP_MESH_TILT_RAD = Math.PI * 0.5;
-
 export interface RedeemerPickupDeps {
   readonly scene: Scene;
   readonly registry: ActorRegistry;
@@ -46,7 +44,7 @@ export class RedeemerPickup {
 
     const weapon = redeemerWeaponDefinition();
     const mesh = createWeaponMesh(weapon);
-    mesh.rotation.x = REDEEMER_PICKUP_MESH_TILT_RAD;
+    mesh.position.z = -weapon.length * 0.5;
     mesh.scale.setScalar(REDEEMER_PICKUP_DISPLAY_SCALE);
 
     this.#root = new Group();

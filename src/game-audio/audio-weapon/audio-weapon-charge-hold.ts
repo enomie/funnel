@@ -15,7 +15,7 @@ import { AudioContextEngine } from '../audio-mixer';
 import { isWithinHearingRange } from '../audio-system';
 import { setAudioParamImmediate } from '../audio-spatial-sync';
 import { tryBeginSpatialOneShot, tryBeginSustainedSpatialVoice, type SustainedSpatialVoice } from '../audio-spatial-voice';
-import { playNoiseBurst, playOscBurst } from '../audio-one-shots/audio-one-shot-synth';
+import { scheduleExponentialDecay } from '../audio-one-shots/audio-one-shot-synth';
 
 export interface ChargeHoldMechanicsState {
   readonly rocketMarking: boolean;
@@ -24,9 +24,12 @@ export interface ChargeHoldMechanicsState {
   readonly bioChargeFraction: number;
 }
 
-const ROCKET_MARK_CLICK_HZ = 1520;
-const ROCKET_MARK_CLICK_S = 0.024;
+const ROCKET_MARK_CLICK_S = 0.016;
 const ROCKET_MARK_CLICK_GAIN = AUDIO_VOICE_PEAK * 0.95;
+const ROCKET_MARK_TICK_START_HZ = 2480;
+const ROCKET_MARK_TICK_END_HZ = 920;
+const ROCKET_MARK_BODY_START_HZ = 780;
+const ROCKET_MARK_BODY_END_HZ = 430;
 
 const BIO_RUMBLE_BASE_HZ = 44;
 const BIO_RUMBLE_PEAK_HZ = 68;
@@ -101,33 +104,11 @@ export class WeaponChargeHoldAudio {
     const context = AudioContextEngine.get().context;
     const time = context.currentTime;
 
-    playOscBurst({
-      context,
-      destination: voice.input,
-      time,
-      frequency: ROCKET_MARK_CLICK_HZ,
-      durationS: ROCKET_MARK_CLICK_S,
-      volume: ROCKET_MARK_CLICK_GAIN,
-      type: 'square',
-      track: (...nodes) => {
-        voice.track(...nodes);
-      }
+    const tick = scheduleRocketMarkClickPhrase(context, voice.input, time, (...nodes) => {
+      voice.track(...nodes);
     });
 
-    const scrape = playNoiseBurst({
-      context,
-      destination: voice.input,
-      time: time + 0.006,
-      durationS: ROCKET_MARK_CLICK_S * 1.1,
-      volume: ROCKET_MARK_CLICK_GAIN * 0.58,
-      noiseKey: 'empty-click',
-      filterHz: 2280,
-      track: (...nodes) => {
-        voice.track(...nodes);
-      }
-    });
-
-    voice.endAfter(scrape);
+    voice.endAfter(tick);
   }
 
   #syncBioRumble(position: Vector3, state: ChargeHoldMechanicsState): void {
@@ -280,4 +261,52 @@ function wireBioHoldGraph(sustained: SustainedSpatialVoice, fraction: number): B
 
 function bioRumbleGainForFraction(fraction: number): number {
   return BIO_RUMBLE_IDLE_GAIN + fraction * (BIO_RUMBLE_PEAK_GAIN - BIO_RUMBLE_IDLE_GAIN);
+}
+
+function scheduleRocketMarkClickPhrase(
+  context: BaseAudioContext,
+  destination: AudioNode,
+  startTime: number,
+  track: (...nodes: AudioNode[]) => void
+): OscillatorNode {
+  const time = startTime;
+  const durationS = ROCKET_MARK_CLICK_S;
+
+  const masterGain = context.createGain();
+  scheduleExponentialDecay(masterGain.gain, time, ROCKET_MARK_CLICK_GAIN, durationS);
+  masterGain.connect(destination);
+
+  const tickOsc = context.createOscillator();
+  tickOsc.type = 'sine';
+  tickOsc.frequency.setValueAtTime(ROCKET_MARK_TICK_START_HZ, time);
+  tickOsc.frequency.exponentialRampToValueAtTime(
+    Math.max(0.001, ROCKET_MARK_TICK_END_HZ),
+    time + durationS * 0.82
+  );
+
+  const tickGain = context.createGain();
+  tickGain.gain.value = 0.94;
+  tickOsc.connect(tickGain);
+  tickGain.connect(masterGain);
+
+  const bodyOsc = context.createOscillator();
+  bodyOsc.type = 'triangle';
+  bodyOsc.frequency.setValueAtTime(ROCKET_MARK_BODY_START_HZ, time);
+  bodyOsc.frequency.exponentialRampToValueAtTime(
+    Math.max(0.001, ROCKET_MARK_BODY_END_HZ),
+    time + durationS
+  );
+
+  const bodyGain = context.createGain();
+  bodyGain.gain.value = 0.22;
+  bodyOsc.connect(bodyGain);
+  bodyGain.connect(masterGain);
+
+  track(masterGain, tickOsc, tickGain, bodyOsc, bodyGain);
+  tickOsc.start(time);
+  bodyOsc.start(time);
+  tickOsc.stop(time + durationS);
+  bodyOsc.stop(time + durationS);
+
+  return tickOsc;
 }

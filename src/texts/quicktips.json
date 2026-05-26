@@ -1,5 +1,13 @@
 [
   {
+    "name": "Occupy Enemy Territory",
+    "description": "Push into the enemy home zone. Your team earns points every second you hold their territory, plus kills. First team to 1000 points wins."
+  },
+  {
+    "name": "Home Zone Alert",
+    "description": "The central ceiling orb glows in team color when enemies are in that home zone—yours means head back."
+  },
+  {
     "name": "Revive and Hire",
     "description": "Near a downed teammate, hold R for 1 second to revive them in place. Near a downed enemy, hold R for 2 seconds to hire them—they switch to your team."
   },
@@ -8,15 +16,11 @@
     "description": "Step on the glowing floor pads to launch yourself across the arena."
   },
   {
-    "name": "Occupy Enemy Territory",
-    "description": "Push into the enemy home zone. Your team earns points every second you hold their territory, plus kills. First team to 1000 points wins."
-  },
-  {
     "name": "Crouch Behind Cover",
     "description": "Hold C to duck behind obstacles. You stay in place—crouch is for cover, not for moving."
   },
   {
-    "name": "Home Zone Alert",
-    "description": "The central ceiling orb glows in team color when enemies are in that home zone—yours means head back."
+    "name": "Redeemer Friendly Fire",
+    "description": "The Redeemer's expanding blast damages teammates too. Watch your angle when you send it skyward—your team can still get caught in the kill zone."
   }
 ]

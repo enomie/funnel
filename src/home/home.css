@@ -19,22 +19,24 @@
   --home-card-width: 300px;
   --home-control-card-width: 240px;
   --home-hero-width: min(1120px, calc(100% - 40px));
+  --home-hero-logo-max: 860px;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html,
+html {
+  margin: 0;
+  overflow-y: scroll;
+}
+
 body.home {
   margin: 0;
   min-height: 100%;
   min-height: 100dvh;
-}
-
-body.home {
-  display: flex;
-  flex-direction: column;
+  display: block;
+  overflow-x: clip;
   background-color: var(--home-grid-base);
   background-image:
     linear-gradient(var(--home-grid-major) 1px, transparent 1px),
@@ -48,8 +50,12 @@ body.home {
   -webkit-tap-highlight-color: transparent;
 }
 
-body.home > * {
-  flex-shrink: 0;
+/* Intro column (logo, copy, CTA) — width changes here must not affect sliders below. */
+
+.home-intro {
+  width: 100%;
+  max-width: var(--home-hero-width);
+  margin-inline: auto;
 }
 
 /* —— Navbar —— */
@@ -88,30 +94,44 @@ body.home > * {
 }
 
 .home-nav__start {
-  min-height: 44px;
-  padding: 0 24px;
+  min-height: 40px;
+  padding: 0 22px;
 }
 
 .home-start {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin: 0;
   border: 1px solid var(--home-team);
   border-radius: 0;
   background: var(--home-team);
   color: var(--home-text);
   font: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: normal;
-  text-transform: none;
-  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
   white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: none;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
 }
 
 .home-start:hover {
   background: transparent;
   color: var(--home-text);
+}
+
+.home-start:active {
+  background: rgba(var(--home-team-rgb), 0.16);
 }
 
 .home-start:focus-visible {
@@ -128,8 +148,7 @@ body.home > * {
   justify-content: center;
   gap: 10px;
   width: 100%;
-  max-width: var(--home-hero-width);
-  margin-inline: auto;
+  margin: 0;
   padding: clamp(48px, 12vh, 96px) 20px 0;
   text-align: center;
 }
@@ -145,12 +164,19 @@ body.home > * {
 
 .home-hero__brand {
   margin: 0;
-  font-size: clamp(3.5rem, 14vw, 7rem);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  line-height: 0.95;
-  color: var(--home-team);
-  text-shadow: 0 0 48px rgba(var(--home-team-rgb), 0.42);
+  line-height: 0;
+  width: 100%;
+  max-width: var(--home-hero-logo-max);
+}
+
+.home-hero__logo {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 904.435 / 417.522;
+  margin-inline: auto;
+  filter: drop-shadow(0 0 48px rgba(var(--home-team-rgb), 0.42));
 }
 
 .home-hero__tagline {
@@ -176,6 +202,14 @@ body.home > * {
   color: var(--home-text-dim);
 }
 
+.home-hero__controls-icon {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin-top: 32px;
+}
+
 /* —— Hero CTA —— */
 
 .home-hero-cta {
@@ -184,9 +218,8 @@ body.home > * {
   align-items: center;
   gap: 16px;
   width: 100%;
-  max-width: var(--home-hero-width);
-  margin-inline: auto;
-  padding: 90px 20px 90px;
+  margin: 0;
+  padding: 48px 20px 56px;
   text-align: center;
 }
 
@@ -206,8 +239,7 @@ body.home > * {
 
 .home-hero-cta__start {
   min-height: 48px;
-  min-width: min(360px, 100%);
-  padding: 0 28px;
+  padding: 0 40px;
 }
 
 .home-hero-cta__platforms {
@@ -244,7 +276,11 @@ body.home > * {
   display: flex;
   flex-direction: column;
   gap: 28px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: 8px 0 24px;
+  overflow: visible;
 }
 
 .home-slider {
@@ -265,11 +301,7 @@ body.home > * {
 .home-slider__viewport {
   position: relative;
   width: 100%;
-  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
-}
-
-.home-slider--static .home-slider__viewport {
-  mask-image: none;
+  overflow: visible;
 }
 
 .home-slider__static {
@@ -290,7 +322,8 @@ body.home > * {
 }
 
 .home-slider__clip {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
   width: 100%;
 }
 
@@ -324,6 +357,9 @@ body.home > * {
 /* —— Cards —— */
 
 .home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   flex: 0 0 var(--home-card-width);
   width: var(--home-card-width);
   padding: 16px 18px;
@@ -337,22 +373,28 @@ body.home > * {
   border-color: var(--card-accent, var(--home-card-border));
 }
 
-.home-card--weapon .home-card__title,
-.home-card--pickup .home-card__title {
-  color: var(--card-accent, var(--home-text));
+.home-card--control {
+  flex: 0 1 var(--home-control-card-width);
+  width: var(--home-control-card-width);
+  border-color: var(--home-team);
+}
+
+.home-card--tip {
+  border-color: var(--home-team-enemy);
 }
 
 .home-card__head {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .home-card__slot {
- 
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.04em;
   color: var(--card-accent, var(--home-text-dim));
 }
 
@@ -361,22 +403,17 @@ body.home > * {
   font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
+  color: var(--home-text);
 }
 
-.home-card--tip .home-card__title {
-  color: var(--home-team);
-  margin-bottom: 8px;
+.home-card--weapon .home-card__title,
+.home-card--pickup .home-card__title {
+  color: var(--card-accent, var(--home-text));
 }
 
-.home-card--control {
-  flex: 0 1 var(--home-control-card-width);
-  width: var(--home-control-card-width);
-  border-color: var(--home-team);
-}
-
+.home-card--tip .home-card__title,
 .home-card--control .home-card__title {
   color: var(--home-team);
-  margin-bottom: 8px;
 }
 
 .home-card__body {
@@ -391,17 +428,20 @@ body.home > * {
   margin: 0;
   font-size: 13px;
   line-height: 1.45;
-  color: #c0cedc;
+  color: var(--home-text-dim);
 }
 
-.home-card__fire {
-  font-size: 12px;
-  color: #9aabb8;
+.home-card__lead {
+  color: #c0cedc;
 }
 
 .home-card__combo {
   color: #ffd27a;
-  font-size: 12px;
+}
+
+.home-card__fire-key {
+  font-weight: 700;
+  color: inherit;
 }
 
 /* —— Keys —— */
@@ -434,7 +474,7 @@ body.home > * {
 /* —— Footer —— */
 
 .home-footer {
-  margin-top: auto;
+  margin-top: 48px;
   padding: 24px 20px 28px;
   background-color: var(--home-grid-base);
   background-image: none;
@@ -508,8 +548,8 @@ body.home > * {
   }
 
   .home-nav__start {
-    padding: 0 16px;
-    font-size: 14px;
+    padding: 0 18px;
+    font-size: 12px;
   }
 
   .home-hero-cta__start {

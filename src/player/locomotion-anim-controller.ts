@@ -7,6 +7,7 @@ import {
   type AnimationMixer
 } from 'three/webgpu';
 import type { AnimationClipRegistry } from './animation-clip-registry';
+import { STANDING_UP_CLIP_ID } from './actor-death';
 import { resolveLocomotionBlendInto, type LocomotionBlendResult, type LocomotionBlendRole } from './locomotion-blend';
 import {
   advanceLocomotionPhase,
@@ -49,7 +50,8 @@ const ONE_SHOT_CLIPS = new Set([
   'jump-up-takeoff',
   'jump-down-land',
   'firing-rifle',
-  'walking-to-dying'
+  'walking-to-dying',
+  STANDING_UP_CLIP_ID
 ]);
 
 const CLIP = {
@@ -58,6 +60,7 @@ const CLIP = {
   jumpBackward: 'jump-backward',
   fire: 'firing-rifle',
   death: 'walking-to-dying',
+  standingUp: STANDING_UP_CLIP_ID,
   crouchIdle: CROUCH_LOCOMOTION_CLIP_ID
 } as const;
 
@@ -65,6 +68,7 @@ const HARD_SWITCH_LOCOMOTION_CLIPS: Set<string> = new Set([
   CLIP.jumpForward,
   CLIP.jumpBackward,
   CLIP.death,
+  CLIP.standingUp,
   VERTICAL_JUMP_SUBCLIP_IDS.takeoff
 ]);
 
@@ -152,6 +156,7 @@ export class LocomotionAnimController {
   #overlay: AnimationAction | null = null;
   #jumpPlayedThisAirborne = false;
   #deathPoseSettled = false;
+  #standingUpActive = false;
 
   readonly #handleFinished = (event: { action: AnimationAction }): void => {
     if (event.action === this.#overlay) {
@@ -170,6 +175,15 @@ export class LocomotionAnimController {
     this.#pauseBlendLayerClocks();
 
     if (input.isDead && this.#deathPoseSettled) {
+      return;
+    }
+
+    if (this.#standingUpActive) {
+      this.#mixer.update(deltaSeconds);
+      if (this.#locomotion !== null && !this.#locomotion.isRunning()) {
+        this.#standingUpActive = false;
+        this.#playLocomotionClip(CLIP.idle, { fade: CROSSFADE_LOCOMOTION });
+      }
       return;
     }
 
@@ -232,13 +246,32 @@ export class LocomotionAnimController {
     return this.#deathPoseSettled;
   }
 
-  
+  get standingUpActive(): boolean {
+    return this.#standingUpActive;
+  }
+
   reviveToIdle(): void {
+    this.#standingUpActive = false;
     this.#deathPoseSettled = false;
     this.#fadeOutOverlay();
     this.#clearBlendLayers();
     this.#jumpPlayedThisAirborne = false;
     this.#playLocomotionClip(CLIP.idle, { immediate: true });
+  }
+
+  playStandingUpRevive(): void {
+    this.#deathPoseSettled = false;
+    this.#fadeOutOverlay();
+    this.#clearBlendLayers();
+    this.#jumpPlayedThisAirborne = false;
+
+    if (this.#registry.hasClip(CLIP.standingUp)) {
+      this.#standingUpActive = true;
+      this.#playLocomotionClip(CLIP.standingUp, { once: true, immediate: true });
+      return;
+    }
+
+    this.reviveToIdle();
   }
 
   #updateAirborne(input: LocomotionAnimInput): void {

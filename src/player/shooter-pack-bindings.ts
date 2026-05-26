@@ -21,6 +21,7 @@ export const SHOOTER_PACK_KNOWN_BINDINGS: Record<string, string> = {
   'walk-backwards-stop': 'locomotion.backwardStop',
   'walking-backwards': 'locomotion.backwardWalk',
   'walking-to-dying': 'vitals.death',
+  'standing-up': 'vitals.revive',
   walking: 'locomotion.forwardWalk'
 };
 

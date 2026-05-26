@@ -80,8 +80,8 @@ export class PlayerVisual {
     this.#humanoid.updateLocomotion(deltaSeconds, input, nowMs);
   }
 
-  reviveLocomotion(): void {
-    this.#humanoid.reviveLocomotion();
+  reviveLocomotion(standUp = false): void {
+    this.#humanoid.reviveLocomotion(standUp);
   }
 
   syncThirdPersonWeaponStance(crouching: boolean, firstPersonBlend: number): void {
@@ -104,6 +104,10 @@ export class PlayerVisual {
 
   get locomotionClipId(): string {
     return this.#humanoid.locomotionClipId;
+  }
+
+  get standingUpActive(): boolean {
+    return this.#humanoid.standingUpActive;
   }
 
   updateCameraPresentation(firstPersonBlend: number): void {

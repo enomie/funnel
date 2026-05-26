@@ -71,6 +71,10 @@ export class BotVisual {
     return this.#humanoid.locomotionClipId;
   }
 
+  get standingUpActive(): boolean {
+    return this.#humanoid.standingUpActive;
+  }
+
   get rigId(): HumanoidRigId {
     return this.#rigId;
   }
@@ -121,8 +125,8 @@ export class BotVisual {
     this.#humanoid.syncEyesFromHead();
   }
 
-  reviveLocomotion(): void {
-    this.#humanoid.reviveLocomotion();
+  reviveLocomotion(standUp = false): void {
+    this.#humanoid.reviveLocomotion(standUp);
   }
 
   dispose(): void {

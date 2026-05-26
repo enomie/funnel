@@ -24,11 +24,15 @@ export interface ReloadMechanicsState {
   readonly kind: ReloadMechanicsKind;
 }
 
-const RELOAD_SAW_BASE_HZ = 280;
-const RELOAD_SAW_PEAK_HZ = 640;
-const RELOAD_IDLE_GAIN = AUDIO_VOICE_PEAK * 0.14;
-const RELOAD_PEAK_GAIN = AUDIO_VOICE_PEAK * 0.26;
-const RELOAD_ATTACK_S = 0.1;
+const RELOAD_TRI_BASE_HZ = 200;
+const RELOAD_TRI_PEAK_HZ = 500;
+const RELOAD_SQR_BASE_HZ = 300;
+const RELOAD_SQR_PEAK_HZ = 600;
+const RELOAD_IDLE_GAIN = AUDIO_VOICE_PEAK * 1.05;
+const RELOAD_PEAK_GAIN = AUDIO_VOICE_PEAK * 1.55;
+const RELOAD_ATTACK_S = 0.06;
+/** Reach working loudness quickly — not tied to 30 s Redeemer reload length. */
+const RELOAD_GAIN_RAMP_S = 0.22;
 const RELOAD_RELEASE_S = 0.4;
 /** Hard safety stop if sync/end path ever misses — prevents runaway osc / lease leak. */
 const RELOAD_SAFETY_PADDING_S = 1.2;
@@ -38,7 +42,8 @@ const RELOAD_TTL_PADDING_S = 2;
 interface ReloadVoice {
   releaseLease: () => void;
   syncPosition: (position: Vector3) => void;
-  osc: OscillatorNode;
+  triangleOsc: OscillatorNode;
+  squareOsc: OscillatorNode;
   gain: GainNode;
   /** True once nodes are stopped, disconnected, and lease released. */
   finalized: boolean;
@@ -157,7 +162,8 @@ export class WeaponReloadAudio {
     }
 
     voice.releasing = true;
-    voice.osc.onended = null;
+    voice.triangleOsc.onended = null;
+    voice.squareOsc.onended = null;
 
     if (this.#active === voice) {
       this.#active = null;
@@ -181,9 +187,11 @@ export class WeaponReloadAudio {
     voice.gain.gain.exponentialRampToValueAtTime(0.001, now + RELOAD_RELEASE_S);
 
     const fadeEnd = now + RELOAD_RELEASE_S;
-    safeStop(voice.osc, fadeEnd + 0.02, 'reload-saw-fade-stop');
+    const stopTime = fadeEnd + 0.02;
+    safeStop(voice.triangleOsc, stopTime, 'reload-tri-fade-stop');
+    safeStop(voice.squareOsc, stopTime, 'reload-sqr-fade-stop');
 
-    voice.osc.onended = () => {
+    voice.squareOsc.onended = () => {
       this.#finalizeVoice(voice);
     };
   }
@@ -195,13 +203,17 @@ export class WeaponReloadAudio {
 
     voice.finalized = true;
     voice.releasing = true;
-    voice.osc.onended = null;
+    voice.triangleOsc.onended = null;
+    voice.squareOsc.onended = null;
 
+    const stopTime = AudioContextEngine.get().context.currentTime;
     voice.gain.gain.cancelScheduledValues(0);
     setAudioParamImmediate(voice.gain.gain, 0.001);
-    safeStop(voice.osc, AudioContextEngine.get().context.currentTime, 'reload-saw-final-stop');
+    safeStop(voice.triangleOsc, stopTime, 'reload-tri-final-stop');
+    safeStop(voice.squareOsc, stopTime, 'reload-sqr-final-stop');
     safeDisconnect(voice.gain, 'reload-gain-final-disconnect');
-    safeDisconnect(voice.osc, 'reload-osc-final-disconnect');
+    safeDisconnect(voice.triangleOsc, 'reload-tri-final-disconnect');
+    safeDisconnect(voice.squareOsc, 'reload-sqr-final-disconnect');
     voice.releaseLease();
 
     if (this.#active === voice) {
@@ -225,32 +237,49 @@ function wireReloadHoldGraph(
   const time = context.currentTime;
   const safetyStopTime = time + durationS + RELOAD_RELEASE_S + RELOAD_SAFETY_PADDING_S;
 
-  const gain = safeCreateNode('reload-saw-gain', () => context.createGain());
-  const osc = safeCreateNode('reload-saw-osc', () => context.createOscillator());
-  if (gain === null || osc === null) {
+  const gain = safeCreateNode('reload-gain', () => context.createGain());
+  const triangleOsc = safeCreateNode('reload-tri-osc', () => context.createOscillator());
+  const squareOsc = safeCreateNode('reload-sqr-osc', () => context.createOscillator());
+  if (gain === null || triangleOsc === null || squareOsc === null) {
     return null;
   }
 
   gain.gain.setValueAtTime(0.001, time);
   gain.gain.exponentialRampToValueAtTime(Math.max(0.001, RELOAD_IDLE_GAIN), time + RELOAD_ATTACK_S);
+  const gainPeakAt =
+    time +
+    RELOAD_ATTACK_S +
+    Math.min(Math.max(0, durationS - RELOAD_ATTACK_S), RELOAD_GAIN_RAMP_S);
+  gain.gain.linearRampToValueAtTime(RELOAD_PEAK_GAIN, gainPeakAt);
 
-  osc.type = 'sawtooth';
-  setAudioParamImmediate(osc.frequency, RELOAD_SAW_BASE_HZ);
+  triangleOsc.type = 'triangle';
+  triangleOsc.frequency.setValueAtTime(RELOAD_TRI_BASE_HZ, time);
+  triangleOsc.frequency.linearRampToValueAtTime(RELOAD_TRI_PEAK_HZ, time + durationS);
+
+  squareOsc.type = 'square';
+  squareOsc.frequency.setValueAtTime(RELOAD_SQR_BASE_HZ, time);
+  squareOsc.frequency.linearRampToValueAtTime(RELOAD_SQR_PEAK_HZ, time + durationS);
 
   if (
-    !safeConnect(osc, gain, 'reload-saw-gain') ||
-    !safeConnect(gain, sustained.input, 'reload-saw-input')
+    !safeConnect(triangleOsc, gain, 'reload-tri-gain') ||
+    !safeConnect(squareOsc, gain, 'reload-sqr-gain') ||
+    !safeConnect(gain, sustained.input, 'reload-input')
   ) {
     return null;
   }
 
-  if (!safeStart(osc, time, 'reload-saw-start')) {
-    safeStop(osc, time + 0.01, 'reload-saw-rollback');
+  if (
+    !safeStart(triangleOsc, time, 'reload-tri-start') ||
+    !safeStart(squareOsc, time, 'reload-sqr-start')
+  ) {
+    safeStop(triangleOsc, time + 0.01, 'reload-tri-rollback');
+    safeStop(squareOsc, time + 0.01, 'reload-sqr-rollback');
     return null;
   }
 
-  safeStop(osc, safetyStopTime, 'reload-saw-safety-stop');
-  sustained.track(gain, osc);
+  safeStop(triangleOsc, safetyStopTime, 'reload-tri-safety-stop');
+  safeStop(squareOsc, safetyStopTime, 'reload-sqr-safety-stop');
+  sustained.track(gain, triangleOsc, squareOsc);
 
   const voice: ReloadVoice = {
     releaseLease: () => {
@@ -259,24 +288,20 @@ function wireReloadHoldGraph(
     syncPosition: (position) => {
       sustained.syncPosition(position);
     },
-    osc,
+    triangleOsc,
+    squareOsc,
     gain,
     finalized: false,
     releasing: false
   };
 
-  osc.onended = () => {
+  squareOsc.onended = () => {
     onFinalized(voice);
   };
 
   return voice;
 }
 
-function applyReloadTone(voice: ReloadVoice, progress: number): void {
-  const t = Math.max(0, Math.min(1, progress));
-  const hz = RELOAD_SAW_BASE_HZ + t * (RELOAD_SAW_PEAK_HZ - RELOAD_SAW_BASE_HZ);
-  const level = RELOAD_IDLE_GAIN + t * (RELOAD_PEAK_GAIN - RELOAD_IDLE_GAIN);
-
-  setAudioParamImmediate(voice.osc.frequency, hz);
-  setAudioParamImmediate(voice.gain.gain, level);
+function applyReloadTone(_voice: ReloadVoice, _progress: number): void {
+  // Tone envelope is scheduled once at voice start — per-frame param writes caused crackle.
 }

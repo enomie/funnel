@@ -94,6 +94,7 @@ export class InputState {
   #teamFlipPressed = false;
   #yaw = Math.PI;
   #pitch = -0.05;
+  #lookSensitivityScale = 1;
   #weaponSlotSelect: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -125,6 +126,15 @@ export class InputState {
 
   reviveChannelHeldNow(): boolean {
     return this.#keys.has('KeyR');
+  }
+
+  /** Multiplier on `PLAYER_CONFIG.mouseSensitivity` (FOV zoom, etc.). */
+  setLookSensitivityScale(scale: number): void {
+    this.#lookSensitivityScale = Math.max(0.05, Math.min(1, scale));
+  }
+
+  get isFirstPersonView(): boolean {
+    return this.#firstPersonView;
   }
 
   snapshot(out: InputSnapshot = this.#snapshotScratch): InputSnapshot {
@@ -280,8 +290,8 @@ export class InputState {
       return;
     }
 
-    this.#yaw -= event.movementX * PLAYER_CONFIG.mouseSensitivity;
-    this.#pitch -= event.movementY * PLAYER_CONFIG.mouseSensitivity;
+    this.#yaw -= event.movementX * PLAYER_CONFIG.mouseSensitivity * this.#lookSensitivityScale;
+    this.#pitch -= event.movementY * PLAYER_CONFIG.mouseSensitivity * this.#lookSensitivityScale;
     this.#pitch = Math.max(-1.2, Math.min(0.85, this.#pitch));
   };
 

@@ -19,8 +19,8 @@ const ONE_SHOT_CLIP_IDS = new Set([
   'start-walking-backwards',
   'walk-backwards-stop',
   'walking-to-dying',
-  'firing-rifle',
-  'walking-to-dying'
+  'standing-up',
+  'firing-rifle'
 ]);
 
 export class AnimationClipRegistry {

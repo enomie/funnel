@@ -65,7 +65,7 @@ import {
 } from '../input/input-state';
 import { createRapierRuntime } from '../physics/rapier-world';
 import { CapsuleColliderDebugLayer } from '../physics/capsule-collider-debug';
-import { PlayerCamera } from '../player/player-camera';
+import { PlayerCamera, playerHipFovDeg, weaponZoomLookSensitivityScale } from '../player/player-camera';
 import { PlayerController } from '../player/player-controller';
 import type { HumanoidRigId } from '../player/humanoid-rig';
 import { loadShooterPackCharacter } from '../player/shooter-pack-loader';
@@ -73,6 +73,7 @@ import { PlayerVisual } from '../player/player-visual';
 import { enterArenaDisplayMode } from '../platform/browser-fullscreen';
 import { createRenderer } from '../render/create-renderer';
 import { createRenderScene } from '../render/create-scene';
+import { BlobShadowController } from '../render/blob-shadow';
 import { ShadowLodController } from '../render/shadow-lod';
 import { SphereInstancingService } from '../render/sphere-instancing';
 import { SegmentLineInstancingService } from '../render/segment-line-instancing';
@@ -236,6 +237,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   };
 
   const shadowLod = new ShadowLodController();
+  const blobShadow = new BlobShadowController(scene);
   const sphereInstancing = new SphereInstancingService(scene);
   const segmentLineInstancing = new SegmentLineInstancingService(scene);
   const boltInstancing = new BoltInstancingService(scene);
@@ -254,6 +256,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     impactDeps,
     weaponAudio,
     shadowLod,
+    blobShadow,
     sphereInstancing,
     segmentLineInstancing,
     projectileSim,
@@ -334,7 +337,8 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   const weaponBarHud = new WeaponBarHud({ root: dom.weaponBar });
   const ammoHud = new AmmoHud({
     root: dom.ammoHud,
-    title: dom.ammoTitle,
+    weaponName: dom.ammoWeaponName,
+    count: dom.ammoCount,
     magazine: dom.ammoMagazine,
     reloadFill: dom.ammoReloadFill
   });
@@ -356,6 +360,9 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   const matchResultScreen = new MatchResultScreen({ shell: dom.shell });
   deathRuntime.player = new PlayerController(world, visual);
   const player = deathRuntime.player;
+  blobShadow.register(visual.root, {
+    isVisible: () => !player.health.isDead && !input.isFirstPersonView
+  });
   const localPlayerActor = createCombatActor({
     id: LOCAL_PLAYER_ACTOR_ID,
     kind: 'player',
@@ -770,6 +777,9 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
         ? selectedWeapon.sniperZoomFovScale
         : 1;
     playerCamera.setWeaponZoomFovScale(sniperZoom);
+    input.setLookSensitivityScale(
+      weaponZoomLookSensitivityScale(sniperZoom, playerHipFovDeg(snapshot.firstPersonView))
+    );
 
     playerCamera.setGuidedOverride(weapon.resolveGuidedRedeemerCamera());
 
@@ -781,6 +791,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     visual.updateAimSpine(frame.pitch, cameraFrame.firstPersonBlend, frame.isDead);
     lighting.updateShadowFocus(frame.position.x, frame.position.z);
     shadowLod.update(frame.position.x, frame.position.y, frame.position.z);
+    blobShadow.update(frame.position.x, frame.position.y, frame.position.z);
     if (matchLive) {
       matchLiveUi.tick({
         frameNowMs,
@@ -808,9 +819,6 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
 
       const muzzlePosition = playerCamera.resolveMuzzleWorldPosition(_muzzlePosition, cameraVectors);
       weapon.trackMechanicsAudioOrigin(muzzlePosition);
-      if (weapon.needsMechanicsAudioTick(frameNowMs)) {
-        weapon.tickMechanicsAudio(frameNowMs);
-      }
       const fireIntent = fillFireIntentFromInput(snapshot, selectedWeapon, PLAYER_FIRE_INTENT_SCRATCH);
       const hold = fillSecondaryHoldFromInput(snapshot, selectedWeapon, PLAYER_SECONDARY_HOLD_SCRATCH);
       const holdBlocksPrimary =
@@ -843,6 +851,10 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
           matchLive,
           cameraFrame.firstPersonBlend > 0.5
         );
+      }
+
+      if (weapon.needsMechanicsAudioTick(frameNowMs)) {
+        weapon.tickMechanicsAudio(frameNowMs);
       }
     }
 

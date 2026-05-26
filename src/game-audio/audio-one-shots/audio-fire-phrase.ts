@@ -1,9 +1,10 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/game-audio/audio-one-shots/audio-fire-phrase.ts
 
-import type { FireProfile } from '../../combat/weapon-definitions';
+import type { FireProfile, WeaponDefinition } from '../../combat/weapon-definitions';
 import type { FireAudioPreset } from '../audio-weapon/audio-fire-preset';
 import { AUDIO_VOICE_PEAK } from '../audio-config';
 import { playOscBurst } from './audio-one-shot-synth';
+import { scheduleSniperFirePhrase } from './audio-fire-sniper';
 
 
 export function scheduleFirePhrase(
@@ -11,8 +12,13 @@ export function scheduleFirePhrase(
   destination: AudioNode,
   preset: FireAudioPreset,
   fire: FireProfile,
-  startTime: number
+  startTime: number,
+  weapon?: WeaponDefinition
 ): number {
+  if (weapon?.visualKind === 'sniper') {
+    return scheduleSniperFirePhrase(context, destination, startTime);
+  }
+
   const time = startTime;
   let durationS = preset.fireDurationS;
 

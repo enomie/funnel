@@ -7,6 +7,7 @@ import { deriveFireAudioPreset } from './audio-fire-preset';
 import { defaultImpactPhraseDuration, scheduleDefaultImpactPhrase } from '../audio-one-shots/audio-impact-default';
 import { rocketImpactPhraseDuration, scheduleRocketImpactPhrase } from '../audio-one-shots/audio-impact-rocket';
 import { scheduleFirePhrase } from '../audio-one-shots/audio-fire-phrase';
+import { sniperFirePhraseDuration } from '../audio-one-shots/audio-fire-sniper';
 import { scheduleNoAmmoPhrase, NO_AMMO_PHRASE_DURATION_S } from '../audio-one-shots/audio-no-ammo-phrase';
 
 const FIRE_KEY_PREFIX = 'fire:';
@@ -54,8 +55,15 @@ async function ensureFireBake(
   }
 
   const preset = deriveFireAudioPreset(weapon, fire, weapon.primaryImpact);
-  const durationS = scheduleFirePhraseDuration(preset, fire);
+  const durationS =
+    weapon.visualKind === 'sniper'
+      ? sniperFirePhraseDuration()
+      : scheduleFirePhraseDuration(preset, fire);
   await cache.getOrBake(key, sampleRate, durationS, (context, output) => {
+    if (weapon.visualKind === 'sniper') {
+      scheduleFirePhrase(context, output, preset, fire, 0, weapon);
+      return;
+    }
     scheduleFirePhrase(context, output, preset, fire, 0);
   });
 }
@@ -124,7 +132,15 @@ export async function warmWeaponBakes(): Promise<void> {
   await Promise.all(jobs);
 }
 
-function scheduleFirePhraseDuration(preset: ReturnType<typeof deriveFireAudioPreset>, fire: FireProfile): number {
+function scheduleFirePhraseDuration(
+  preset: ReturnType<typeof deriveFireAudioPreset>,
+  fire: FireProfile,
+  weapon?: WeaponDefinition
+): number {
+  if (weapon?.visualKind === 'sniper') {
+    return sniperFirePhraseDuration();
+  }
+
   let durationS = preset.fireDurationS;
   durationS = Math.max(durationS, preset.fireDurationS * 0.72);
   if (fire.projectileCount > 1) {

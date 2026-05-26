@@ -8,6 +8,7 @@ import {
   InstancedMesh,
   Matrix4,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   Quaternion,
   Scene,
   Vector3
@@ -17,7 +18,9 @@ import type { ActorRegistry } from '../combat/actor-registry';
 import type { AudioPoint } from '../game-audio/audio-system';
 import { applyPickupPhysicsColliderDesc } from './environment-physics-material';
 import { randomPickupSpawnCenter } from './environment-rain-bounds';
+import { getHealthCrossGeometry } from '../render/pickup-geometries';
 import { getUnitLowPolySphereGeometry } from '../render/low-poly-sphere-geometry';
+import { getUnitCylinderGeometry } from '../render/unit-cylinder-geometry';
 
 export type PickupKind = 'health' | 'shield';
 
@@ -56,7 +59,19 @@ function randomDropRotation(out: Quaternion): Quaternion {
   );
 }
 
-function createPickupMaterial(color: number): MeshBasicMaterial {
+function createPickupGlowMaterial(color: number, emissiveIntensity: number): MeshStandardMaterial {
+  return new MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity,
+    roughness: 0.35,
+    metalness: 0.05,
+    transparent: true,
+    opacity: PICKUP_FIELD_CONFIG.glowOpacity
+  });
+}
+
+function createPickupDetailMaterial(color: number): MeshBasicMaterial {
   return new MeshBasicMaterial({ color });
 }
 
@@ -66,6 +81,21 @@ function pickupHalfExtentY(kind: PickupKind): number {
     : PICKUP_FIELD_CONFIG.shield.radius;
 }
 
+function createPickupInstancedMesh(
+  scene: Scene,
+  name: string,
+  geometry: BoxGeometry | ReturnType<typeof getUnitLowPolySphereGeometry> | ReturnType<typeof getUnitCylinderGeometry> | ReturnType<typeof getHealthCrossGeometry>,
+  material: MeshStandardMaterial | MeshBasicMaterial,
+  capacity: number
+): InstancedMesh {
+  const mesh = new InstancedMesh(geometry, material, capacity);
+  mesh.name = name;
+  mesh.frustumCulled = false;
+  mesh.count = capacity;
+  scene.add(mesh);
+  return mesh;
+}
+
 
 export class PickupField {
   readonly #world: World;
@@ -73,9 +103,13 @@ export class PickupField {
   readonly #onCollected: PickupFieldDeps['onCollected'];
   readonly #slots: PickupSlot[] = [];
   readonly #healthMesh: InstancedMesh;
+  readonly #healthCrossMesh: InstancedMesh;
   readonly #shieldMesh: InstancedMesh;
+  readonly #shieldDiscMesh: InstancedMesh;
   readonly #collectRadiusSq: number;
   readonly #shieldScale: number;
+  readonly #shieldDiscRadius: number;
+  readonly #shieldDiscThickness: number;
   #started = false;
 
   constructor(deps: PickupFieldDeps) {
@@ -84,38 +118,65 @@ export class PickupField {
     this.#onCollected = deps.onCollected;
     this.#collectRadiusSq = PICKUP_FIELD_CONFIG.collectRadiusM ** 2;
     this.#shieldScale = PICKUP_FIELD_CONFIG.shield.radius;
+    this.#shieldDiscRadius = PICKUP_FIELD_CONFIG.shield.radius * PICKUP_FIELD_CONFIG.shield.discRadiusScale;
+    this.#shieldDiscThickness = PICKUP_FIELD_CONFIG.shield.discThicknessM;
+
+    const healthGlowMaterial = createPickupGlowMaterial(
+      PICKUP_FIELD_CONFIG.health.color,
+      PICKUP_FIELD_CONFIG.health.emissiveIntensity
+    );
+    const healthDetailMaterial = createPickupDetailMaterial(PICKUP_FIELD_CONFIG.health.color);
+    const shieldGlowMaterial = createPickupGlowMaterial(
+      PICKUP_FIELD_CONFIG.shield.color,
+      PICKUP_FIELD_CONFIG.shield.emissiveIntensity
+    );
+    const shieldDetailMaterial = createPickupDetailMaterial(PICKUP_FIELD_CONFIG.shield.color);
 
     const [healthW, healthH, healthD] = PICKUP_FIELD_CONFIG.health.size;
-    this.#healthMesh = new InstancedMesh(
+    this.#healthMesh = createPickupInstancedMesh(
+      deps.scene,
+      'pickup-health-field',
       new BoxGeometry(healthW, healthH, healthD),
-      createPickupMaterial(PICKUP_FIELD_CONFIG.health.color),
+      healthGlowMaterial,
       PICKUP_FIELD_CONFIG.healthCount
     );
-    this.#healthMesh.name = 'pickup-health-field';
-    this.#healthMesh.frustumCulled = false;
-    this.#healthMesh.count = PICKUP_FIELD_CONFIG.healthCount;
-    deps.scene.add(this.#healthMesh);
+    this.#healthCrossMesh = createPickupInstancedMesh(
+      deps.scene,
+      'pickup-health-cross-field',
+      getHealthCrossGeometry(),
+      healthDetailMaterial,
+      PICKUP_FIELD_CONFIG.healthCount
+    );
 
-    this.#shieldMesh = new InstancedMesh(
+    this.#shieldMesh = createPickupInstancedMesh(
+      deps.scene,
+      'pickup-shield-field',
       getUnitLowPolySphereGeometry(),
-      createPickupMaterial(PICKUP_FIELD_CONFIG.shield.color),
+      shieldGlowMaterial,
       PICKUP_FIELD_CONFIG.shieldCount
     );
-    this.#shieldMesh.name = 'pickup-shield-field';
-    this.#shieldMesh.frustumCulled = false;
-    this.#shieldMesh.count = PICKUP_FIELD_CONFIG.shieldCount;
-    deps.scene.add(this.#shieldMesh);
+    this.#shieldDiscMesh = createPickupInstancedMesh(
+      deps.scene,
+      'pickup-shield-disc-field',
+      getUnitCylinderGeometry(),
+      shieldDetailMaterial,
+      PICKUP_FIELD_CONFIG.shieldCount
+    );
 
     for (let slotIndex = 0; slotIndex < PICKUP_FIELD_CONFIG.healthCount; slotIndex += 1) {
       this.#slots.push({ kind: 'health', slotIndex, body: null });
       this.#healthMesh.setMatrixAt(slotIndex, _hiddenMatrix);
+      this.#healthCrossMesh.setMatrixAt(slotIndex, _hiddenMatrix);
     }
     for (let slotIndex = 0; slotIndex < PICKUP_FIELD_CONFIG.shieldCount; slotIndex += 1) {
       this.#slots.push({ kind: 'shield', slotIndex, body: null });
       this.#shieldMesh.setMatrixAt(slotIndex, _hiddenMatrix);
+      this.#shieldDiscMesh.setMatrixAt(slotIndex, _hiddenMatrix);
     }
     this.#healthMesh.instanceMatrix.needsUpdate = true;
+    this.#healthCrossMesh.instanceMatrix.needsUpdate = true;
     this.#shieldMesh.instanceMatrix.needsUpdate = true;
+    this.#shieldDiscMesh.instanceMatrix.needsUpdate = true;
   }
 
   
@@ -197,9 +258,11 @@ export class PickupField {
 
     if (healthDirty) {
       this.#healthMesh.instanceMatrix.needsUpdate = true;
+      this.#healthCrossMesh.instanceMatrix.needsUpdate = true;
     }
     if (shieldDirty) {
       this.#shieldMesh.instanceMatrix.needsUpdate = true;
+      this.#shieldDiscMesh.instanceMatrix.needsUpdate = true;
     }
   }
 
@@ -208,25 +271,31 @@ export class PickupField {
     const rotation = body.rotation();
     _composePosition.set(translation.x, translation.y, translation.z);
     _composeQuaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+
     if (slot.kind === 'shield') {
       _composeScale.set(this.#shieldScale, this.#shieldScale, this.#shieldScale);
-    } else {
-      _composeScale.set(1, 1, 1);
-    }
-    _composeMatrix.compose(_composePosition, _composeQuaternion, _composeScale);
-
-    if (slot.kind === 'health') {
-      this.#healthMesh.setMatrixAt(slot.slotIndex, _composeMatrix);
-    } else {
+      _composeMatrix.compose(_composePosition, _composeQuaternion, _composeScale);
       this.#shieldMesh.setMatrixAt(slot.slotIndex, _composeMatrix);
+
+      _composeScale.set(this.#shieldDiscRadius, this.#shieldDiscThickness, this.#shieldDiscRadius);
+      _composeMatrix.compose(_composePosition, _composeQuaternion, _composeScale);
+      this.#shieldDiscMesh.setMatrixAt(slot.slotIndex, _composeMatrix);
+      return;
     }
+
+    _composeScale.set(1, 1, 1);
+    _composeMatrix.compose(_composePosition, _composeQuaternion, _composeScale);
+    this.#healthMesh.setMatrixAt(slot.slotIndex, _composeMatrix);
+    this.#healthCrossMesh.setMatrixAt(slot.slotIndex, _composeMatrix);
   }
 
   #markMeshDirty(kind: PickupKind): void {
     if (kind === 'health') {
       this.#healthMesh.instanceMatrix.needsUpdate = true;
+      this.#healthCrossMesh.instanceMatrix.needsUpdate = true;
     } else {
       this.#shieldMesh.instanceMatrix.needsUpdate = true;
+      this.#shieldDiscMesh.instanceMatrix.needsUpdate = true;
     }
   }
 

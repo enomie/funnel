@@ -70,6 +70,12 @@ export const AUDIO_VOICE_PEAK = 0.035;
 
 export const AUDIO_GRUNT_OUTPUT_GAIN = 0.5;
 
+/** Character-select hover lines — quieter than in-match spatial grunts. */
+export const AUDIO_PREMATCH_HOVER_TTS_GAIN = 0.34;
+
+/** Match / respawn countdown narrator send level. */
+export const AUDIO_COUNTDOWN_NARRATOR_GAIN = 0.46;
+
 
 export const BAKED_NOISE_PEAK = 0.15;
 

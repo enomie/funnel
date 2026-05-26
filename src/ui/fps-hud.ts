@@ -1,8 +1,7 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/ui/fps-hud.ts
 
-import { deriveTeamHex, deriveTeamUiHex, teamRgbaCss } from '../combat/team-color-derive';
-
 const HISTORY_SIZE = 96;
+const FPS_ACCENT_RGB_FALLBACK = '88, 214, 255';
 const UI_UPDATE_MS = 80;
 const GRAPH_WIDTH = 128;
 const GRAPH_HEIGHT = 28;
@@ -21,6 +20,7 @@ export class FpsHud {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
   readonly #samples = new Float32Array(HISTORY_SIZE);
+  readonly #accentRgb: string;
   #writeIndex = 0;
   #filled = 0;
   #lastUiMs = 0;
@@ -34,6 +34,10 @@ export class FpsHud {
       throw new Error('FUNNEL FPS HUD canvas context was not created.');
     }
     this.#ctx = context;
+    const accentRgb = getComputedStyle(document.documentElement)
+      .getPropertyValue('--funnel-fps-accent-rgb')
+      .trim();
+    this.#accentRgb = accentRgb.length > 0 ? accentRgb : FPS_ACCENT_RGB_FALLBACK;
     this.#syncCanvasSize();
   }
 
@@ -100,8 +104,8 @@ export class FpsHud {
     }
 
     const fillGradient = context.createLinearGradient(0, 0, 0, height);
-    fillGradient.addColorStop(0, teamRgbaCss(deriveTeamHex('ally'), 0.38));
-    fillGradient.addColorStop(1, teamRgbaCss(deriveTeamHex('ally'), 0));
+    fillGradient.addColorStop(0, `rgba(${this.#accentRgb}, 0.38)`);
+    fillGradient.addColorStop(1, `rgba(${this.#accentRgb}, 0)`);
 
     context.beginPath();
     context.moveTo(points[0].x, height);
@@ -119,7 +123,7 @@ export class FpsHud {
     for (let index = 1; index < points.length; index += 1) {
       context.lineTo(points[index].x, points[index].y);
     }
-    context.strokeStyle = teamRgbaCss(deriveTeamUiHex('ally', 'muted'), 0.92);
+    context.strokeStyle = `rgba(${this.#accentRgb}, 0.92)`;
     context.lineWidth = 1.25;
     context.stroke();
 

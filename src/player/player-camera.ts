@@ -25,6 +25,26 @@ const GUIDED_REDEEMER_FOV = 68;
 const COLLISION_PADDING = 0.22;
 const MIN_CAMERA_DISTANCE = 0.4;
 
+/** FOV-matched look scale for weapon zoom (same cm/360 on screen as hip fire). */
+export function playerHipFovDeg(firstPersonView: boolean): number {
+  return firstPersonView ? FIRST_PERSON_FOV : THIRD_PERSON_FOV;
+}
+
+export function weaponZoomLookSensitivityScale(
+  zoomFovScale: number,
+  hipFovDeg: number,
+  adsMultiplier = PLAYER_CONFIG.adsLookSensitivityMultiplier
+): number {
+  if (zoomFovScale >= 0.999) {
+    return 1;
+  }
+
+  const clampedZoom = Math.max(0.22, Math.min(1, zoomFovScale));
+  const hipHalfRad = (hipFovDeg * Math.PI) / 360;
+  const zoomHalfRad = (hipFovDeg * clampedZoom * Math.PI) / 360;
+  return (Math.tan(zoomHalfRad) / Math.tan(hipHalfRad)) * adsMultiplier;
+}
+
 const DEFAULT_FIRST_PERSON_MUZZLE_OFFSET = firstPersonMuzzleSocketPosition(WEAPON_DEFINITIONS[0]);
 const DEFAULT_THIRD_PERSON_MUZZLE_OFFSET = thirdPersonMuzzleSocketPosition(WEAPON_DEFINITIONS[0]);
 const _viewForward = new Vector3();

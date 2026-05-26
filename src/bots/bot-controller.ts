@@ -18,7 +18,10 @@ import {
   probeHumanoidGrounded
 } from '../player/humanoid-physics';
 import {
+  beginReviveInPlacePhysics,
   createActorDeathSnapshot,
+  finishReviveInPlacePhysics,
+  maintainReviveStandUpPhysics,
   resetActorDeathPhysics,
   syncActorDeathState,
   type ActorDeathSnapshot
@@ -75,6 +78,7 @@ export class BotController {
   #grounded = true;
   #wasGrounded = true;
   readonly #death = createActorDeathSnapshot();
+  #reviveGroundY: number | null = null;
   #lastDrive: BotDriveCommand | null = null;
   #stuckFrames = 0;
   #lastJumpAtMs = 0;
@@ -190,6 +194,26 @@ export class BotController {
 
   get deathSnapshot(): ActorDeathSnapshot {
     return this.#death;
+  }
+
+  get reviveStandUpPending(): boolean {
+    return this.#reviveGroundY !== null;
+  }
+
+  tickReviveStandUpIfDone(standingUpActive: boolean): void {
+    if (this.#reviveGroundY === null) {
+      return;
+    }
+
+    maintainReviveStandUpPhysics(this.body, this.#reviveGroundY);
+
+    if (standingUpActive) {
+      return;
+    }
+
+    finishReviveInPlacePhysics(this.body, this.collider, this.#reviveGroundY);
+    this.#reviveGroundY = null;
+    this.reseedPhysicsInterpolation();
   }
 
   get stuckFrames(): number {
@@ -312,7 +336,7 @@ export class BotController {
 
   
   afterPhysics(): void {
-    if (this.health.isDead) {
+    if (this.health.isDead || this.#reviveGroundY !== null) {
       return;
     }
 
@@ -327,7 +351,7 @@ export class BotController {
     aimTarget: { readonly yaw: number; readonly pitch: number } | null,
     nowMs: number
   ): void {
-    if (this.health.isDead) {
+    if (this.health.isDead || this.#reviveGroundY !== null) {
       return;
     }
 
@@ -385,7 +409,7 @@ export class BotController {
     }
 
     this.health.respawn();
-    resetActorDeathPhysics(this.body, this.collider, this.#death);
+    this.#reviveGroundY = beginReviveInPlacePhysics(this.body, this.collider, this.#death);
     const translation = this.body.translation();
     this.#resetLocomotionState(translation.x, translation.z, this.#yaw);
   }

@@ -66,6 +66,12 @@ function externalLink(href: string, label: string): HTMLAnchorElement {
   return link;
 }
 
+function fireLine(label: 'LMB' | 'RMB', description: string): HTMLElement {
+  const line = el('p', 'home-card__fire');
+  line.append(el('strong', 'home-card__fire-key', label), document.createTextNode(` ${description}`));
+  return line;
+}
+
 function weaponCard(slot: string, weapon: WeaponInfo): HTMLElement {
   const card = el('article', 'home-card home-card--weapon');
   card.style.setProperty('--card-accent', weapon.color);
@@ -76,8 +82,8 @@ function weaponCard(slot: string, weapon: WeaponInfo): HTMLElement {
 
   const body = el('div', 'home-card__body');
   body.append(el('p', 'home-card__lead', weapon.description));
-  body.append(el('p', 'home-card__fire', `LMB — ${weapon.lmbDescription}`));
-  body.append(el('p', 'home-card__fire', `RMB — ${weapon.rmbDescription}`));
+  body.append(fireLine('LMB', weapon.lmbDescription));
+  body.append(fireLine('RMB', weapon.rmbDescription));
   if (weapon.comboDescription) {
     body.append(el('p', 'home-card__combo', weapon.comboDescription));
   }
@@ -88,7 +94,9 @@ function weaponCard(slot: string, weapon: WeaponInfo): HTMLElement {
 function tipCard(tip: QuickTip): HTMLElement {
   const card = el('article', 'home-card home-card--tip');
   card.append(el('h3', 'home-card__title', tip.name));
-  card.append(el('p', 'home-card__lead', tip.description));
+  const body = el('div', 'home-card__body');
+  body.append(el('p', 'home-card__lead', tip.description));
+  card.append(body);
   return card;
 }
 
@@ -96,7 +104,9 @@ function pickupCard(pickup: PickupInfo): HTMLElement {
   const card = el('article', 'home-card home-card--pickup');
   if (pickup.color) card.style.setProperty('--card-accent', pickup.color);
   card.append(el('h3', 'home-card__title', pickup.name));
-  card.append(el('p', 'home-card__lead', pickup.description));
+  const body = el('div', 'home-card__body');
+  body.append(el('p', 'home-card__lead', pickup.description));
+  card.append(body);
   return card;
 }
 
@@ -217,7 +227,9 @@ export function renderKeys(root: HTMLElement, keys: KeyBinding[]): void {
   for (const row of keys) {
     const card = el('article', 'home-card home-card--control');
     card.append(el('h3', 'home-card__title', row.action));
-    card.append(el('p', 'home-card__lead', row.keys));
+    const body = el('div', 'home-card__body');
+    body.append(el('p', 'home-card__lead', row.keys));
+    card.append(body);
     list.append(card);
   }
   section.append(list);

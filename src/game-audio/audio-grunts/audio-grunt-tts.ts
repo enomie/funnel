@@ -4,6 +4,7 @@ import type { HumanoidRigId } from '../../player/humanoid-rig';
 import { tryBeginSpatialOneShot } from '../audio-spatial-voice';
 import { fillCapsuleFootPoint, spatialVectorFromPoint } from '../audio-system';
 import { AudioContextEngine } from '../audio-mixer';
+import { AUDIO_PREMATCH_HOVER_TTS_GAIN } from '../audio-config';
 import { GruntSynth } from './audio-grunt-synth';
 import {
   gruntVoiceSettingsForId,
@@ -12,6 +13,17 @@ import {
 } from './audio-grunt-voice-presets';
 
 let sharedSynth: GruntSynth | null = null;
+let prematchHoverTtsInput: GainNode | null = null;
+
+function getPrematchHoverTtsDestination(): AudioNode {
+  if (prematchHoverTtsInput === null) {
+    const engine = AudioContextEngine.get();
+    prematchHoverTtsInput = engine.context.createGain();
+    prematchHoverTtsInput.gain.value = AUDIO_PREMATCH_HOVER_TTS_GAIN;
+    prematchHoverTtsInput.connect(engine.sfxInput);
+  }
+  return prematchHoverTtsInput;
+}
 
 export function getGruntSynth(): GruntSynth {
   sharedSynth ??= new GruntSynth({
@@ -25,6 +37,15 @@ export function getGruntSynth(): GruntSynth {
 export async function speakGrunt(text: string, rigId: HumanoidRigId): Promise<void> {
   AudioContextEngine.get().resume();
   await getGruntSynth().playText(gruntVoiceSettingsForRig(rigId), text);
+}
+
+export async function speakPrematchHoverGrunt(text: string, rigId: HumanoidRigId): Promise<void> {
+  AudioContextEngine.get().resume();
+  await getGruntSynth().playText(
+    gruntVoiceSettingsForRig(rigId),
+    text,
+    getPrematchHoverTtsDestination()
+  );
 }
 
 

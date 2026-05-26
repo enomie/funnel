@@ -42,6 +42,8 @@ export const PLAYER_CONFIG = {
   
   jumpVelocity: 24,
   mouseSensitivity: 0.0013,
+  /** Extra ADS scale on top of FOV-matched zoom (1 = AAA screen-consistent aim). */
+  adsLookSensitivityMultiplier: 1,
   
   thirdPersonDistance: 5.5,
   cameraHeight: 0.49,
@@ -65,19 +67,24 @@ export const PICKUP_FIELD_CONFIG = {
   healthCount: 6,
   
   collectRadiusM: 1.35,
+  glowOpacity: 0.9,
   
   density: 220,
   shield: {
     color: 0x58d6ff,
     emissiveIntensity: 1.35,
     grantAmount: 50,
-    radius: 0.42
+    radius: 0.42,
+    discRadiusScale: 1.24,
+    discThicknessM: 0.045
   },
   health: {
     color: 0x58ffb0,
     emissiveIntensity: 1.25,
     grantAmount: 25,
-    size: [1, 0.5, 1] as const
+    size: [1, 0.5, 1] as const,
+    crossArmFraction: 0.72,
+    crossBarThicknessM: 0.07
   }
 } as const;
 

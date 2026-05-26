@@ -394,9 +394,10 @@ export class BotActor {
     this.#weaponAimScratch.pitch = this.controller.aimPitch;
 
     tickHumanoidRenderFrame(tickContext as HumanoidRenderTickContext, this.#locomotionScratch);
+    this.controller.tickReviveStandUpIfDone(this.visual.standingUpActive);
     this.#tickFootsteps(landing);
 
-    if (!this.controller.health.isDead) {
+    if (!this.controller.health.isDead && !this.controller.reviveStandUpPending) {
       this.#tickCombat(nowMs, context);
     }
 
@@ -451,10 +452,7 @@ export class BotActor {
       this.#fireIntentScratch
     );
     resolveMuzzleWorldPosition(this.visual.muzzleSocket, _muzzlePosition);
-    if (this.weapon.needsMechanicsAudioTick(nowMs)) {
-      this.weapon.trackMechanicsAudioOrigin(_muzzlePosition);
-      this.weapon.tickMechanicsAudio(nowMs);
-    }
+    this.weapon.trackMechanicsAudioOrigin(_muzzlePosition);
     aimDirectionFromYawPitch(fireIntent.aimYaw, fireIntent.aimPitch, _aimDirection);
 
     const wantsHoldSecondary =
@@ -483,6 +481,10 @@ export class BotActor {
       this.#secondaryHoldActive = this.weapon.isBioChargeHolding() || this.weapon.isRocketMarking();
     } else {
       this.#secondaryHoldActive = false;
+    }
+
+    if (this.weapon.needsMechanicsAudioTick(nowMs)) {
+      this.weapon.tickMechanicsAudio(nowMs);
     }
 
     const primaryBusy =
@@ -517,7 +519,7 @@ export class BotActor {
     this.#targetFocus.reset();
     this.#combatSuspend.active = false;
     this.#secondaryHoldActive = false;
-    this.visual.reviveLocomotion();
+    this.visual.reviveLocomotion(true);
   }
 
   hireInPlace(newFaction: FactionTeam, viewerTeam: PlayerTeam): void {
@@ -530,7 +532,7 @@ export class BotActor {
     this.#combatSuspend.active = false;
     this.#secondaryHoldActive = false;
     this.visual.applyViewerColors(viewerTeam);
-    this.visual.reviveLocomotion();
+    this.visual.reviveLocomotion(true);
   }
 
   dispose(world: World, registry: ActorRegistry): void {

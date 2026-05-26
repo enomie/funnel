@@ -9,6 +9,7 @@ import { devPlaceholderSpawnPairs } from '../combat/match-roster';
 import type { FactionTeam } from '../combat/teams';
 import { resolveBotShooterPack, type ShooterPackRoster } from '../player/humanoid-rig';
 import type { PlayerTeam } from '../player/player-team';
+import type { BlobShadowController } from '../render/blob-shadow';
 import type { ShadowLodController } from '../render/shadow-lod';
 import type { SphereInstancingService } from '../render/sphere-instancing';
 import type { SegmentLineInstancingService } from '../render/segment-line-instancing';
@@ -39,6 +40,7 @@ export interface BotRosterDeps {
   readonly impactDeps: ApplyImpactDeps;
   readonly weaponAudio: WeaponAudio;
   readonly shadowLod: ShadowLodController;
+  readonly blobShadow: BlobShadowController;
   readonly sphereInstancing: SphereInstancingService;
   readonly segmentLineInstancing: SegmentLineInstancingService;
   readonly projectileSim: WorldProjectileSim;
@@ -53,6 +55,7 @@ export class BotRoster {
   readonly #impactDeps: ApplyImpactDeps;
   readonly #weaponAudio: WeaponAudio;
   readonly #shadowLod: ShadowLodController;
+  readonly #blobShadow: BlobShadowController;
   readonly #sphereInstancing: SphereInstancingService;
   readonly #segmentLineInstancing: SegmentLineInstancingService;
   readonly #projectileSim: WorldProjectileSim;
@@ -90,6 +93,7 @@ export class BotRoster {
     this.#impactDeps = deps.impactDeps;
     this.#weaponAudio = deps.weaponAudio;
     this.#shadowLod = deps.shadowLod;
+    this.#blobShadow = deps.blobShadow;
     this.#sphereInstancing = deps.sphereInstancing;
     this.#segmentLineInstancing = deps.segmentLineInstancing;
     this.#projectileSim = deps.projectileSim;
@@ -124,6 +128,9 @@ export class BotRoster {
           spawnPairs.length
         );
       this.#shadowLod.register(bot.visual.root);
+      this.#blobShadow.register(bot.visual.root, {
+        isVisible: () => !bot.controller.health.isDead
+      });
       this.#bots.push(bot);
     }
   }
@@ -297,6 +304,7 @@ export class BotRoster {
     for (const bot of this.#bots) {
       this.#capsuleDebug.untrack(bot.combatActor.id);
       this.#shadowLod.unregister(bot.visual.root);
+      this.#blobShadow.unregister(bot.visual.root);
       bot.dispose(this.#world, this.#actorRegistry);
     }
 

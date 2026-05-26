@@ -86,7 +86,14 @@ export class MatchFlowScreen {
     loadingPanel.innerHTML = `
       <div class="funnel-prematch-screen__loader-brand">
         <p class="funnel-prematch-screen__welcome">Welcome to the</p>
-        <h1 class="funnel-prematch-screen__brand">FUNNEL</h1>
+        <h1 class="funnel-prematch-screen__brand funnel-prematch-screen__brand--loader">
+          <img
+            class="funnel-prematch-screen__logo"
+            src="/icons/logo-standalone.svg"
+            alt="FUNNEL"
+            decoding="async"
+          />
+        </h1>
       </div>
       <div class="funnel-prematch-screen__loader-progress">
         <p class="funnel-prematch-screen__progress-label">Preparing…</p>

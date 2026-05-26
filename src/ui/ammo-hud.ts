@@ -4,14 +4,16 @@ import type { AmmoCellState, AmmoHudSnapshot } from '../combat/ammo-controller';
 
 export interface AmmoHudNodes {
   root: HTMLDivElement;
-  title: HTMLSpanElement;
+  weaponName: HTMLSpanElement;
+  count: HTMLSpanElement;
   magazine: HTMLDivElement;
   reloadFill: HTMLDivElement;
 }
 
 export class AmmoHud {
   readonly #root: HTMLDivElement;
-  readonly #title: HTMLSpanElement;
+  readonly #weaponName: HTMLSpanElement;
+  readonly #count: HTMLSpanElement;
   readonly #magazine: HTMLDivElement;
   readonly #reloadFill: HTMLDivElement;
   #cells: HTMLDivElement[] = [];
@@ -20,7 +22,8 @@ export class AmmoHud {
 
   constructor(nodes: AmmoHudNodes) {
     this.#root = nodes.root;
-    this.#title = nodes.title;
+    this.#weaponName = nodes.weaponName;
+    this.#count = nodes.count;
     this.#magazine = nodes.magazine;
     this.#reloadFill = nodes.reloadFill;
     this.#root.hidden = true;
@@ -40,7 +43,8 @@ export class AmmoHud {
     }
 
     this.#root.hidden = false;
-    this.#title.textContent = `${snapshot.weaponName} · ${String(snapshot.ammoCurrent)}`;
+    this.#weaponName.textContent = snapshot.weaponName;
+    this.#count.textContent = String(snapshot.ammoCurrent);
     setAmmoAccentColor(this.#root, snapshot.weaponColor);
     this.#syncMagazineCells(snapshot);
     const reloadPercent = Math.round(snapshot.reloadProgress * 100);

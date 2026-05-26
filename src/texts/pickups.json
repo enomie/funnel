@@ -8,5 +8,10 @@
     "name": "Shield Belt",
     "color": "#44ddff",
     "description": "Cyan sphere that falls from the sky. Walk over it to gain 50 shield. A new belt drops when one is taken."
+  },
+  "redeemer": {
+    "name": "Redeemer",
+    "color": "#ffe66d",
+    "description": "Golden nuke on the center podium. Walk over it to equip the Redeemer — one shot, massive blast. Respawns 60 seconds after pickup."
   }
 }

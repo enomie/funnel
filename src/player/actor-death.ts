@@ -9,7 +9,8 @@ import {
   inferCapsuleModeFromCollider,
   inferGroundYFromBody,
   meshUsesCrouchCapsule,
-  pinBodyCapsuleToGround
+  pinBodyCapsuleToGround,
+  transitionCapsuleOnGround
 } from './humanoid-capsule-sync';
 import {
   anchorCharacterMeshFromAnimatedFeet,
@@ -18,9 +19,12 @@ import {
 import type { StanceMeshAnchors } from './player-stance';
 import { VERTICAL_JUMP_SUBCLIP_IDS } from './vertical-jump-subclips';
 
+export const STANDING_UP_CLIP_ID = 'standing-up';
+
 export const HUMANOID_JUMP_FOOT_CLIP_IDS = new Set<string>([
   VERTICAL_JUMP_SUBCLIP_IDS.takeoff,
-  VERTICAL_JUMP_SUBCLIP_IDS.land
+  VERTICAL_JUMP_SUBCLIP_IDS.land,
+  STANDING_UP_CLIP_ID
 ]);
 
 export type ReviveHireChannelMode = 'revive' | 'hire';
@@ -130,6 +134,40 @@ export function resetActorDeathPhysics(
   freezeBodyOnGround(body);
 }
 
+export function beginReviveInPlacePhysics(
+  body: RigidBody,
+  collider: Collider,
+  snapshot: ActorDeathSnapshot
+): number {
+  const groundY =
+    snapshot.groundY ??
+    inferGroundYFromBody(body, inferCapsuleModeFromCollider(collider));
+  clearActorDeathSnapshot(snapshot);
+  applyCapsuleMode(collider, 'crouch');
+  pinBodyCapsuleToGround(body, groundY, 'crouch');
+  freezeBodyOnGround(body);
+  return groundY;
+}
+
+export function finishReviveInPlacePhysics(
+  body: RigidBody,
+  collider: Collider,
+  groundY: number
+): void {
+  transitionCapsuleOnGround({
+    collider,
+    body,
+    toMode: 'stand',
+    groundY
+  });
+  freezeBodyOnGround(body);
+}
+
+export function maintainReviveStandUpPhysics(body: RigidBody, groundY: number): void {
+  freezeBodyOnGround(body);
+  pinBodyCapsuleToGround(body, groundY, 'crouch');
+}
+
 export function actorVisualYaw(snapshot: ActorDeathSnapshot, liveYaw: number): number {
   return snapshot.applied ? snapshot.frozenYaw : liveYaw;
 }
@@ -153,7 +191,8 @@ export function syncHumanoidVisualMesh(
   footAnchor: FootAnchorState
 ): void {
   const capsuleRoot = character.parent as Object3D;
-  const lowCapsule = meshUsesCrouchCapsule(isDead, crouching);
+  const lowCapsule =
+    meshUsesCrouchCapsule(isDead, crouching) || locomotionClipId === STANDING_UP_CLIP_ID;
   const needsLiveFeet = isDead || HUMANOID_JUMP_FOOT_CLIP_IDS.has(locomotionClipId);
   const clipChanged = footAnchor.lastClipId !== locomotionClipId;
   footAnchor.lastClipId = locomotionClipId;

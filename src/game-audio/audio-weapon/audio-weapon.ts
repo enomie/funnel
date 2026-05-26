@@ -91,7 +91,7 @@ export class WeaponAudio {
 
     const preset = deriveFireAudioPreset(weapon, fire, impact);
     const time = context.currentTime;
-    const durationS = scheduleFirePhrase(context, voice.input, preset, fire, time);
+    const durationS = scheduleFirePhrase(context, voice.input, preset, fire, time, weapon);
     const tail = scheduleVoiceTail(context, voice.input, durationS);
     voice.track(tail);
     voice.endAfter(tail);

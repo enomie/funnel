@@ -7,10 +7,10 @@ import {
   safeCreateNode
 } from '../audio-guard';
 import { AudioContextEngine } from '../audio-mixer';
+import { AUDIO_COUNTDOWN_NARRATOR_GAIN } from '../audio-config';
 
-const NARRATOR_COUNTDOWN_GAIN = 0.86;
-const NARRATOR_REVERB_DRY = 0.68;
-const NARRATOR_REVERB_WET = 0.54;
+const NARRATOR_REVERB_DRY = 0.58;
+const NARRATOR_REVERB_WET = 0.4;
 const NARRATOR_REVERB_IR_DURATION_S = 2.4;
 const NARRATOR_REVERB_IR_DECAY = 3.2;
 const NARRATOR_REVERB_WET_CUTOFF_HZ = 3200;
@@ -86,7 +86,7 @@ function ensureNarratorReverbBus(): boolean {
     return false;
   }
 
-  input.gain.value = NARRATOR_COUNTDOWN_GAIN;
+  input.gain.value = AUDIO_COUNTDOWN_NARRATOR_GAIN;
   dryGain.gain.value = NARRATOR_REVERB_DRY;
   wetGain.gain.value = NARRATOR_REVERB_WET;
   wetFilter.type = 'lowpass';

@@ -54,6 +54,10 @@ export class HumanoidVisual {
     return this.#locomotion?.currentClipId ?? 'rifle-aiming-idle';
   }
 
+  get standingUpActive(): boolean {
+    return this.#locomotion?.standingUpActive ?? false;
+  }
+
   get meshAnchors(): StanceMeshAnchors {
     return this.#meshAnchors;
   }
@@ -134,18 +138,22 @@ export class HumanoidVisual {
     this.#jointFlashActive = false;
   }
 
-  reviveLocomotion(): void {
-    this.#locomotion?.reviveToIdle();
-    resetHeadBoneEyeSyncGate(this.#eyeSyncGate);
-    this.#clearJointFlash();
-    if (this.#character !== null) {
-      anchorCharacterMeshToStance(this.#character, this.#meshAnchors, false);
-      return;
+  reviveLocomotion(standUp = false): void {
+    if (standUp) {
+      this.#locomotion?.playStandingUpRevive();
+      this.#footAnchor.lastClipId = '';
+      this.#footAnchor.liveFeetActive = true;
+    } else {
+      this.#locomotion?.reviveToIdle();
+      if (this.#character !== null) {
+        anchorCharacterMeshToStance(this.#character, this.#meshAnchors, false);
+      } else if (this.#fallbackBody !== null) {
+        this.#fallbackBody.position.y = HUMANOID_FALLBACK_MESH_BOTTOM_Y;
+      }
     }
 
-    if (this.#fallbackBody !== null) {
-      this.#fallbackBody.position.y = HUMANOID_FALLBACK_MESH_BOTTOM_Y;
-    }
+    resetHeadBoneEyeSyncGate(this.#eyeSyncGate);
+    this.#clearJointFlash();
   }
 
   syncTransform(x: number, y: number, z: number, yaw: number): void {

@@ -41,7 +41,10 @@ import {
 } from './humanoid-capsule-sync';
 import { computeJumpImpulse, createJumpAirThrustState, applyJumpAirThrust, type JumpAirThrustState, type JumpStyle, type JumpImpulseResult } from './player-jump';
 import {
+  beginReviveInPlacePhysics,
   createActorDeathSnapshot,
+  finishReviveInPlacePhysics,
+  maintainReviveStandUpPhysics,
   resetActorDeathPhysics,
   syncActorDeathState,
   type ActorDeathSnapshot
@@ -92,6 +95,7 @@ export class PlayerController {
   #isSliding = false;
   #pinnedGroundY: number | null = null;
   #movementLocked = false;
+  #reviveGroundY: number | null = null;
   #frameNow = 0;
   #lastJumpStyle: JumpStyle = 'idle';
   #jumpAirThrust: JumpAirThrustState | null = null;
@@ -224,6 +228,10 @@ export class PlayerController {
       return;
     }
 
+    if (this.#reviveGroundY !== null) {
+      return;
+    }
+
     this.#reconcileGrounded(this.#frameNow);
     this.#applyKeyEdges(input, this.#frameNow);
     this.#applyJumpImpulse(this.#frameNow, input);
@@ -231,7 +239,7 @@ export class PlayerController {
 
   
   fixedUpdate(fixedStep: number, input: InputSnapshot): void {
-    if (this.health.isDead) {
+    if (this.health.isDead || this.#reviveGroundY !== null) {
       return;
     }
 
@@ -241,6 +249,10 @@ export class PlayerController {
   
   afterPhysics(): void {
     if (this.health.isDead) {
+      return;
+    }
+
+    if (this.#reviveGroundY !== null) {
       return;
     }
 
@@ -273,6 +285,10 @@ export class PlayerController {
     this.#weaponBodyPosition.set(translation.x, translation.y, translation.z);
     this.#fillLocomotionInput(input, landedFromAir, this.#locomotionScratch);
 
+    if (this.#reviveGroundY !== null) {
+      maintainReviveStandUpPhysics(this.body, this.#reviveGroundY);
+    }
+
     const tickContext = this.#humanoidTickContext;
     tickContext.isDead = this.health.isDead;
     tickContext.nowMs = now;
@@ -282,6 +298,7 @@ export class PlayerController {
     tickContext.weaponAim.pitch = input.pitch;
     tickContext.onRevive = onRevive;
     tickHumanoidRenderFrame(tickContext as HumanoidRenderTickContext, this.#locomotionScratch);
+    this.#finishReviveStandUpIfDone();
 
     fillHumanoidRenderTranslation(
       this.#translationInterp,
@@ -440,9 +457,18 @@ export class PlayerController {
     }
 
     this.health.respawn();
-    resetActorDeathPhysics(this.body, this.collider, this.#death);
-    this.#standFromCrouch();
-    this.visual.reviveLocomotion();
+    this.#reviveGroundY = beginReviveInPlacePhysics(this.body, this.collider, this.#death);
+    this.visual.reviveLocomotion(true);
+  }
+
+  #finishReviveStandUpIfDone(): void {
+    if (this.#reviveGroundY === null || this.visual.standingUpActive) {
+      return;
+    }
+
+    finishReviveInPlacePhysics(this.body, this.collider, this.#reviveGroundY);
+    this.#reviveGroundY = null;
+    this.reseedPhysicsInterpolation();
   }
 
   #applyJumpImpulse(now: number, input: InputSnapshot): void {
@@ -673,7 +699,7 @@ export class PlayerController {
   }
 
   #applyKeyEdges(input: InputSnapshot, now: number): void {
-    if (this.health.isDead) {
+    if (this.health.isDead || this.#reviveGroundY !== null) {
       return;
     }
 

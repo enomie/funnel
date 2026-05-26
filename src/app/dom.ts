@@ -24,7 +24,8 @@ export interface AppDom {
   teamEnemyKills: HTMLSpanElement;
   teamEnemyPoints: HTMLSpanElement;
   ammoHud: HTMLDivElement;
-  ammoTitle: HTMLSpanElement;
+  ammoWeaponName: HTMLSpanElement;
+  ammoCount: HTMLSpanElement;
   ammoMagazine: HTMLDivElement;
   ammoReloadFill: HTMLDivElement;
   weaponBar: HTMLDivElement;
@@ -70,60 +71,58 @@ export function createAppDom(root: HTMLDivElement): AppDom {
       ${FUNNEL_GAME_BRAND_MARKUP}
       <div class="funnel-team-scoreboard" aria-label="Team scores">
       <div class="funnel-team-badge funnel-team-badge--own" data-role="ally">
-        <div class="funnel-team-badge__head">
-          <span class="funnel-team-badge__label">Team Beta</span>
-        </div>
-        <div class="funnel-team-badge__metrics">
-          <div class="funnel-team-badge__metric">
-            <span class="funnel-team-badge__members" aria-label="Team members">0</span>
-            <span class="funnel-team-badge__metric-label">Members</span>
-          </div>
-          <div class="funnel-team-badge__metric">
-            <span class="funnel-team-badge__kills" aria-label="Team kills">0</span>
-            <span class="funnel-team-badge__metric-label">Kills</span>
-          </div>
-          <div class="funnel-team-badge__metric">
-            <span class="funnel-team-badge__points" aria-label="Team points">000</span>
-            <span class="funnel-team-badge__metric-label">Points</span>
+        <div class="funnel-team-badge__body">
+          <span class="funnel-hud-panel__caption funnel-team-badge__caption funnel-team-badge__label">Team Beta</span>
+          <div class="funnel-team-badge__metrics">
+            <div class="funnel-team-badge__metric funnel-team-badge__metric--members">
+              <span class="funnel-team-badge__members" aria-label="Team members">0</span>
+              <span class="funnel-team-badge__metric-label">Members</span>
+            </div>
+            <div class="funnel-team-badge__metric funnel-team-badge__metric--kills">
+              <span class="funnel-team-badge__kills" aria-label="Team kills">0</span>
+              <span class="funnel-team-badge__metric-label">Kills</span>
+            </div>
+            <div class="funnel-team-badge__metric funnel-team-badge__metric--points">
+              <span class="funnel-team-badge__points" aria-label="Team points">000</span>
+              <span class="funnel-team-badge__metric-label">Points</span>
+            </div>
           </div>
         </div>
       </div>
       <div class="funnel-team-badge funnel-team-badge--enemy" data-role="enemy">
-        <div class="funnel-team-badge__head">
-          <span class="funnel-team-badge__label">Team Alpha</span>
-        </div>
-        <div class="funnel-team-badge__metrics">
-          <div class="funnel-team-badge__metric">
-            <span class="funnel-team-badge__members" aria-label="Team members">0</span>
-            <span class="funnel-team-badge__metric-label">Members</span>
-          </div>
-          <div class="funnel-team-badge__metric">
-            <span class="funnel-team-badge__kills" aria-label="Team kills">0</span>
-            <span class="funnel-team-badge__metric-label">Kills</span>
-          </div>
-          <div class="funnel-team-badge__metric">
-            <span class="funnel-team-badge__points" aria-label="Team points">000</span>
-            <span class="funnel-team-badge__metric-label">Points</span>
+        <div class="funnel-team-badge__body">
+          <span class="funnel-hud-panel__caption funnel-team-badge__caption funnel-team-badge__label">Team Alpha</span>
+          <div class="funnel-team-badge__metrics">
+            <div class="funnel-team-badge__metric funnel-team-badge__metric--members">
+              <span class="funnel-team-badge__members" aria-label="Team members">0</span>
+              <span class="funnel-team-badge__metric-label">Members</span>
+            </div>
+            <div class="funnel-team-badge__metric funnel-team-badge__metric--kills">
+              <span class="funnel-team-badge__kills" aria-label="Team kills">0</span>
+              <span class="funnel-team-badge__metric-label">Kills</span>
+            </div>
+            <div class="funnel-team-badge__metric funnel-team-badge__metric--points">
+              <span class="funnel-team-badge__points" aria-label="Team points">000</span>
+              <span class="funnel-team-badge__metric-label">Points</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
     </div>
-    <div class="funnel-hud-panel funnel-health" aria-label="Player health and shield">
-      <div class="funnel-hud-panel__head funnel-health__head">
-        <span class="funnel-hud-panel__title">Vitals</span>
-      </div>
+    <div class="funnel-hud-panel funnel-hud-panel--stat funnel-health" aria-label="Player health and shield">
       <div class="funnel-hud-panel__body">
-        <div class="funnel-stat-row">
-          <span class="funnel-stat-row__label funnel-stat-row__label--health">HP</span>
-          <div class="funnel-stat-row__track">
-            <div class="funnel-health__fill funnel-stat-row__fill"></div>
+        <div class="funnel-hud-panel__caption funnel-health__caption">Vitals</div>
+        <div class="funnel-hud-panel__bars">
+          <div class="funnel-stat-row">
+            <div class="funnel-stat-row__track">
+              <div class="funnel-health__fill funnel-stat-row__fill"></div>
+            </div>
           </div>
-        </div>
-        <div class="funnel-stat-row">
-          <span class="funnel-stat-row__label funnel-stat-row__label--shield">SH</span>
-          <div class="funnel-stat-row__track">
-            <div class="funnel-shield__fill funnel-stat-row__fill"></div>
+          <div class="funnel-stat-row">
+            <div class="funnel-stat-row__track">
+              <div class="funnel-shield__fill funnel-stat-row__fill"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -131,49 +130,48 @@ export function createAppDom(root: HTMLDivElement): AppDom {
     <div class="funnel-weapon-bar" aria-label="Weapon selection" hidden>
       <div class="funnel-weapon-bar__slots"></div>
     </div>
-    <div class="funnel-hud-panel funnel-ammo" aria-label="Weapon ammunition" hidden>
-      <div class="funnel-hud-panel__head funnel-ammo__head">
-        <span class="funnel-hud-panel__title funnel-ammo__title"></span>
-      </div>
+    <div class="funnel-hud-panel funnel-hud-panel--stat funnel-ammo" aria-label="Weapon ammunition" hidden>
       <div class="funnel-hud-panel__body">
-        <div class="funnel-stat-row">
-          <span class="funnel-stat-row__label funnel-stat-row__label--mag">MG</span>
-          <div class="funnel-stat-row__track">
-            <div class="funnel-ammo__mag"></div>
-          </div>
-        </div>
-        <div class="funnel-stat-row">
-          <span class="funnel-stat-row__label funnel-stat-row__label--reload">RL</span>
-          <div class="funnel-stat-row__track">
-            <div class="funnel-ammo__reload-fill funnel-stat-row__fill"></div>
+        <span class="funnel-hud-panel__caption funnel-ammo__caption funnel-ammo__weapon-name"></span>
+        <div class="funnel-hud-panel__meter">
+          <span class="funnel-ammo__count" aria-label="Current ammunition">0</span>
+          <div class="funnel-hud-panel__bars">
+            <div class="funnel-stat-row">
+              <div class="funnel-stat-row__track">
+                <div class="funnel-ammo__mag"></div>
+              </div>
+            </div>
+            <div class="funnel-stat-row">
+              <div class="funnel-stat-row__track">
+                <div class="funnel-ammo__reload-fill funnel-stat-row__fill"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
     <div class="funnel-personal-stats" aria-label="Player match stats">
-      <div class="funnel-personal-stats__head">
-        <span class="funnel-personal-stats__title">Stats</span>
-      </div>
-      <div class="funnel-personal-stats__metrics">
-        <div class="funnel-personal-stats__metric funnel-personal-stats__metric--kills">
-          <span class="funnel-personal-stats__value funnel-personal-stats__kills">0</span>
-          <span class="funnel-personal-stats__label">Kills</span>
-        </div>
-        <div class="funnel-personal-stats__metric funnel-personal-stats__metric--deaths">
-          <span class="funnel-personal-stats__value funnel-personal-stats__deaths">0</span>
-          <span class="funnel-personal-stats__label">Death</span>
-        </div>
-        <div class="funnel-personal-stats__metric funnel-personal-stats__metric--ratio">
-          <span class="funnel-personal-stats__value funnel-personal-stats__kd">-</span>
-          <span class="funnel-personal-stats__label">Ratio</span>
+      <div class="funnel-personal-stats__body">
+        <div class="funnel-hud-panel__caption funnel-personal-stats__caption">Stats</div>
+        <div class="funnel-personal-stats__metrics">
+          <div class="funnel-personal-stats__metric funnel-personal-stats__metric--kills">
+            <span class="funnel-personal-stats__value funnel-personal-stats__kills">0</span>
+            <span class="funnel-personal-stats__label">Kills</span>
+          </div>
+          <div class="funnel-personal-stats__metric funnel-personal-stats__metric--deaths">
+            <span class="funnel-personal-stats__value funnel-personal-stats__deaths">0</span>
+            <span class="funnel-personal-stats__label">Death</span>
+          </div>
+          <div class="funnel-personal-stats__metric funnel-personal-stats__metric--ratio">
+            <span class="funnel-personal-stats__value funnel-personal-stats__kd">-</span>
+            <span class="funnel-personal-stats__label">Ratio</span>
+          </div>
         </div>
       </div>
     </div>
     <div class="funnel-fps-hud" aria-label="Frames per second">
-      <div class="funnel-fps-hud__head">
-        <span class="funnel-fps-hud__title">FPS</span>
-      </div>
       <div class="funnel-fps-hud__body">
+        <div class="funnel-hud-panel__caption funnel-fps-hud__caption">FPS</div>
         <div class="funnel-fps-hud__metric">
           <span class="funnel-fps-hud__value">0</span>
         </div>
@@ -240,12 +238,14 @@ export function createAppDom(root: HTMLDivElement): AppDom {
   }
 
   const ammoHud = hud.querySelector<HTMLDivElement>('.funnel-ammo');
-  const ammoTitle = hud.querySelector<HTMLSpanElement>('.funnel-ammo__title');
+  const ammoWeaponName = hud.querySelector<HTMLSpanElement>('.funnel-ammo__weapon-name');
+  const ammoCount = hud.querySelector<HTMLSpanElement>('.funnel-ammo__count');
   const ammoMagazine = hud.querySelector<HTMLDivElement>('.funnel-ammo__mag');
   const ammoReloadFill = hud.querySelector<HTMLDivElement>('.funnel-ammo__reload-fill');
   if (
     ammoHud === null ||
-    ammoTitle === null ||
+    ammoWeaponName === null ||
+    ammoCount === null ||
     ammoMagazine === null ||
     ammoReloadFill === null
   ) {
@@ -301,7 +301,8 @@ export function createAppDom(root: HTMLDivElement): AppDom {
     teamEnemyPoints,
     weaponBar,
     ammoHud,
-    ammoTitle,
+    ammoWeaponName,
+    ammoCount,
     ammoMagazine,
     ammoReloadFill,
     healthHud,
