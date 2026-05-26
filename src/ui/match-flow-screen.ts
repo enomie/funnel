@@ -3,6 +3,7 @@
 
 
 import type { HumanoidRigId } from '../player/humanoid-rig';
+import { dismissLaunchVeil } from '../home/launch-veil';
 import { assetUrl } from '../utils/asset-url';
 import { createFunnelGameBrandElement } from './funnel-game-brand';
 
@@ -129,6 +130,7 @@ export class MatchFlowScreen {
     this.#preMatchHost.hidden = false;
     this.setPreMatchPhase('boot-loading');
     this.setLoadingProgress(0, 'Preparing…');
+    dismissLaunchVeil();
   }
 
   showCharacterSelectOverlay(): void {

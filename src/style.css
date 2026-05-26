@@ -44,6 +44,7 @@
   --funnel-overlay-blur: 14px;
   --funnel-overlay-scrim-center: rgba(var(--funnel-team-ally-rgb), 0.1);
   --funnel-overlay-scrim-edge: rgba(var(--funnel-surface-rgb), 0.52);
+  --funnel-loader-logo-max: 860px;
   --funnel-btn-radius: 0;
   --funnel-btn-min-height: 40px;
   --funnel-btn-padding-x: 20px;
@@ -1180,7 +1181,8 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
 }
 
 .funnel-prematch-screen__brand--loader {
-  width: 100%;
+  width: min(var(--funnel-loader-logo-max), 90vw);
+  max-width: 100%;
 }
 
 .funnel-prematch-screen__logo {
@@ -1189,6 +1191,7 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
   max-width: 100%;
   height: auto;
   aspect-ratio: 904.435 / 417.522;
+  object-fit: contain;
   filter: drop-shadow(0 0 56px var(--funnel-team-ally-glow));
 }
 
@@ -1346,7 +1349,7 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
 
 .funnel-prematch-screen__panel--loader {
   gap: clamp(32px, 6vh, 56px);
-  width: min(560px, 92vw);
+  width: min(920px, 94vw);
 }
 
 .funnel-prematch-screen__welcome {
@@ -1363,6 +1366,8 @@ html.funnel-platform-target .funnel-prematch-screen__platform-note {
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  width: min(var(--funnel-loader-logo-max), 90vw);
+  max-width: 100%;
 }
 
 .funnel-prematch-screen__loader-progress {

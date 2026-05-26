@@ -1,6 +1,7 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/home/start-match.ts
 
 import { AudioContextEngine } from '../game-audio/audio-mixer';
+import { showLaunchVeil } from './launch-veil';
 
 const HOME_CHROME_SELECTOR =
   '.home-nav, .home-intro, .home-sliders, #home-keys-root, #home-footer-root';
@@ -24,6 +25,7 @@ async function launchMatchFromHome(trigger: HTMLButtonElement): Promise<void> {
   launchInFlight = true;
   trigger.disabled = true;
 
+  showLaunchVeil();
   hideHomeChrome();
 
   const [{ injectGameTeamCssVars }, { initAppFullscreen }, { initRuntimeProfile }] =
@@ -47,7 +49,9 @@ function hideHomeChrome(): void {
   document.body.classList.remove('home');
 
   for (const node of document.querySelectorAll(HOME_CHROME_SELECTOR)) {
-    (node as HTMLElement).hidden = true;
+    const el = node as HTMLElement;
+    el.hidden = true;
+    el.style.display = 'none';
   }
 }
 

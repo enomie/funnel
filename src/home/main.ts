@@ -37,27 +37,17 @@ if (startButtons.length === 0) {
 
 bindHomeStartMatch(startButtons);
 
-const paintHomeContent = (): void => {
-  if (sliderRoot) {
-    renderCarousels(sliderRoot, weaponInfos, quicktips, pickups);
-  }
-  if (keysRoot) {
-    renderKeys(keysRoot, keys);
-  }
-  if (footerRoot) {
-    renderFooter(footerRoot, info);
-  }
-};
-
-requestAnimationFrame(paintHomeContent);
-
 interface VisitorResponse {
   status: string;
   visits: number;
 }
 
-const visitorCountEl = document.getElementById('visitor-count');
-if (visitorCountEl) {
+function fetchVisitorCount(): void {
+  const visitorCountEl = document.getElementById('visitor-count');
+  if (!visitorCountEl) {
+    return;
+  }
+
   fetch('counter.php')
     .then((res) => {
       if (!res.ok) throw new Error('Not OK');
@@ -71,3 +61,18 @@ if (visitorCountEl) {
       visitorCountEl.textContent = 'Active';
     });
 }
+
+const paintHomeContent = (): void => {
+  if (sliderRoot) {
+    renderCarousels(sliderRoot, weaponInfos, quicktips, pickups);
+  }
+  if (keysRoot) {
+    renderKeys(keysRoot, keys);
+  }
+  if (footerRoot) {
+    renderFooter(footerRoot, info);
+    fetchVisitorCount();
+  }
+};
+
+requestAnimationFrame(paintHomeContent);

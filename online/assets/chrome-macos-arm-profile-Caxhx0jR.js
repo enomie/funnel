@@ -1,0 +1,1 @@
+import{a as e,i as t,n,o as r,r as i,s as a,t as o}from"./chrome-macos-arm-profile-CkbOPGmM.js";export{o as PLATFORM_TARGET_NOTE,n as getRendererPixelRatio,i as getRuntimeProfile,t as initRuntimeProfile,e as isFirefox,r as renderPlatformTargetNoteHtml,a as shouldAdvanceGameFrame};

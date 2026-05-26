@@ -1,1 +1,0 @@
-import{n as e,t}from"./team-css-vars-CBXCUHiz.js";export{t as injectGameTeamCssVars,e as injectTeamCssVars};
