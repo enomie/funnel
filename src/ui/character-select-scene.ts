@@ -27,6 +27,7 @@ import {
   syncHumanoidEyes
 } from '../player/humanoid-eye-visual';
 import type { HumanoidRigId } from '../player/humanoid-rig';
+import { seedShooterPackModelTemplatesFromPreviews } from '../player/shooter-pack-loader';
 import { lowestSkinnedMeshYInCapsuleSpace } from '../player/player-mesh-foot-anchor';
 import { applyRelativeTeamColors, isHumanoidEyeMeshName, isPooledTeamMaterial } from '../player/team-visual-colors';
 import { enableHumanoidCastShadows } from '../player/humanoid-visual-mount';
@@ -464,6 +465,7 @@ export async function runCharacterSelect(
   try {
     return await session.run();
   } finally {
+    seedShooterPackModelTemplatesFromPreviews(resolvedPreviews);
     session.dispose();
     activeSession = null;
   }

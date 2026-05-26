@@ -93,9 +93,9 @@ export function measureStanceMeshAnchors(
 
   capsuleAnchor.remove(model);
 
-  if (import.meta.env.DEV) {
-    console.info('[Stance] mesh foot anchors (m)', { standFootY, crouchFootY });
-  }
+  // if (import.meta.env.DEV) {
+  //   console.info('[Stance] mesh foot anchors (m)', { standFootY, crouchFootY });
+  // }
 
   return { standFootY, crouchFootY };
 }

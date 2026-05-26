@@ -1,0 +1,12 @@
+import{t as e}from"./asset-url-aPudv8WI.js";var t=`Optimized for macOS + M1 and latest Chrome browser`,n=e(`icons/platform-apple.svg`),r=e(`icons/platform-chrome.svg`);function i(){return`
+    <span class="funnel-prematch-screen__platform-note-part">Optimized for</span>
+    <span class="funnel-prematch-screen__platform-chip">
+      <img class="funnel-prematch-screen__platform-icon" src="${n}" width="12" height="12" alt="" aria-hidden="true">
+      <span>macOS M1+ </span>
+    </span>
+    <span class="funnel-prematch-screen__platform-note-part"> </span>
+    <span class="funnel-prematch-screen__platform-chip">
+      <img class="funnel-prematch-screen__platform-icon" src="${r}" width="12" height="12" alt="" aria-hidden="true">
+      <span>Chrome browser</span>
+    </span>
+  `.trim()}var a={pixelRatioCap:1,shadowMapSize:512,shadowsEnabled:!1,navRayBudgetPerFrame:3,routeSteerFanBudgetPerFrame:10,shadowSubjectsPerFrame:8,rendererAntialias:!1,rendererSamples:0,pointerLockUnadjustedMovement:!0,playersPerTeam:15,maxRenderHz:0,physicsMaxSubSteps:3,botBrainTickHz:2,rainWaveCountScale:.35,rainDropIntervalScale:2},o={isTarget:!0,...a},s={isTarget:!1,...a},c=null;function l(){return navigator.userAgentData}function u(){return/\bFirefox\//.test(navigator.userAgent)&&!/\bSeamonkey\//i.test(navigator.userAgent)}function d(){let e=l()?.brands;if(e!==void 0)return e.some(e=>e.brand===`Google Chrome`);let t=navigator.userAgent;return/\bChrome\//.test(t)&&!/\b(Edg|OPR|Brave)\//.test(t)}function f(){return l()?.platform===`macOS`?!0:/Mac/.test(navigator.platform)||/Mac OS X/.test(navigator.userAgent)}function p(){try{let e=document.createElement(`canvas`),t=e.getContext(`webgl`,{powerPreference:`high-performance`})??e.getContext(`experimental-webgl`);if(!(t instanceof WebGLRenderingContext))return!1;let n=t.getExtension(`WEBGL_debug_renderer_info`);if(n===null)return!1;let r=t.getParameter(n.UNMASKED_RENDERER_WEBGL);return typeof r==`string`&&/Apple M[1-9]\d*/i.test(r)}catch{return!1}}function m(){return d()&&f()&&p()?o:s}function h(e){return e.isTarget?`chrome-macos-arm`:u()?`firefox`:`generic`}function g(e){let t=document.documentElement;t.dataset.funnelPlatform=h(e),t.classList.toggle(`funnel-platform-target`,e.isTarget)}function _(){return c===null?(c=m(),g(c),c):c}function v(){return c??_()}function y(){let{pixelRatioCap:e}=v();return Math.min(window.devicePixelRatio,e)}function b(e,t){if(document.visibilityState===`hidden`)return!1;let{maxRenderHz:n}=v();return n<=0?!0:e-t>=1e3/n-.25}export{u as a,_ as i,y as n,i as o,v as r,b as s,t};

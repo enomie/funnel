@@ -16,7 +16,7 @@ import { PickupField } from '../arena/pickup-field';
 import { RedeemerPickup } from '../arena/redeemer-pickup';
 import { JumpPadField } from '../arena/jump-pad-field';
 import { createFunnelArena } from '../arena/funnel-arena';
-import { TeamSpawnMascots, preloadTeamSpawnMascotModels } from '../arena/team-spawn-mascots';
+import { TeamSpawnMascots, seedTeamSpawnMascotModels, seedTeamSpawnMascotModelsFromModelTemplates } from '../arena/team-spawn-mascots';
 import { BotRoster } from '../bots/bot-roster';
 import type { BotActor } from '../bots/bot-actor';
 import { beginNavRayBudgetFrame } from '../bots/bot-nav-ray-budget';
@@ -273,7 +273,10 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     visual.mountShooterPack(playerPack);
     shadowLod.register(visual.root, { alwaysFull: true });
     matchFlow.setLoadingProgress(72, 'Preparing mascots…');
-    await preloadTeamSpawnMascotModels();
+    seedTeamSpawnMascotModels({
+      [selectedRig]: playerPack,
+      [alternateRig]: alternatePack
+    });
     matchFlow.setLoadingProgress(75, 'Spawning bots…');
     botRoster.spawn({
       [selectedRig]: playerPack,
@@ -284,7 +287,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     visual.useFallbackMesh();
     shadowLod.register(visual.root, { alwaysFull: true });
     matchFlow.setLoadingProgress(72, 'Preparing mascots…');
-    await preloadTeamSpawnMascotModels();
+    seedTeamSpawnMascotModelsFromModelTemplates();
     matchFlow.setLoadingProgress(75, 'Spawning bots…');
     botRoster.spawn();
     teamSpawnMascots.spawn();

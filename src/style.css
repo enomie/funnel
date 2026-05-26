@@ -142,12 +142,16 @@ html,
 body,
 #app {
   width: 100%;
-  height: 100%;
-  height: 100dvh;
   margin: 0;
 }
 
-body {
+body:not(.home),
+body:not(.home) #app {
+  height: 100%;
+  height: 100dvh;
+}
+
+body:not(.home) {
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;

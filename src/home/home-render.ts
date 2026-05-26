@@ -124,15 +124,27 @@ function buildInfiniteTrack(cards: HTMLElement[]): HTMLElement {
   return track;
 }
 
-function cardsOverflowViewport(viewport: HTMLElement, cards: HTMLElement[]): boolean {
-  const probe = el('div', 'home-slider__static home-slider__static--probe');
-  for (const card of cards) {
-    probe.append(card.cloneNode(true));
+const HOME_CARD_GAP_PX = 16;
+
+function readHomeCardWidthPx(): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--home-card-width').trim();
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
+}
+
+function cardsOverflowViewport(viewport: HTMLElement, cardCount: number): boolean {
+  if (cardCount <= 0) {
+    return false;
   }
-  viewport.append(probe);
-  const overflow = probe.scrollWidth > viewport.clientWidth + 1;
-  probe.remove();
-  return overflow;
+
+  const cardWidth = readHomeCardWidthPx();
+  const rowWidth = cardCount * cardWidth + (cardCount - 1) * HOME_CARD_GAP_PX;
+  const viewportWidth = viewport.clientWidth;
+  if (viewportWidth <= 0) {
+    return cardCount > 1;
+  }
+
+  return rowWidth > viewportWidth + 1;
 }
 
 function mountCardSection(
@@ -149,7 +161,7 @@ function mountCardSection(
   section.append(viewport);
   container.append(section);
 
-  const useSlide = mode === 'slide' || cardsOverflowViewport(viewport, cards);
+  const useSlide = mode === 'slide' || cardsOverflowViewport(viewport, cards.length);
 
   if (useSlide) {
     const clip = el('div', 'home-slider__clip');

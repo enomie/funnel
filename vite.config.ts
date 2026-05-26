@@ -2,6 +2,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import { stripRapierDevSourceMap } from './vite-rapier-firefox-dev';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
@@ -12,6 +13,7 @@ const threeWebgpuEntry = path.join(root, 'node_modules/three/build/three.webgpu.
 const rapierSimdEntry = path.join(root, 'node_modules/@dimforge/rapier3d-simd-compat/rapier.mjs');
 
 export default defineConfig({
+  plugins: [stripRapierDevSourceMap()],
   /**
    * Relative asset URLs so `dist` can be deployed under any subfolder
    * (for example on shared hosting with PHP/Apache only).

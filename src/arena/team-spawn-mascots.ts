@@ -10,8 +10,10 @@ import {
 import { factionHumanoidRig, type HumanoidRigId } from '../player/humanoid-rig';
 import { lowestSkinnedMeshYInCapsuleSpace } from '../player/player-mesh-foot-anchor';
 import { cloneShooterPackModel } from '../player/shooter-pack-clone';
-import { loadColladaFromUrl } from '../player/collada-asset-loader';
-import { shooterPackModelUrlForRig } from '../player/shooter-pack-paths';
+import {
+  getShooterPackModelTemplate,
+  type ShooterPackCharacter
+} from '../player/shooter-pack-loader';
 import type { PlayerTeam } from '../player/player-team';
 import {
   attachHumanoidEyes,
@@ -76,18 +78,36 @@ function mountMascotFallback(root: Group): void {
   root.add(createHumanoidFallbackMesh(MASCOT_FALLBACK_HALF_HEIGHT_M));
 }
 
-export async function preloadTeamSpawnMascotModels(): Promise<void> {
-  await Promise.all(
-    MASCOT_RIG_IDS.map(async (rigId) => {
-      if (bindPoseTemplates.has(rigId)) {
-        return;
-      }
+export function seedTeamSpawnMascotModels(
+  packs: Partial<Record<HumanoidRigId, ShooterPackCharacter>>
+): void {
+  for (const rigId of MASCOT_RIG_IDS) {
+    if (bindPoseTemplates.has(rigId)) {
+      continue;
+    }
 
-      const parsed = await loadColladaFromUrl(shooterPackModelUrlForRig(rigId));
-      parsed.scene.name = `${rigId}-mascot-bind`;
-      bindPoseTemplates.set(rigId, parsed.scene);
-    })
-  );
+    const pack = packs[rigId];
+    if (pack === undefined) {
+      continue;
+    }
+
+    bindPoseTemplates.set(rigId, cloneShooterPackModel(pack.model));
+  }
+}
+
+export function seedTeamSpawnMascotModelsFromModelTemplates(): void {
+  for (const rigId of MASCOT_RIG_IDS) {
+    if (bindPoseTemplates.has(rigId)) {
+      continue;
+    }
+
+    const template = getShooterPackModelTemplate(rigId);
+    if (template === undefined) {
+      continue;
+    }
+
+    bindPoseTemplates.set(rigId, cloneShooterPackModel(template));
+  }
 }
 
 export class TeamSpawnMascots {

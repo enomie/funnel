@@ -1,0 +1,1 @@
+function e(e){return`${`./`.endsWith(`/`)?`./`:`.//`}${e.replace(/^\/+/,``)}`}export{e as t};

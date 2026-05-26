@@ -37,15 +37,19 @@ if (startButtons.length === 0) {
 
 bindHomeStartMatch(startButtons);
 
-if (sliderRoot) {
-  renderCarousels(sliderRoot, weaponInfos, quicktips, pickups);
-}
-if (keysRoot) {
-  renderKeys(keysRoot, keys);
-}
-if (footerRoot) {
-  renderFooter(footerRoot, info);
-}
+const paintHomeContent = (): void => {
+  if (sliderRoot) {
+    renderCarousels(sliderRoot, weaponInfos, quicktips, pickups);
+  }
+  if (keysRoot) {
+    renderKeys(keysRoot, keys);
+  }
+  if (footerRoot) {
+    renderFooter(footerRoot, info);
+  }
+};
+
+requestAnimationFrame(paintHomeContent);
 
 interface VisitorResponse {
   status: string;
