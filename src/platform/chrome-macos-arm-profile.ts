@@ -60,8 +60,8 @@ interface NavigatorUaData {
 }
 
 
-const TARGET_PROFILE: RuntimePlatformProfile = {
-  isTarget: true,
+/** Shared perf cuts for Chrome/M1 target and all non-target browsers (Firefox, Edge, …). */
+const PERF_CUTS = {
   pixelRatioCap: 1,
   shadowMapSize: 512,
   shadowsEnabled: false,
@@ -77,31 +77,26 @@ const TARGET_PROFILE: RuntimePlatformProfile = {
   botBrainTickHz: 2,
   rainWaveCountScale: 0.35,
   rainDropIntervalScale: 2
+} satisfies Omit<RuntimePlatformProfile, 'isTarget'>;
+
+const TARGET_PROFILE: RuntimePlatformProfile = {
+  isTarget: true,
+  ...PERF_CUTS
 };
 
-const FALLBACK_PROFILE: RuntimePlatformProfile = {
+const NON_TARGET_PROFILE: RuntimePlatformProfile = {
   isTarget: false,
-  pixelRatioCap: 2,
-  shadowMapSize: 512,
-  shadowsEnabled: true,
-  navRayBudgetPerFrame: 4,
-  routeSteerFanBudgetPerFrame: 16,
-  shadowSubjectsPerFrame: 12,
-  rendererAntialias: true,
-  rendererSamples: 4,
-  pointerLockUnadjustedMovement: true,
-  playersPerTeam: 15,
-  maxRenderHz: 0,
-  physicsMaxSubSteps: 6,
-  botBrainTickHz: 6,
-  rainWaveCountScale: 1,
-  rainDropIntervalScale: 1
+  ...PERF_CUTS
 };
 
 let runtimeProfile: RuntimePlatformProfile | null = null;
 
 function readNavigatorUaData(): NavigatorUaData | undefined {
   return (navigator as Navigator & { userAgentData?: NavigatorUaData }).userAgentData;
+}
+
+export function isFirefox(): boolean {
+  return /\bFirefox\//.test(navigator.userAgent) && !/\bSeamonkey\//i.test(navigator.userAgent);
 }
 
 function isGoogleChrome(): boolean {
@@ -151,12 +146,24 @@ function detectRuntimeProfile(): RuntimePlatformProfile {
     return TARGET_PROFILE;
   }
 
-  return FALLBACK_PROFILE;
+  return NON_TARGET_PROFILE;
+}
+
+function resolvePlatformDatasetId(profile: RuntimePlatformProfile): string {
+  if (profile.isTarget) {
+    return 'chrome-macos-arm';
+  }
+
+  if (isFirefox()) {
+    return 'firefox';
+  }
+
+  return 'generic';
 }
 
 function applyDocumentProfile(profile: RuntimePlatformProfile): void {
   const root = document.documentElement;
-  root.dataset.funnelPlatform = profile.isTarget ? 'chrome-macos-arm' : 'generic';
+  root.dataset.funnelPlatform = resolvePlatformDatasetId(profile);
   root.classList.toggle('funnel-platform-target', profile.isTarget);
 }
 

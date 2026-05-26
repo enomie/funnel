@@ -21,6 +21,7 @@ import {
 } from './audio-config';
 import { AudioContextEngine } from './audio-mixer';
 import { isAudioAlive } from './audio-guard';
+import { syncListenerPositionAndOrientation } from './audio-spatial-sync';
 
 const WORLD_UP_Y = 1;
 const LISTENER_EPSILON_SQ = 0.000001;
@@ -89,16 +90,12 @@ export function syncAudioListenerFromCamera(vectors: CameraVectors): void {
   _position.copy(origin);
   _forward.copy(forward);
 
-  const listener = AudioContextEngine.get().context.listener;
-  listener.positionX.value = origin.x;
-  listener.positionY.value = origin.y;
-  listener.positionZ.value = origin.z;
-  listener.forwardX.value = forward.x;
-  listener.forwardY.value = forward.y;
-  listener.forwardZ.value = forward.z;
-  listener.upX.value = 0;
-  listener.upY.value = WORLD_UP_Y;
-  listener.upZ.value = 0;
+  syncListenerPositionAndOrientation(
+    AudioContextEngine.get().context.listener,
+    origin,
+    forward,
+    { x: 0, y: WORLD_UP_Y, z: 0 }
+  );
 }
 
 export function distanceSqFromListener(source: Vector3): number {

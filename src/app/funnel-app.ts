@@ -4,7 +4,6 @@ import { PerspectiveCamera, Vector3, type Scene, type WebGPURenderer } from 'thr
 import {
   createWeaponAudio,
   bindGameAudioUserGestureResume,
-  resumeGameAudio,
   syncAudioListenerFromCamera,
   warmGameAudio
 } from '../game-audio/audio-manager';
@@ -152,7 +151,6 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
 
   matchFlow.beginFromHomeNavigation();
   matchFlow.beginBootLoading();
-  resumeGameAudio();
 
   matchFlow.setLoadingProgress(5, 'Starting WebGPU…');
   const renderer = await createRenderer(dom.canvas);

@@ -5,10 +5,10 @@ import { Euler, Quaternion } from 'three/webgpu';
 import { createDynamicEnvironmentProp } from './environment-dynamic-body';
 import type { DynamicEnvironmentInstances, DynamicSyncedBody } from './environment-dynamic-instances';
 import { randomCountdownRainSpawnCenter } from './environment-rain-bounds';
+import { getRuntimeProfile } from '../platform/chrome-macos-arm-profile';
 import { resolveRainWaves, type RainWaveSpec } from './environment-rain-waves';
 
-
-const DROP_INTERVAL_S = 0.05;
+const BASE_DROP_INTERVAL_S = 0.05;
 const SETTLE_SPEED_EPS = 0.05;
 const SETTLE_FRAMES_REQUIRED = 15;
 
@@ -51,7 +51,8 @@ export class EnvironmentRainSpawner {
   #allSpawned = false;
   #waveIndex = 0;
   #pieceIndex = 0;
-  #spawnElapsedS = DROP_INTERVAL_S;
+  #dropIntervalS = BASE_DROP_INTERVAL_S;
+  #spawnElapsedS = BASE_DROP_INTERVAL_S;
   #finalSettleFrames = 0;
 
   constructor(deps: EnvironmentRainSpawnerDeps) {
@@ -59,6 +60,8 @@ export class EnvironmentRainSpawner {
   }
 
   start(): void {
+    this.#dropIntervalS = BASE_DROP_INTERVAL_S * getRuntimeProfile().rainDropIntervalScale;
+    this.#spawnElapsedS = this.#dropIntervalS;
     this.#waves = resolveRainWaves();
     this.#started = true;
     if (this.#waves.length === 0) {
@@ -78,8 +81,8 @@ export class EnvironmentRainSpawner {
 
     if (!this.#allSpawned) {
       this.#spawnElapsedS += deltaSeconds;
-      if (this.#spawnElapsedS >= DROP_INTERVAL_S) {
-        this.#spawnElapsedS -= DROP_INTERVAL_S;
+      if (this.#spawnElapsedS >= this.#dropIntervalS) {
+        this.#spawnElapsedS -= this.#dropIntervalS;
         this.#spawnNextPiece();
       }
       return;

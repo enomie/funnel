@@ -6,9 +6,11 @@ import {
   WebGPURenderer
 } from 'three/webgpu';
 import { getRendererPixelRatio, getRuntimeProfile } from '../platform/chrome-macos-arm-profile';
+import { installWebGpuAdapterFeatureLevelShim } from './webgpu-adapter-shim';
 
 export async function createRenderer(canvas: HTMLCanvasElement): Promise<WebGPURenderer> {
   const profile = getRuntimeProfile();
+  installWebGpuAdapterFeatureLevelShim();
 
   const renderer = new WebGPURenderer({
     canvas,

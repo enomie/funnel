@@ -15,6 +15,8 @@ export function resumeGameAudio(): void {
   AudioContextEngine.get().resume();
 }
 
+export { waitForGameAudioUnlock } from './audio-unlock';
+
 export async function warmGameAudio(): Promise<void> {
   AudioContextEngine.get().resume();
   warmFlybyVoicePool();

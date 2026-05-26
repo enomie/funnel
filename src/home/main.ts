@@ -1,6 +1,5 @@
 // Path: /Users/johann/MyBrew/funnel-real/src/home/main.ts
 
-import { markFunnelBootIntent } from './boot-gate';
 import {
   renderCarousels,
   renderFooter,
@@ -8,6 +7,7 @@ import {
   renderKeys,
   type HomeInformation
 } from './home-render';
+import { bindHomeStartMatch } from './start-match';
 import './home.css';
 
 import weaponInfos from '../texts/weapon-infos.json';
@@ -35,12 +35,7 @@ if (startButtons.length === 0) {
   throw new Error('FUNNEL home start button was not found.');
 }
 
-for (const startButton of startButtons) {
-  startButton.addEventListener('click', () => {
-    markFunnelBootIntent();
-    window.location.assign('./game.html');
-  });
-}
+bindHomeStartMatch(startButtons);
 
 if (sliderRoot) {
   renderCarousels(sliderRoot, weaponInfos, quicktips, pickups);
