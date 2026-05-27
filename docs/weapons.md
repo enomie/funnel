@@ -154,8 +154,8 @@ LMB blockiert während Hold (`#bioCharge.isHolding` → `tryFire` primary/second
 
 | Modus | Input | Verhalten |
 |-------|-------|-----------|
-| **LMB** | semi | Langsame Mini-Nuke geradeaus (speed 22, großer Impact-Radius 0.58 m) |
-| **RMB** | semi | **Guided** Seed — Kamera folgt Projektil, Maus lenkt, Spieler steht still |
+| **LMB** | semi | Langsame Mini-Nuke geradeaus (speed 22) — expandierende Kill-Kugel **50 m** über **3 s** (`expandingLethal`; VFX = Kill-Radius, weglaufbar) |
+| **RMB** | semi | **Guided** Seed (speed 28) — gleicher Detonation-Impact wie LMB |
 
 Während Guided: kein Feuern, kein Movement (`setMovementLocked`), Kamera-Override hinter Rakete (`redeemer-guided.ts`, Tag `redeemer-guided`). Max. Flugzeit 14 s → Detonation. Waffenwechsel beendet Guided-Tracking (Projektil fliegt weiter); `suspendCombat` räumt Hold/Burst auf.
 

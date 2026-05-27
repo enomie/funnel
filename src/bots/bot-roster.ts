@@ -240,15 +240,26 @@ export class BotRoster {
     }
   }
 
+  afterPhysics(): void {
+    for (const bot of this.#bots) {
+      if (!bot.controller.health.isDead) {
+        bot.controller.afterPhysics();
+      }
+    }
+  }
+
+  primeMatchLive(): void {
+    for (const bot of this.#bots) {
+      bot.primeBrain();
+    }
+  }
+
   
   tickJumpPads(jumpPadField: JumpPadField, nowMs: number): void {
     const bots = this.#bots;
     const scratch = this.#jumpPadBotScratch;
     for (let index = 0; index < bots.length; index += 1) {
       const controller = bots[index].controller;
-      if (!controller.health.isDead) {
-        controller.afterPhysics();
-      }
       scratch[index] = controller;
     }
     scratch.length = bots.length;

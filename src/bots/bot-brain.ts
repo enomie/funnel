@@ -88,6 +88,11 @@ export class BotBrain {
     this.#modeLockRemaining = 0;
   }
 
+  /** Run `#think` on the next `update()` — used when the match goes live. */
+  primeAccumulator(): void {
+    this.#accumulator = BOT_BRAIN_STEP_S;
+  }
+
   update(deltaSeconds: number, sampleInput: () => BotBrainInput): BotBrainFrame {
     let stepped = false;
     this.#accumulator += deltaSeconds;

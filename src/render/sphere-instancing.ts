@@ -74,6 +74,8 @@ export interface InstancedImpactBurst {
   
   readonly opacityPeak?: number;
   readonly hotBurst?: boolean;
+  /** Match gameplay expanding-lethal radius: scale = endScale × progress (linear). */
+  readonly linearLethalRadius?: boolean;
 }
 
 function impactBurstMaterialForColor(color: number, hot = false): MeshBasicMaterial {
@@ -184,6 +186,7 @@ export class SphereInstancingService {
       opacityFade?: number;
       opacityFadePower?: number;
       hotBurst?: boolean;
+      linearLethalRadius?: boolean;
     } = {}
   ): InstancedImpactBurst | null {
     const layerKey = profile.hotBurst ? `impact:hot:${String(color)}` : `impact:${String(color)}`;
@@ -208,7 +211,8 @@ export class SphereInstancingService {
       opacityPeak: profile.opacityPeak,
       opacityFade: profile.opacityFade,
       opacityFadePower: profile.opacityFadePower,
-      hotBurst: profile.hotBurst
+      hotBurst: profile.hotBurst,
+      linearLethalRadius: profile.linearLethalRadius
     };
     this.#syncImpactBurst(burst, spawnedAtMs);
     return burst;
@@ -233,6 +237,27 @@ export class SphereInstancingService {
   #syncImpactBurst(burst: InstancedImpactBurst, nowMs: number): boolean {
     const elapsed = nowMs - burst.spawnedAtMs;
     const progress = Math.min(1, elapsed / burst.durationMs);
+
+    if (burst.linearLethalRadius === true) {
+      const scale = burst.endScale * progress;
+      const opacityPeak = burst.opacityPeak ?? 0.88;
+      let opacity = opacityPeak;
+      if (progress > 0.92) {
+        opacity = opacityPeak * ((1 - progress) / 0.08);
+      }
+      this.#setBurstVisual(
+        this.#impactLayerKey(burst),
+        burst.slot,
+        burst.x,
+        burst.y,
+        burst.z,
+        scale,
+        opacity,
+        true
+      );
+      return progress >= 1;
+    }
+
     const expandPeak = burst.expandPeakFraction ?? 1;
     const contractEnd = burst.contractEndScaleFraction;
     let scale: number;
@@ -273,11 +298,12 @@ export class SphereInstancingService {
     y: number,
     z: number,
     scale: number,
-    opacity: number
+    opacity: number,
+    opacityDoesNotShrinkRadius = false
   ): void {
     const layer = this.#layers.get(key);
     const clampedOpacity = Math.max(0, opacity);
-    const fadeScale = scale * clampedOpacity;
+    const fadeScale = opacityDoesNotShrinkRadius ? scale : scale * clampedOpacity;
     this.#setMatrix(key, slot, x, y, z, fadeScale);
 
     if (layer === undefined || !layer.colored) {

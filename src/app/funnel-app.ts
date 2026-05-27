@@ -724,6 +724,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
     });
 
     player.afterPhysics();
+    botRoster.afterPhysics();
     if (!player.health.isDead) {
       jumpPadField.tickPlayer(player, snapshot, frameNowMs);
     }
@@ -884,6 +885,7 @@ export async function startFunnelApp(root: HTMLDivElement): Promise<void> {
   enterArenaDisplayMode(dom.canvas);
   dom.hud.style.visibility = 'visible';
   matchLive = true;
+  botRoster.primeMatchLive();
   if (rainSpawner === undefined) {
     pickupField.begin();
   }

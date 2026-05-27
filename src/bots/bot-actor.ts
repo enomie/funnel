@@ -630,6 +630,10 @@ export class BotActor {
     this.visual.reviveLocomotion();
   }
 
+  primeBrain(): void {
+    this.#brain.primeAccumulator();
+  }
+
   #autoReleaseBotSecondary(nowMs: number, muzzlePosition: Vector3, direction: Vector3): void {
     if (this.weapon.isRocketMarking()) {
       const marked = this.weapon.rocketMarkedCount;

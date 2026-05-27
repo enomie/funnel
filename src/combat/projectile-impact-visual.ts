@@ -34,11 +34,7 @@ const ROCKET_IMPACT_EXPAND_PEAK_FRACTION = 0.16;
 const ROCKET_IMPACT_OPACITY_FADE = 0.58;
 const ROCKET_IMPACT_OPACITY_FADE_POWER = 2.4;
 
-const REDEEMER_IMPACT_EXPAND_PEAK_FRACTION = 0.78;
-const REDEEMER_IMPACT_CONTRACT_END_FRACTION = 0.08;
-const REDEEMER_IMPACT_OPACITY_PEAK = 0.9;
-const REDEEMER_IMPACT_OPACITY_FADE = 0.22;
-const REDEEMER_IMPACT_OPACITY_FADE_POWER = 3.1;
+const EXPANDING_LETHAL_IMPACT_OPACITY_PEAK = 0.88;
 
 const LETHAL_KILL_EXPAND_PEAK_FRACTION = 0.4;
 const LETHAL_KILL_CONTRACT_END_FRACTION = 0.14;
@@ -94,26 +90,12 @@ function resolveImpactBurstProfile(
   opacityFade?: number;
   opacityFadePower?: number;
   hotBurst?: boolean;
+  linearLethalRadius?: boolean;
 } {
   if (weapon.visualKind === 'redeemer' || impact.expandingLethal === true) {
-    if (weapon.visualKind === 'shock') {
-      return {
-        expandPeakFraction: LETHAL_KILL_EXPAND_PEAK_FRACTION,
-        expandEase: 'cubic',
-        contractEndScaleFraction: LETHAL_KILL_CONTRACT_END_FRACTION,
-        opacityFade: LETHAL_KILL_OPACITY_FADE,
-        opacityFadePower: LETHAL_KILL_OPACITY_FADE_POWER,
-        hotBurst: true
-      };
-    }
-
     return {
-      expandPeakFraction: REDEEMER_IMPACT_EXPAND_PEAK_FRACTION,
-      expandEase: 'cubic',
-      contractEndScaleFraction: REDEEMER_IMPACT_CONTRACT_END_FRACTION,
-      opacityPeak: REDEEMER_IMPACT_OPACITY_PEAK,
-      opacityFade: REDEEMER_IMPACT_OPACITY_FADE,
-      opacityFadePower: REDEEMER_IMPACT_OPACITY_FADE_POWER,
+      linearLethalRadius: true,
+      opacityPeak: EXPANDING_LETHAL_IMPACT_OPACITY_PEAK,
       hotBurst: true
     };
   }
