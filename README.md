@@ -3,12 +3,14 @@
 Inspired by Unreal Tournament UT99 Funnel Mod, Star Wars & Tron, this is a high-speed WebGPU arena FPS shooter in a Fun Tunnel.
 
 - **Spec:** [docs/introduction.md](docs/introduction.md)
+- **Demo:** https://unzine.net/unseen/code/funnel/
 - **Stack:** Three.js WebGPU + Rapier SIMD, Vite + TypeScript
 - **Dev:** `npm install` → `npm run dev` → [http://localhost:3011/](http://localhost:3011/)
 - **Origonal UT99 Funnel Video:** https://www.youtube.com/watch?v=KGDlYjuMloc
 - https://www.youtube.com/@simondev758
 - https://www.youtube.com/@robotbobby9
 - https://www.reddit.com/r/threejs/
+
 
 ```bash
 npm run lint
